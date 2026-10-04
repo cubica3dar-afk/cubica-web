@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cúbica 3D — Gestión y tienda</title>
+  <link rel="icon" href="assets/logo.jpg">
+  <link rel="stylesheet" href="styles.css">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="toast-container" aria-live="polite"></div>
+
+  <section id="welcome-view" class="welcome-screen">
+    <div class="welcome-card">
+      <img src="assets/logo.jpg" alt="Logo Cúbica" class="welcome-logo">
+      <p class="eyebrow">CÚBICA 3D</p>
+      <blockquote id="welcome-message">Hecho para vos, impreso para quedarse.</blockquote>
+      <p class="welcome-subtitle">Cada objeto puede ser simplemente una impresión... o convertirse en algo que tenga un lugar especial en tu vida.</p>
+      <button id="enter-store-btn" class="btn primary welcome-btn">Entrar a la tienda <span>→</span></button>
+    </div>
+  </section>
+
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand">
+        <img src="assets/logo.jpg" alt="Cúbica">
+        <div><strong>Cúbica</strong><small>Impresión 3D</small></div>
+      </div>
+      <nav id="main-nav" class="nav"></nav>
+      <div class="top-actions">
+        <button id="server-sync-badge" class="sync-badge hidden" type="button" title="Estado de almacenamiento">Datos: conectando…</button>
+        <span id="user-badge" class="user-badge"></span>
+        <button id="cart-icon-btn" class="cart-icon-btn" type="button" aria-label="Carrito de compras" title="Carrito de compras"><span class="cart-icon" aria-hidden="true">🛒</span><span id="cart-badge" class="cart-badge hidden">0</span></button>
+        <button id="logout-btn" class="btn ghost hidden">Salir</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="section-login" class="page-section hidden">
+        <div class="login-page-layout">
+          <div class="login-intro">
+            <p class="eyebrow">TU CUENTA</p>
+            <h1>Ingresá a Cúbica</h1>
+            <p>Podés recorrer la tienda y armar tu carrito sin iniciar sesión. El acceso es únicamente para consultar tus pedidos o administrar el emprendimiento.</p>
+            <div class="login-perks">
+              <div><strong>Cliente</strong><span>Consultá tus pedidos realizados.</span></div>
+              <div><strong>Administrador</strong><span>Gestioná stock, ventas, insumos y presupuestos.</span></div>
+            </div>
+          </div>
+          <div class="auth-card login-card">
+            <img src="assets/logo.jpg" alt="Logo Cúbica" class="auth-logo">
+            <p class="eyebrow">ACCESO</p>
+            <h2>Iniciar sesión</h2>
+            <p class="muted">No necesitás una cuenta para comprar.</p>
+            <form id="login-form">
+              <label>Usuario
+                <input id="login-user" autocomplete="username" required placeholder="Usuario">
+              </label>
+              <label>Contraseña
+                <input id="login-password" type="password" autocomplete="current-password" required placeholder="Contraseña">
+              </label>
+              <button class="btn primary full" type="submit">Iniciar sesión</button>
+            </form>
+            <div class="demo-box">
+              <strong>Accesos de prueba</strong>
+              <span>Admin: <code>admin</code> / <code>cubica123</code></span>
+              <span>Cliente: <code>cliente</code> / <code>cliente123</code></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-store" class="page-section">
+        <div class="hero">
+          <div>
+            <p class="eyebrow">CÚBICA 3D</p>
+            <h1>Objetos hechos para vos.</h1>
+            <p>Explorá los productos disponibles, elegí cantidades y armá tu pedido.</p>
+          </div>
+          <a class="instagram" href="https://instagram.com/cubica3d.ar" target="_blank" rel="noopener">@cubica3d.ar ↗</a>
+        </div>
+        <div class="section-head">
+          <div>
+            <h2>Catálogo</h2>
+            <p class="muted">Los precios se toman del catálogo configurado por Cúbica. Hacé click en un producto para verlo en detalle.</p>
+          </div>
+          <div class="filters">
+            <input id="product-search" placeholder="Buscar producto...">
+            <select id="product-category"><option value="all">Todas las categorías</option></select>
+          </div>
+        </div>
+        <div id="product-grid" class="product-grid"></div>
+      </section>
+
+      <section id="section-cart" class="page-section hidden">
+        <div class="section-head">
+          <div><p class="eyebrow">PEDIDO</p><h2>Carrito</h2></div>
+        </div>
+        <div class="cart-layout">
+          <div id="cart-items" class="card"></div>
+          <aside class="summary-card">
+            <h3>Resumen</h3>
+            <div class="summary-row"><span>Productos</span><strong id="cart-count">0</strong></div>
+            <div class="summary-row total"><span>Total</span><strong id="cart-total">$0</strong></div>
+            <button id="checkout-btn" class="btn primary full">Finalizar pedido</button>
+          </aside>
+        </div>
+      </section>
+
+      <section id="section-orders" class="page-section hidden">
+        <div class="section-head">
+          <div><p class="eyebrow">VENTAS</p><h2>Ventas / Pedidos</h2><p class="muted">Historial agrupable por día, mes y año.</p></div>
+          <div class="period-tabs">
+            <button class="tab active" data-period="day">Día</button>
+            <button class="tab" data-period="month">Mes</button>
+            <button class="tab" data-period="year">Año</button>
+          </div>
+        </div>
+        <div id="sales-kpis" class="kpi-grid"></div>
+        <div id="payment-breakdown" class="payment-breakdown"></div>
+        <div id="orders-list"></div>
+      </section>
+
+      <section id="section-analytics" class="page-section hidden admin-only">
+        <div class="section-head">
+          <div><p class="eyebrow">DATOS</p><h2>Análisis</h2><p class="muted">Visualizá la cantidad de ventas según el período y los horarios en que se realizaron los pedidos.</p></div>
+          <div class="period-tabs analytics-tabs">
+            <button class="tab active" data-analysis-period="day">Días</button>
+            <button class="tab" data-analysis-period="month">Meses</button>
+            <button class="tab" data-analysis-period="year">Años</button>
+          </div>
+        </div>
+        <div class="analytics-grid">
+          <article class="chart-card"><div class="chart-head"><div><h3>Ventas a través del tiempo</h3><span id="sales-chart-caption" class="muted">Cantidad de pedidos por día</span></div></div><div class="chart-wrap"><svg id="sales-chart" viewBox="0 0 900 360" role="img" aria-label="Gráfico de ventas"></svg></div></article>
+          <article class="chart-card"><div class="chart-head"><div><h3>Horario semanal de compras</h3><span class="muted">Cada punto representa un pedido. X = día de la semana · Y = hora.</span></div></div><div class="chart-wrap"><svg id="weekly-time-chart" viewBox="0 0 900 360" role="img" aria-label="Gráfico de horarios de compra"></svg></div></article>
+        </div>
+      </section>
+
+      <section id="section-stock-finished" class="page-section hidden admin-only">
+        <div class="section-head">
+          <div><p class="eyebrow">INVENTARIO</p><h2>Productos terminados</h2><p class="muted">Figuras, veladores, accesorios y otros productos listos para vender.</p></div>
+          <button class="btn primary" data-open-modal="finished-modal">+ Producto</button>
+        </div>
+        <div class="inventory-toolbar finished-toolbar">
+          <div class="inventory-search"><span>⌕</span><input id="finished-search" placeholder="Buscar producto por nombre, categoría o descripción..."></div>
+          <select id="finished-category-filter"><option value="all">Todas las categorías</option></select>
+        </div>
+        <div id="finished-stock-table" class="table-wrap"></div>
+      </section>
+
+      <section id="section-stock-supplies" class="page-section hidden admin-only">
+        <div class="section-head">
+          <div><p class="eyebrow">INVENTARIO</p><h2>Insumos y depósito</h2><p class="muted">Organizá filamentos, electrónica, cajas, electricidad y cualquier otro material.</p></div>
+          <div class="inventory-actions">
+            <button id="add-supply-category" class="btn secondary">+ Categoría</button>
+            <button class="btn primary" data-open-modal="supply-modal">+ Insumo</button>
+          </div>
+        </div>
+        <div class="inventory-toolbar">
+          <div class="inventory-search"><span>⌕</span><input id="supply-search" placeholder="Buscar insumo por nombre o categoría..."></div>
+          <select id="supply-category-filter"><option value="all">Todas las categorías</option></select>
+        </div>
+        <div id="supply-category-list" class="category-list"></div>
+        <div id="stock-value-card" class="deposit-value"></div>
+        <div id="supplies-stock-table" class="table-wrap"></div>
+      </section>
+
+      <section id="section-budget" class="page-section hidden admin-only">
+        <div class="section-head">
+          <div><p class="eyebrow">COSTOS</p><h2>Presupuesto de producto</h2><p class="muted">Modelo basado en tu Excel: material + electricidad + máquina + fallos + insumos, con 50% sobre el costo.</p></div>
+        </div>
+
+        <div id="github-pages-mode" class="github-pages-mode">
+          <strong>Modo GitHub Pages</strong>
+          <span>La tienda, carrito, presupuestos y visor 3D funcionan en el navegador. El slicing real, el correo y la base compartida requieren un backend externo.</span>
+        </div>
+
+        <div class="slicer-budget-panel card">
+          <div class="slicer-panel-head">
+            <div>
+              <p class="eyebrow">ANALIZADOR 3D</p>
+              <h3>Slicer para presupuesto</h3>
+              <p class="muted">Subí un STL o 3MF, elegí material, color, soportes y alisado. Cúbica cargará automáticamente el peso y el tiempo en el presupuesto.</p>
+            </div>
+            <span id="slicer-status" class="slicer-status">Comprobando motor…</span>
+          </div>
+
+          <label id="slicer-drop" class="slicer-drop">
+            <input id="slicer-file" type="file" accept=".stl,.3mf">
+            <span class="slicer-drop-title">Arrastrá un STL o 3MF</span>
+            <span class="slicer-drop-sub">o hacé clic para seleccionarlo</span>
+            <span id="slicer-filename" class="slicer-filename"></span>
+          </label>
+
+          <div id="slicer-viewer-card" class="slicer-viewer-card hidden">
+            <div class="slicer-viewer-toolbar">
+              <div>
+                <strong>Vista 3D del modelo</strong>
+                <small id="slicer-viewer-info">Arrastrá para rotar · rueda para zoom</small>
+              </div>
+              <button id="slicer-reset-view" class="btn ghost slicer-small-btn" type="button">Centrar vista</button>
+            </div>
+            <div id="slicer-viewer3d" class="slicer-viewer3d">
+              <div id="slicer-viewer-loading" class="slicer-viewer-loading">Cargando modelo…</div>
+            </div>
+            <div id="slicer-viewer-error" class="slicer-viewer-error hidden"></div>
+          </div>
+
+          <div class="slicer-controls">
+            <label>Perfil de impresión
+              <select id="slicer-profile"></select>
+            </label>
+            <div class="slicer-support-box">
+              <span><strong>Soportes</strong><small id="slicer-support-text">Desactivados</small></span>
+              <label class="slicer-switch" aria-label="Activar soportes">
+                <input id="slicer-supports" type="checkbox">
+                <span class="slicer-slider"></span>
+              </label>
+            </div>
+            <button id="slicer-analyze" type="button" class="btn primary" disabled>Analizar impresión</button>
+          </div>
+
+
+          <div id="slicer-plate-panel" class="slicer-plate-panel hidden">
+            <div><strong>Bandejas de impresión</strong><small>Podés analizar todo el proyecto o una bandeja específica.</small></div>
+            <label class="slicer-plate-select-wrap">Analizar
+              <select id="slicer-plate-select">
+                <option value="0">Proyecto completo</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="slicer-material-panel">
+            <div><strong>Material</strong><small>Perfil de filamento usado para la simulación.</small></div>
+            <div class="slicer-segmented" role="group" aria-label="Material">
+              <button type="button" class="slicer-segment active" data-slicer-material="PLA">PLA</button>
+              <button type="button" class="slicer-segment" data-slicer-material="PETG">PETG</button>
+              <button type="button" class="slicer-segment" data-slicer-material="ASA">ASA</button>
+            </div>
+          </div>
+
+          <div class="slicer-color-panel">
+            <div><strong>Colores del modelo</strong><small>La vista 3D cambia en tiempo real. El color no modifica el costo ni el tiempo de impresión.</small></div>
+            <div id="slicer-color-controls" class="slicer-color-controls"></div>
+          </div>
+
+          <div class="slicer-ironing-panel">
+            <div><strong>Alisado</strong><small>Elegí qué superficies superiores querés alisar.</small></div>
+            <div class="slicer-segmented" role="group" aria-label="Tipo de alisado">
+              <button type="button" class="slicer-segment active" data-slicer-ironing="none">Sin alisado</button>
+              <button type="button" class="slicer-segment" data-slicer-ironing="topmost">Solo superficie superior</button>
+              <button type="button" class="slicer-segment" data-slicer-ironing="top">Todas las superiores</button>
+            </div>
+          </div>
+
+          <div id="slicer-message" class="slicer-message hidden"></div>
+
+          <div id="slicer-result" class="slicer-result hidden">
+            <div class="slicer-result-head">
+              <div><span class="eyebrow">RESULTADO DEL SLICER</span><h3 id="slicer-result-name">—</h3></div>
+              <span id="slicer-printer" class="slicer-pill">Anycubic Kobra S1</span>
+            </div>
+            <div class="slicer-metrics">
+              <div><span>Tiempo estimado</span><strong id="slicer-time">—</strong><small id="slicer-time-mode"></small></div>
+              <div><span>Filamento</span><strong id="slicer-grams">—</strong></div>
+              <div><span>Material</span><strong id="slicer-material">—</strong></div>
+              <div><span>Colores</span><div id="slicer-color" class="slicer-result-colors">—</div></div>
+            </div>
+            <div class="slicer-detail-grid">
+              <div><span>Soportes</span><b id="slicer-supports-used">—</b></div>
+              <div><span>Alisado</span><b id="slicer-ironing-used">—</b></div>
+              <div><span>Tiempo silencioso</span><b id="slicer-time-silent">—</b></div>
+            </div>
+            <div id="slicer-plate-breakdown" class="slicer-plate-breakdown hidden"></div>
+            <div class="slicer-result-actions">
+              <span id="slicer-budget-applied" class="muted">Peso y tiempo se pasan automáticamente al formulario.</span>
+              <button id="slicer-apply-budget" class="btn secondary" type="button">Volver a aplicar al presupuesto</button>
+            </div>
+          </div>
+        </div>
+        <div class="budget-layout">
+          <form id="budget-form" class="card form-grid">
+            <label>Material
+              <select id="budget-material"></select>
+            </label>
+            <label>Peso de filamento (g)
+              <input id="budget-weight" type="number" min="0" step="0.1" value="50" required>
+              <small>Dato del slicer.</small>
+            </label>
+            <label>Tiempo de impresión (h)
+              <input id="budget-time" type="number" min="0" step="0.01" value="2" required>
+              <small>Dato del slicer.</small>
+            </label>
+            <label>Consumo impresora (W)
+              <input id="budget-watts" type="number" min="0" step="1" value="150" required>
+            </label>
+            <label>Precio electricidad ($/kWh)
+              <input id="budget-kwh" type="number" min="0" step="0.01" value="130" required>
+            </label>
+            <label>Costo hora máquina ($/h)
+              <input id="budget-machine" type="number" min="0" step="0.01" value="1500" required>
+            </label>
+            <label>Fallos
+              <input id="budget-failure" type="number" min="0" max="100" step="0.1" value="10" required>
+              <small>En tu Excel: 10%.</small>
+            </label>
+            <label>Margen general sobre costo
+              <input id="budget-margin" type="number" min="0" step="0.1" value="50" required>
+              <small>Se aplica a material, electricidad y máquina.</small>
+            </label>
+            <label>Margen de insumos adicionales
+              <input id="budget-supplies-margin" type="number" min="0" step="0.1" value="50" required>
+              <small>Se puede cambiar para cada presupuesto. Por defecto: 50%.</small>
+            </label>
+            <div class="full-span">
+              <h3>Insumos adicionales</h3>
+              <div id="budget-supplies"></div>
+              <button type="button" id="add-budget-supply" class="btn secondary">+ Agregar insumo</button>
+            </div>
+            <div class="budget-actions full-span">
+              <button class="btn primary" type="submit">Calcular</button>
+              <button class="btn secondary" type="button" id="save-budget">Guardar presupuesto</button>
+              <button class="btn ghost" type="button" id="copy-budget">Copiar resumen</button>
+            </div>
+          </form>
+          <aside id="budget-result" class="budget-result"></aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="checkout-modal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" data-close-modal="checkout-modal">×</button>
+      <h2>Datos del pedido</h2>
+      <form id="checkout-form" class="form-grid">
+        <label>Nombre
+          <input id="customer-name" required>
+        </label>
+        <label>Email
+          <input id="customer-email" type="email" required>
+        </label>
+        <label>Teléfono / WhatsApp
+          <input id="customer-phone" placeholder="+54 9 ...">
+        </label>
+        <label>Forma de pago
+          <select id="payment-method" required>
+            <option value="Efectivo">Efectivo</option>
+            <option value="Transferencia">Transferencia</option>
+          </select>
+        </label>
+        <label class="full-span">Observaciones
+          <textarea id="customer-notes" rows="3" placeholder="Color, retiro, personalización, etc."></textarea>
+        </label>
+        <div class="checkout-note full-span">
+          Al confirmar, el pedido se guarda en Cúbica. El servidor envía el detalle interno a Cúbica y, si el correo está configurado, el cliente recibe una confirmación. El email del cliente nunca se usa como remitente.
+        </div>
+        <button class="btn primary full" type="submit">Confirmar pedido</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="finished-modal" class="modal hidden">
+    <div class="modal-card finished-product-modal">
+      <button class="modal-close" data-close-modal="finished-modal">×</button>
+      <p class="eyebrow">INVENTARIO · PRODUCTO TERMINADO</p>
+      <h2 id="finished-modal-title">Nuevo producto terminado</h2>
+      <p class="muted">Definí cómo se fabrica el producto. Cúbica calculará automáticamente cuántas unidades podrías elaborar con el stock actual de insumos.</p>
+      <form id="finished-form" class="form-grid">
+        <input id="finished-id" type="hidden">
+        <label class="full-span">Producto
+          <input id="finished-name" required placeholder="Ej.: Velador Búho LED">
+        </label>
+        <label>Categoría
+          <select id="finished-category" required></select>
+        </label>
+        <label>Precio de venta
+          <input id="finished-price" type="number" min="0" step="1" required>
+        </label>
+        <label>Stock actual
+          <input id="finished-qty" type="number" min="0" step="1" value="0" required>
+          <small>Unidades ya terminadas y listas para vender.</small>
+        </label>
+
+        <label class="full-span">Descripción del producto
+          <textarea id="finished-description" rows="4" maxlength="1200" placeholder="Contale al cliente qué es, para qué sirve, qué incluye y qué lo hace especial..."></textarea>
+          <small>Esta descripción aparecerá en la vista pública del producto.</small>
+        </label>
+
+        <div class="full-span finished-form-block">
+          <div class="form-block-head">
+            <div><strong>Imágenes y videos</strong><small>La primera imagen será la portada de la tienda. Se recomienda usar imágenes claras y videos cortos.</small></div>
+          </div>
+          <div class="media-upload-grid">
+            <label class="media-upload">
+              <span>🖼️ Agregar imágenes</span>
+              <small>JPG, PNG o WEBP · hasta 6 imágenes · 5 MB c/u</small>
+              <input id="finished-images" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+            </label>
+            <label class="media-upload">
+              <span>🎥 Agregar videos</span>
+              <small>MP4/WebM · hasta 2 videos · 8 MB c/u</small>
+              <input id="finished-videos" type="file" accept="video/mp4,video/webm" multiple>
+            </label>
+          </div>
+          <div id="finished-media-preview" class="media-admin-preview"></div>
+        </div>
+
+        <div class="full-span finished-form-block">
+          <div class="form-block-head">
+            <div><strong>Colores del producto</strong><small>Podés agregar uno o varios colores.</small></div>
+          </div>
+          <div class="color-entry-row">
+            <input id="finished-color-name" placeholder="Ej.: Blanco">
+            <input id="finished-color-hex" type="color" value="#ffffff" title="Elegir color">
+            <button id="add-finished-color" type="button" class="btn secondary">+ Color</button>
+          </div>
+          <div id="finished-colors-list" class="color-chip-list"></div>
+          <div id="finished-colors-empty" class="inline-empty">Todavía no agregaste colores.</div>
+          <label class="checkbox-row" style="margin-top:12px">
+            <input id="finished-multi-color" type="checkbox">
+            <span>Permitir elegir más de un color al comprar este producto</span>
+          </label>
+          <small>Ejemplo: un escudo puede combinar amarillo + azul.</small>
+        </div>
+
+        <div class="full-span finished-form-block">
+          <div class="form-block-head">
+            <div><strong>Insumos necesarios por unidad</strong><small>Indicá cuánto consume una unidad de cada insumo.</small></div>
+            <button id="add-finished-supply" type="button" class="btn secondary">+ Insumo</button>
+          </div>
+          <div id="finished-recipe-list" class="recipe-list"></div>
+          <div id="finished-recipe-empty" class="inline-empty">Todavía no agregaste insumos a la receta.</div>
+        </div>
+
+        <div id="finished-capacity-preview" class="full-span production-capacity-preview"></div>
+        <button id="finished-submit" class="btn primary full" type="submit">Agregar producto</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="product-detail-modal" class="modal hidden">
+    <div class="modal-card product-detail-modal">
+      <button class="modal-close" data-close-modal="product-detail-modal">×</button>
+      <div id="product-detail-content"></div>
+    </div>
+  </div>
+
+  <div id="supply-modal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" data-close-modal="supply-modal">×</button>
+      <h2>Nuevo insumo</h2>
+      <form id="supply-form" class="form-grid">
+        <label>Insumo<input id="supply-name" required></label>
+        <label>Categoría
+          <select id="supply-category"></select>
+        </label>
+        <label>Costo unitario<input id="supply-cost" type="number" min="0" step="0.01" required></label>
+        <label>Cantidad<input id="supply-qty" type="number" min="0" step="0.01" value="0" required></label>
+        <button class="btn primary full" type="submit">Agregar</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="supply-category-modal" class="modal hidden">
+    <div class="modal-card small-modal">
+      <button class="modal-close" data-close-modal="supply-category-modal">×</button>
+      <p class="eyebrow">INVENTARIO</p>
+      <h2>Nueva categoría</h2>
+      <p class="muted">Creá categorías propias para mantener ordenado el depósito.</p>
+      <form id="supply-category-form" class="form-grid single-form">
+        <label>Nombre de categoría<input id="new-supply-category" maxlength="40" required placeholder="Ej.: Herramientas"></label>
+        <button class="btn primary full" type="submit">Crear categoría</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="github-config.js"></script>
+  <script src="script.js"></script>
+  <script type="module" src="viewer.js"></script>
+  <script src="slicer.js"></script>
+</body>
+</html>
