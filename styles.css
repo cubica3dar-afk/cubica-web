@@ -234,3 +234,12 @@ td input,td select{padding:8px;border-radius:8px;min-width:80px}
 .media-url-row select,.media-url-row input{margin:0}
 .media-admin-card span small{display:block;color:var(--muted);font-size:9px;margin-top:2px}
 @media(max-width:700px){.media-url-row{grid-template-columns:1fr}.media-url-row .btn{width:100%}}
+
+
+/* Videos sociales embebidos */
+.social-admin-preview{height:100px;display:grid;place-items:center;align-content:center;gap:4px;background:#11131f;color:#fff;text-align:center}
+.social-admin-preview>span{font-size:30px;line-height:1}
+.social-admin-preview>strong{font-size:11px}
+.detail-viewer iframe.social-embed{width:100%;height:100%;border:0;background:#000;display:block}
+.detail-viewer iframe.social-instagram,.detail-viewer iframe.social-tiktok{max-width:520px;margin:auto}
+.social-thumb{font-size:22px;line-height:1}
