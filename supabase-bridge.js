@@ -120,7 +120,7 @@
 
       const [{data:colors,error:colorError},{data:media,error:mediaError}] = await Promise.all([
         client.from("product_colors").select("product_id,name,hex,sort_order").in("product_id",ids).order("sort_order"),
-        client.from("product_media").select("product_id,media_type,public_url,file_name,sort_order").in("product_id",ids).order("sort_order")
+        client.from("product_media").select("product_id,media_type,storage_path,public_url,file_name,sort_order").in("product_id",ids).order("sort_order")
       ]);
       if(colorError) throw colorError;
       if(mediaError) throw mediaError;
@@ -139,7 +139,9 @@
           id:"remote-"+m.product_id+"-"+m.sort_order,
           type:m.media_type,
           src:m.public_url,
-          name:m.file_name||""
+          name:m.file_name||"",
+          storagePath:m.storage_path||"",
+          source:(m.storage_path||"").startsWith("external/")?"url":"storage"
         });
       }
 
@@ -191,16 +193,16 @@
         if(r.error) throw r.error;
       }
 
-      // Medios pequeños pueden migrarse como URL existente.
-      // Data URLs grandes quedan para la etapa de Supabase Storage.
+      // Cada medio puede venir de Supabase Storage o de una URL externa.
+      // Evitamos persistir data: URLs grandes para no inflar la base ni el navegador.
       r=await client.from("product_media").delete().eq("product_id",String(p.id));
       if(r.error) throw r.error;
       const media=(Array.isArray(p.media)?p.media:[])
-        .filter(m=>m?.src && (!String(m.src).startsWith("data:") || String(m.src).length<250000))
+        .filter(m=>m?.src && !String(m.src).startsWith("data:"))
         .map((m,i)=>({
           product_id:String(p.id),
           media_type:m.type==="video"?"video":"image",
-          storage_path:"legacy/"+String(p.id)+"/"+i,
+          storage_path:String(m.storagePath||(`external/${p.id}/${i}`)),
           public_url:String(m.src),
           file_name:String(m.name||""),
           sort_order:i
@@ -244,6 +246,43 @@
   }
 
   window.loadCubicaCatalogFromSupabase=loadCatalogFromSupabase;
+
+  async function uploadProductMedia(file,type){
+    if(session?.role!=="admin") throw new Error("Solo el administrador puede subir archivos.");
+    if(!file) throw new Error("Archivo inválido.");
+
+    const allowedImage=["image/jpeg","image/png","image/webp"];
+    const allowedVideo=["video/mp4","video/webm"];
+    const allowed=type==="video"?allowedVideo:allowedImage;
+    const max=type==="video"?8*1024*1024:5*1024*1024;
+
+    if(!allowed.includes(file.type)) throw new Error("Formato de archivo no permitido.");
+    if(file.size>max) throw new Error(`${file.name} supera el límite de ${Math.round(max/1024/1024)} MB.`);
+
+    const ext=(file.name.split(".").pop()|| (type==="video"?"mp4":"jpg")).toLowerCase().replace(/[^a-z0-9]/g,"");
+    const token=(globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)).replace(/-/g,"");
+    const path=`products/${session.supabaseUserId||"admin"}/${Date.now()}-${token}.${ext}`;
+
+    const {error}=await client.storage.from("product-media").upload(path,file,{
+      cacheControl:"3600",
+      upsert:false,
+      contentType:file.type
+    });
+    if(error) throw error;
+
+    const {data}=client.storage.from("product-media").getPublicUrl(path);
+    if(!data?.publicUrl) throw new Error("No se pudo obtener la URL pública del archivo.");
+
+    return {
+      id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+      type:type==="video"?"video":"image",
+      src:data.publicUrl,
+      name:file.name,
+      storagePath:path,
+      source:"storage"
+    };
+  }
+  window.cubicaUploadProductMedia=uploadProductMedia;
 
   async function migrateProductsToSupabase(){
     if(session?.role!=="admin") throw new Error("Solo el administrador puede migrar productos.");
