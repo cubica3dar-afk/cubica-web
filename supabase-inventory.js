@@ -193,7 +193,7 @@
       }
       await loadInventoryFromSupabase();
       if(forcePrompt){
-        toast("Supabase conectado: productos, insumos y recetas están sincronizados.");
+        toast("Supabase conectado: productos, insumos, recetas, ventas y presupuestos están centralizados.");
       }
     }catch(err){
       console.error("Revisión inventario Supabase",err);
