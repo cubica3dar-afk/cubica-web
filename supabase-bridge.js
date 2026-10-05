@@ -181,6 +181,17 @@
     if(error) throw error;
   }
 
+  function isManagedProductMediaPath(path){
+    return typeof path==="string" && path.startsWith("products/");
+  }
+
+  async function removeStoragePaths(paths){
+    const unique=[...new Set((paths||[]).filter(isManagedProductMediaPath))];
+    if(!unique.length) return;
+    const {error}=await client.storage.from("product-media").remove(unique);
+    if(error) throw error;
+  }
+
   async function syncProductChildren(list){
     for(const p of list){
       let r=await client.from("product_colors").delete().eq("product_id",String(p.id));
@@ -194,9 +205,14 @@
       }
 
       // Cada medio puede venir de Supabase Storage o de una URL externa.
-      // Evitamos persistir data: URLs grandes para no inflar la base ni el navegador.
-      r=await client.from("product_media").delete().eq("product_id",String(p.id));
-      if(r.error) throw r.error;
+      // Si se quitó un archivo gestionado por Storage, borramos también el archivo físico
+      // después de actualizar correctamente las referencias en la base.
+      const {data:previousMedia,error:previousMediaError}=await client
+        .from("product_media")
+        .select("storage_path")
+        .eq("product_id",String(p.id));
+      if(previousMediaError) throw previousMediaError;
+
       const media=(Array.isArray(p.media)?p.media:[])
         .filter(m=>m?.src && !String(m.src).startsWith("data:"))
         .map((m,i)=>({
@@ -207,10 +223,19 @@
           file_name:String(m.name||""),
           sort_order:i
         }));
+
+      r=await client.from("product_media").delete().eq("product_id",String(p.id));
+      if(r.error) throw r.error;
       if(media.length){
         r=await client.from("product_media").insert(media);
         if(r.error) throw r.error;
       }
+
+      const keepPaths=new Set(media.map(m=>m.storage_path).filter(isManagedProductMediaPath));
+      const orphanPaths=(previousMedia||[])
+        .map(m=>m.storage_path)
+        .filter(path=>isManagedProductMediaPath(path) && !keepPaths.has(path));
+      await removeStoragePaths(orphanPaths);
     }
   }
 
@@ -227,8 +252,16 @@
         const keep=new Set(list.map(p=>String(p.id)));
         const remove=(existing||[]).map(x=>x.id).filter(id=>!keep.has(String(id)));
         if(remove.length){
+          const {data:removedMedia,error:removedMediaError}=await client
+            .from("product_media")
+            .select("storage_path")
+            .in("product_id",remove);
+          if(removedMediaError) throw removedMediaError;
+
           const d=await client.from("products").delete().in("id",remove);
           if(d.error) throw d.error;
+
+          await removeStoragePaths((removedMedia||[]).map(m=>m.storage_path));
         }
       }
 
