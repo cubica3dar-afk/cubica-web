@@ -243,3 +243,90 @@ td input,td select{padding:8px;border-radius:8px;min-width:80px}
 .detail-viewer iframe.social-embed{width:100%;height:100%;border:0;background:#000;display:block}
 .detail-viewer iframe.social-instagram,.detail-viewer iframe.social-tiktok{max-width:520px;margin:auto}
 .social-thumb{font-size:22px;line-height:1}
+
+
+/* Mobile-first polish — iPhone / pantallas angostas */
+html{-webkit-text-size-adjust:100%}
+body{overflow-x:hidden}
+@supports(padding:max(0px)){
+  .topbar{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
+  .container{padding-bottom:max(70px,calc(30px + env(safe-area-inset-bottom)))}
+  .modal{padding-bottom:max(14px,env(safe-area-inset-bottom))}
+}
+@media(max-width:600px){
+  .topbar{position:sticky;top:0;gap:8px;padding-top:max(9px,env(safe-area-inset-top));padding-bottom:8px}
+  .brand{min-width:0}
+  .brand img{width:36px;height:36px}
+  .brand small{display:none}
+  .top-actions{gap:3px}
+  .top-actions .btn{padding:8px 9px}
+  .nav{order:3;width:calc(100% + 8px);margin:0 -4px;padding:2px 4px 3px;gap:3px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .nav::-webkit-scrollbar{display:none}
+  .nav button{padding:8px 10px;font-size:12px}
+
+  .container{width:calc(100% - 20px);padding-top:14px}
+  .hero{padding:20px;border-radius:18px}
+  .hero h1{font-size:clamp(30px,9vw,38px);line-height:1.02}
+  .hero p:not(.eyebrow){line-height:1.55}
+  .section-head{gap:12px}
+  .section-head h2{font-size:25px}
+  .filters{gap:8px}
+
+  /* Dos tarjetas cómodas en un Pro Max; una sola en móviles muy angostos. */
+  .product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .product-card{min-width:0;padding:10px;border-radius:15px}
+  .product-cover-wrap{height:auto;aspect-ratio:1/1;margin-bottom:10px;border-radius:12px}
+  .product-card h3{font-size:14px;line-height:1.25;overflow-wrap:anywhere}
+  .product-card p{font-size:11px}
+  .buy-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:6px}
+  .buy-row input{width:100%;min-width:0;padding:9px 7px}
+  .buy-row .btn{min-width:0;padding:9px 7px;font-size:11px}
+
+  .cart-layout,.budget-layout{gap:12px}
+  .cart-row{grid-template-columns:minmax(0,1fr) 62px 76px 30px;gap:6px;font-size:12px}
+  .cart-row input{min-width:0;padding:8px 5px}
+  .summary-card{padding:16px}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{padding:13px}
+  .payment-breakdown{gap:8px}
+
+  /* Las tablas administrativas siguen siendo desplazables, sin ensanchar toda la página. */
+  .table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:680px}
+  .finished-name-cell{min-width:170px}
+  .inventory-toolbar{gap:8px}
+  .inventory-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .inventory-actions .btn{width:100%;min-width:0}
+
+  .modal{place-items:end center;padding:10px}
+  .modal-card{width:100%;max-height:calc(100dvh - max(16px,env(safe-area-inset-top)));border-radius:20px 20px 14px 14px;padding:20px 14px 18px}
+  .modal-close{right:10px;top:7px;z-index:4}
+  .finished-product-modal,.product-detail-modal{width:100%}
+  .form-grid{padding:14px;gap:8px}
+  .media-admin-preview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .media-admin-card{width:auto;min-width:0}
+  .media-admin-card img,.media-admin-card video,.social-admin-preview{height:110px}
+  .recipe-row{grid-template-columns:minmax(0,1fr) 82px 34px}
+  .production-capacity-preview{padding:13px;gap:10px}
+  .color-chip-list{max-width:100%;overflow:hidden}
+
+  .product-detail-grid{gap:14px}
+  .detail-viewer{height:auto;aspect-ratio:1/1;min-height:0;border-radius:14px}
+  .detail-viewer iframe.social-instagram,.detail-viewer iframe.social-tiktok{max-width:100%}
+  .detail-thumbs{padding-bottom:5px}
+  .detail-thumb{flex-basis:60px;height:52px}
+  .product-detail-info h2{font-size:30px}
+  .detail-price{font-size:25px}
+  .detail-description{margin:15px 0;padding-top:14px;line-height:1.55}
+  .detail-buy{position:sticky;bottom:0;z-index:3;background:linear-gradient(to bottom,rgba(32,33,58,.90),rgba(32,33,58,1) 25%);padding:10px 0 max(4px,env(safe-area-inset-bottom));margin-top:16px}
+
+  .chart-card{padding:12px}
+  .chart-wrap{margin:0 -2px}
+  .chart-wrap svg{min-width:560px;min-height:260px}
+  .slicer-viewer3d{height:280px}
+}
+@media(max-width:390px){
+  .product-grid{grid-template-columns:1fr}
+  .product-cover-wrap{aspect-ratio:4/3}
+  .kpi-grid{grid-template-columns:1fr}
+}
