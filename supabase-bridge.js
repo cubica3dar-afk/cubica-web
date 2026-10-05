@@ -243,6 +243,8 @@
     }
   }
 
+  window.loadCubicaCatalogFromSupabase=loadCatalogFromSupabase;
+
   async function migrateProductsToSupabase(){
     if(session?.role!=="admin") throw new Error("Solo el administrador puede migrar productos.");
     if(!Array.isArray(products)||!products.length) throw new Error("No hay productos locales para migrar.");
