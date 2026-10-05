@@ -192,6 +192,9 @@
         return;
       }
       await loadInventoryFromSupabase();
+      if(forcePrompt){
+        toast("Supabase conectado: productos, insumos y recetas están sincronizados.");
+      }
     }catch(err){
       console.error("Revisión inventario Supabase",err);
       setBadge("Supabase: inventario sin conexión","error");
