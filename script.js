@@ -193,7 +193,7 @@ function showSection(id){
     toast("Iniciá sesión para consultar tus pedidos.");
     id="login";
   }
-  if(["stock-finished","stock-supplies","budget"].includes(id) && session?.role!=="admin"){
+  if(["stock-finished","stock-supplies","budget","analytics"].includes(id) && session?.role!=="admin"){
     toast("Esta sección es exclusiva del administrador.");
     id="login";
   }
@@ -218,7 +218,18 @@ function renderApp(){
   $("app").classList.remove("hidden");
   $("user-badge").textContent=session?(session.role==="admin"?"Administrador":"Cliente"):"";
   $("logout-btn").classList.toggle("hidden",!session);
-  document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"));
+
+  // No quitar .hidden de las secciones de página al refrescar la sesión.
+  // showSection() es el único responsable de decidir qué sección está visible.
+  // Esto evita que al volver a la pestaña se muestren todas las secciones admin juntas.
+  document.querySelectorAll(".admin-only").forEach(el=>{
+    if(el.classList.contains("page-section")){
+      if(session?.role!=="admin") el.classList.add("hidden");
+    }else{
+      el.classList.toggle("hidden",session?.role!=="admin");
+    }
+  });
+
   setupNav();
   renderProducts();
   renderCart();
