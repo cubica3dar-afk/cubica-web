@@ -388,20 +388,93 @@ async function fileToDataUrl(file, maxImageBytes=5*1024*1024, maxVideoBytes=8*10
   if(file.size>max) throw new Error(`${file.name} supera el límite de ${Math.round(max/1024/1024)} MB.`);
   return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('No se pudo leer el archivo.'));r.readAsDataURL(file);});
 }
+function socialEmbedInfo(rawUrl){
+  let u;
+  try{u=new URL(rawUrl);}catch{return null;}
+  const host=u.hostname.toLowerCase().replace(/^www\./,"").replace(/^m\./,"");
+  const path=u.pathname.replace(/\/+$/,"");
+
+  // YouTube: watch, youtu.be, Shorts y URLs embed.
+  if(host==="youtube.com" || host==="youtu.be" || host==="youtube-nocookie.com"){
+    let id="";
+    if(host==="youtu.be") id=path.split("/").filter(Boolean)[0]||"";
+    else if(path==="/watch") id=u.searchParams.get("v")||"";
+    else {
+      const m=path.match(/^\/(?:shorts|embed)\/([A-Za-z0-9_-]{6,})/);
+      if(m) id=m[1];
+    }
+    if(/^[A-Za-z0-9_-]{6,}$/.test(id)){
+      return {
+        provider:"youtube",
+        label:"YouTube",
+        id,
+        embedUrl:`https://www.youtube-nocookie.com/embed/${id}?rel=0`
+      };
+    }
+  }
+
+  // Instagram: reels, publicaciones y videos públicos.
+  if(host==="instagram.com"){
+    const m=path.match(/^\/(reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i);
+    if(m){
+      const kind=m[1].toLowerCase()==="reels"?"reel":m[1].toLowerCase();
+      const code=m[2];
+      return {
+        provider:"instagram",
+        label:"Instagram",
+        id:code,
+        embedUrl:`https://www.instagram.com/${kind}/${code}/embed`
+      };
+    }
+  }
+
+  // TikTok: URL completa /@usuario/video/ID o player/v1/ID.
+  if(host==="tiktok.com"){
+    let id="";
+    const full=path.match(/\/video\/(\d+)/);
+    const player=path.match(/^\/player\/v1\/(\d+)/);
+    if(full) id=full[1];
+    else if(player) id=player[1];
+    if(/^\d+$/.test(id)){
+      return {
+        provider:"tiktok",
+        label:"TikTok",
+        id,
+        embedUrl:`https://www.tiktok.com/player/v1/${id}?controls=1&description=1`
+      };
+    }
+  }
+
+  return null;
+}
+function socialProviderIcon(provider){
+  return provider==="youtube"?"▶":provider==="instagram"?"◎":provider==="tiktok"?"♪":"▶";
+}
+function videoLikeCount(){
+  return finishedMedia.filter(m=>m.type==="video"||m.type==="social").length;
+}
 function renderFinishedMedia(){
   const box=$('finished-media-preview'); if(!box)return;
   box.innerHTML=finishedMedia.length?finishedMedia.map((m,i)=>{
-    const sourceLabel=m.source==='url'?'URL externa':m.source==='storage'?'Supabase':'Local';
-    const preview=m.type==='image'
-      ?`<img src="${m.src}" alt="" loading="lazy" decoding="async">`
-      :`<video src="${m.src}" muted controls preload="metadata"></video>`;
-    return `<div class="media-admin-card">${preview}<div><span>${m.type==='image'?'Imagen':'Video'} ${i+1}<small>${sourceLabel}</small></span><button type="button" class="btn ghost" onclick="removeFinishedMedia(${i})">×</button></div></div>`;
+    const social=m.type==='social'?socialEmbedInfo(m.src):null;
+    const sourceLabel=m.type==='social'?(social?.label||m.provider||'Social'):m.source==='url'?'URL externa':m.source==='storage'?'Supabase':'Local';
+    let preview='';
+    if(m.type==='image'){
+      preview=`<img src="${m.src}" alt="" loading="lazy" decoding="async">`;
+    }else if(m.type==='social'){
+      preview=`<div class="social-admin-preview"><span>${socialProviderIcon(social?.provider||m.provider)}</span><strong>${escapeHtml(social?.label||m.provider||'Video social')}</strong></div>`;
+    }else{
+      preview=`<video src="${m.src}" muted controls preload="metadata"></video>`;
+    }
+    const kindLabel=m.type==='image'?'Imagen':m.type==='social'?'Social':'Video';
+    return `<div class="media-admin-card">${preview}<div><span>${kindLabel} ${i+1}<small>${escapeHtml(sourceLabel)}</small></span><button type="button" class="btn ghost" onclick="removeFinishedMedia(${i})">×</button></div></div>`;
   }).join(''):'<div class="inline-empty">Todavía no agregaste imágenes ni videos.</div>';
 }
 async function handleFinishedMediaInput(input,type){
   const files=[...input.files]; if(!files.length)return;
-  const maxCount=type==='image'?6:2; const existing=finishedMedia.filter(m=>m.type===type).length;
-  if(existing+files.length>maxCount){toast(`Podés agregar hasta ${maxCount} ${type==='image'?'imágenes':'videos'}.`);input.value='';return;}
+  const maxCount=type==='image'?6:2;
+  const existing=type==='image'?finishedMedia.filter(m=>m.type==='image').length:videoLikeCount();
+  if(existing+files.length>maxCount){toast(`Podés agregar hasta ${maxCount} ${type==='image'?'imágenes':'videos en total'}.`);input.value='';return;}
   try{
     for(const file of files){
       if(window.CUBICA_CONFIG?.mode==='supabase'){
@@ -423,17 +496,40 @@ async function handleFinishedMediaInput(input,type){
 }
 function addFinishedMediaUrl(){
   const input=$('finished-media-url');
-  const type=$('finished-media-url-type')?.value==='video'?'video':'image';
+  const selected=$('finished-media-url-type')?.value||'image';
   const value=(input?.value||'').trim();
-  if(!value)return toast('Pegá una URL de imagen o video.');
+  if(!value)return toast('Pegá una URL.');
 
   let parsed;
   try{parsed=new URL(value);}catch{return toast('La URL no es válida.');}
   if(!['http:','https:'].includes(parsed.protocol))return toast('La URL debe comenzar con http:// o https://');
 
+  if(selected==='social'){
+    const info=socialEmbedInfo(value);
+    if(!info){
+      if(/(^|\.)vm\.tiktok\.com$/i.test(parsed.hostname)) return toast('Para TikTok usá el enlace completo que contiene /video/ y su ID.');
+      return toast('No pude reconocer ese enlace. Usá YouTube, Instagram Reel/Post o TikTok con URL pública.');
+    }
+    if(videoLikeCount()>=2)return toast('Podés agregar hasta 2 videos en total.');
+    finishedMedia.push({
+      id:uid('m'),
+      type:'social',
+      src:value,
+      name:`${info.label} · video social`,
+      storagePath:`external/social/${info.provider}/${info.id}`,
+      source:'social',
+      provider:info.provider
+    });
+    input.value='';
+    renderFinishedMedia();
+    toast(`${info.label} agregado al producto.`);
+    return;
+  }
+
+  const type=selected==='video'?'video':'image';
   const maxCount=type==='image'?6:2;
-  const existing=finishedMedia.filter(m=>m.type===type).length;
-  if(existing>=maxCount)return toast(`Podés agregar hasta ${maxCount} ${type==='image'?'imágenes':'videos'}.`);
+  const existing=type==='image'?finishedMedia.filter(m=>m.type==='image').length:videoLikeCount();
+  if(existing>=maxCount)return toast(`Podés agregar hasta ${maxCount} ${type==='image'?'imágenes':'videos en total'}.`);
 
   finishedMedia.push({
     id:uid('m'),
@@ -454,8 +550,23 @@ function openProductDetail(id){
 function renderProductDetail(){
   const p=products.find(x=>x.id===detailProductId);if(!p)return;normalizeProduct(p);
   const media=p.media?.length?p.media:[{type:'placeholder'}]; if(detailMediaIndex>=media.length)detailMediaIndex=0; const m=media[detailMediaIndex];
-  const viewer=m.type==='image'?`<img src="${m.src}" alt="${escapeHtml(p.name)}" decoding="async">`:m.type==='video'?`<video src="${m.src}" controls playsinline preload="metadata"></video>`:`<div class="product-detail-placeholder">${iconFor(p.category)}</div>`;
-  const thumbs=media.map((x,i)=>`<button class="detail-thumb ${i===detailMediaIndex?'active':''}" onclick="setProductMedia(${i})">${x.type==='image'?`<img src="${x.src}" alt="" loading="lazy" decoding="async">`:`<span>▶</span>`}</button>`).join('');
+  const social=m.type==='social'?socialEmbedInfo(m.src):null;
+  const viewer=m.type==='image'
+    ?`<img src="${m.src}" alt="${escapeHtml(p.name)}" decoding="async">`
+    :m.type==='video'
+      ?`<video src="${m.src}" controls playsinline preload="metadata"></video>`
+      :m.type==='social'&&social
+        ?`<iframe class="social-embed social-${social.provider}" src="${escapeHtml(social.embedUrl)}" title="${escapeHtml(social.label)} — ${escapeHtml(p.name)}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`
+        :`<div class="product-detail-placeholder">${iconFor(p.category)}</div>`;
+  const thumbs=media.map((x,i)=>{
+    const sx=x.type==='social'?socialEmbedInfo(x.src):null;
+    const content=x.type==='image'
+      ?`<img src="${x.src}" alt="" loading="lazy" decoding="async">`
+      :x.type==='social'
+        ?`<span class="social-thumb" title="${escapeHtml(sx?.label||'Video social')}">${socialProviderIcon(sx?.provider||x.provider)}</span>`
+        :`<span>▶</span>`;
+    return `<button class="detail-thumb ${i===detailMediaIndex?'active':''}" onclick="setProductMedia(${i})">${content}</button>`;
+  }).join('');
   let colors='';
   if(p.colors?.length){
     if(p.colorMode==='multiple'){
