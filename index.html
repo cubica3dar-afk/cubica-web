@@ -62,19 +62,14 @@
             <h2>Iniciar sesión</h2>
             <p class="muted">No necesitás una cuenta para comprar.</p>
             <form id="login-form">
-              <label>Usuario
-                <input id="login-user" autocomplete="username" required placeholder="Usuario">
+              <label>Email
+                <input id="login-user" type="email" autocomplete="username" required placeholder="tu@email.com">
               </label>
               <label>Contraseña
                 <input id="login-password" type="password" autocomplete="current-password" required placeholder="Contraseña">
               </label>
               <button class="btn primary full" type="submit">Iniciar sesión</button>
             </form>
-            <div class="demo-box">
-              <strong>Accesos de prueba</strong>
-              <span>Admin: <code>admin</code> / <code>cubica123</code></span>
-              <span>Cliente: <code>cliente</code> / <code>cliente123</code></span>
-            </div>
           </div>
         </div>
       </section>
@@ -485,7 +480,9 @@
   </div>
 
   <script src="github-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
+  <script src="supabase-bridge.js"></script>
   <script type="module" src="viewer.js"></script>
   <script src="slicer.js"></script>
 </body>
