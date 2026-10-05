@@ -44,6 +44,7 @@
       session = null;
       localStorage.removeItem(STORAGE.session);
       renderApp();
+      window.dispatchEvent(new CustomEvent("cubica:auth-ready",{detail:{role:null}}));
       return;
     }
 
@@ -56,6 +57,7 @@
     };
     writeLocal(STORAGE.session, session);
     renderApp();
+    window.dispatchEvent(new CustomEvent("cubica:auth-ready",{detail:{role:session.role}}));
     if(showToast) toast(session.role === "admin" ? "Sesión de administrador iniciada" : "Sesión iniciada");
   }
 
