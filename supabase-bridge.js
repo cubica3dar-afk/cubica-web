@@ -135,13 +135,16 @@
       for(const m of media||[]){
         if(!m.public_url) continue;
         if(!mediaByProduct.has(m.product_id)) mediaByProduct.set(m.product_id,[]);
+        const storagePath=m.storage_path||"";
+        const socialMatch=storagePath.match(/^external\/social\/(youtube|instagram|tiktok)\//);
         mediaByProduct.get(m.product_id).push({
           id:"remote-"+m.product_id+"-"+m.sort_order,
-          type:m.media_type,
+          type:socialMatch?"social":m.media_type,
           src:m.public_url,
           name:m.file_name||"",
-          storagePath:m.storage_path||"",
-          source:(m.storage_path||"").startsWith("external/")?"url":"storage"
+          storagePath,
+          source:socialMatch?"social":storagePath.startsWith("external/")?"url":"storage",
+          provider:socialMatch?socialMatch[1]:""
         });
       }
 
@@ -217,8 +220,14 @@
         .filter(m=>m?.src && !String(m.src).startsWith("data:"))
         .map((m,i)=>({
           product_id:String(p.id),
-          media_type:m.type==="video"?"video":"image",
-          storage_path:String(m.storagePath||(`external/${p.id}/${i}`)),
+          // La tabla mantiene media_type image/video; los embeds sociales se distinguen por storage_path.
+          media_type:(m.type==="video"||m.type==="social")?"video":"image",
+          storage_path:String(
+            m.storagePath ||
+            (m.type==="social" && m.provider
+              ? `external/social/${m.provider}/${p.id}-${i}`
+              : `external/${p.id}/${i}`)
+          ),
           public_url:String(m.src),
           file_name:String(m.name||""),
           sort_order:i
