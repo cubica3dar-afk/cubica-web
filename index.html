@@ -411,12 +411,13 @@
           <div class="media-url-block">
             <div>
               <strong>O usar una URL externa</strong>
-              <small>No ocupa tu almacenamiento de Supabase. Para videos usá una URL directa a MP4/WebM; un enlace normal de YouTube no funciona como archivo de video.</small>
+              <small>No ocupa tu almacenamiento de Supabase. Podés usar una imagen, un video directo MP4/WebM o un enlace social público de YouTube, Instagram o TikTok.</small>
             </div>
             <div class="media-url-row">
               <select id="finished-media-url-type" aria-label="Tipo de medio">
                 <option value="image">Imagen</option>
-                <option value="video">Video</option>
+                <option value="video">Video directo</option>
+                <option value="social">Video social</option>
               </select>
               <input id="finished-media-url" type="url" inputmode="url" placeholder="https://ejemplo.com/imagen.webp">
               <button id="add-finished-media-url" type="button" class="btn secondary">+ URL</button>
@@ -497,8 +498,8 @@
 
   <script src="github-config.js?v=20261005-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20261005-4"></script>
-  <script src="supabase-bridge.js?v=20261005-5"></script>
+  <script src="script.js?v=20261005-6"></script>
+  <script src="supabase-bridge.js?v=20261005-6"></script>
   <script src="supabase-inventory.js?v=20261005-4"></script>
   <script src="supabase-sales.js?v=20261005-2"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
