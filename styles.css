@@ -224,3 +224,13 @@ td input,td select{padding:8px;border-radius:8px;min-width:80px}
 
 
 .github-pages-mode{margin:0 0 16px;padding:14px 16px;border:1px solid rgba(245,190,70,.32);border-radius:14px;background:rgba(245,190,70,.08);display:flex;gap:10px;align-items:flex-start;flex-direction:column}.github-pages-mode strong{font-size:13px}.github-pages-mode span{font-size:12px;line-height:1.5;color:var(--muted,#aaa)}
+
+
+/* Medios de productos: subida a Storage o URL externa */
+.media-url-block{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}
+.media-url-block>div:first-child strong,.media-url-block>div:first-child small{display:block}
+.media-url-block>div:first-child small{margin-top:4px;color:var(--muted);font-size:11px;line-height:1.45}
+.media-url-row{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:12px}
+.media-url-row select,.media-url-row input{margin:0}
+.media-admin-card span small{display:block;color:var(--muted);font-size:9px;margin-top:2px}
+@media(max-width:700px){.media-url-row{grid-template-columns:1fr}.media-url-row .btn{width:100%}}
