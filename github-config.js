@@ -1,13 +1,15 @@
-/* Configuración de Cúbica para GitHub Pages.
-   Dejá apiBase vacío para modo 100% estático/localStorage.
-   Cuando tengas un backend externo, poné por ejemplo:
-   apiBase: "https://api.cubica3d.ar"
+/* Configuración pública de Cúbica para GitHub Pages + Supabase.
+   La Publishable Key puede vivir en el frontend. La seguridad real la controla RLS.
+   Nunca pongas aquí una Secret Key, service_role ni la contraseña de la base de datos.
 */
 window.CUBICA_CONFIG = {
-  mode: "github-pages",
+  mode: "supabase",
   apiBase: "",
-  publicStore: true
+  publicStore: true,
+  supabaseUrl: "https://mymrbpwvghxmqqpzzdqk.supabase.co",
+  supabasePublishableKey: "sb_publishable_jLx1W-mzf4pL2Z09MLr_Pw_tWS84NWV"
 };
+
 window.cubicaApiUrl = function(path){
   const base = String(window.CUBICA_CONFIG?.apiBase || "").replace(/\/$/, "");
   return base ? base + path : path;
