@@ -397,16 +397,32 @@
           </div>
           <div class="media-upload-grid">
             <label class="media-upload">
-              <span>🖼️ Agregar imágenes</span>
-              <small>JPG, PNG o WEBP · hasta 6 imágenes · 5 MB c/u</small>
+              <span>🖼️ Subir imágenes</span>
+              <small>JPG, PNG o WEBP · hasta 6 imágenes · 5 MB c/u · se guardan en Supabase Storage</small>
               <input id="finished-images" type="file" accept="image/jpeg,image/png,image/webp" multiple>
             </label>
             <label class="media-upload">
-              <span>🎥 Agregar videos</span>
-              <small>MP4/WebM · hasta 2 videos · 8 MB c/u</small>
+              <span>🎥 Subir videos</span>
+              <small>MP4/WebM · hasta 2 videos · 8 MB c/u · se guardan en Supabase Storage</small>
               <input id="finished-videos" type="file" accept="video/mp4,video/webm" multiple>
             </label>
           </div>
+
+          <div class="media-url-block">
+            <div>
+              <strong>O usar una URL externa</strong>
+              <small>No ocupa tu almacenamiento de Supabase. Para videos usá una URL directa a MP4/WebM; un enlace normal de YouTube no funciona como archivo de video.</small>
+            </div>
+            <div class="media-url-row">
+              <select id="finished-media-url-type" aria-label="Tipo de medio">
+                <option value="image">Imagen</option>
+                <option value="video">Video</option>
+              </select>
+              <input id="finished-media-url" type="url" inputmode="url" placeholder="https://ejemplo.com/imagen.webp">
+              <button id="add-finished-media-url" type="button" class="btn secondary">+ URL</button>
+            </div>
+          </div>
+
           <div id="finished-media-preview" class="media-admin-preview"></div>
         </div>
 
@@ -481,10 +497,10 @@
 
   <script src="github-config.js?v=20261005-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20261005-2"></script>
-  <script src="supabase-bridge.js?v=20261005-3"></script>
-  <script src="supabase-inventory.js?v=20261005-3"></script>
-  <script src="supabase-sales.js?v=20261005-1"></script>
+  <script src="script.js?v=20261005-4"></script>
+  <script src="supabase-bridge.js?v=20261005-4"></script>
+  <script src="supabase-inventory.js?v=20261005-4"></script>
+  <script src="supabase-sales.js?v=20261005-2"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
   <script src="slicer.js?v=20261005-2"></script>
 </body>
