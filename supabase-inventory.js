@@ -175,24 +175,46 @@
     },600);
   };
 
+  async function inspectInventoryAndOfferMigration({forcePrompt=false}={}){
+    if(session?.role!=="admin") return;
+    try{
+      const {data,error}=await client.from("supplies").select("id").limit(1);
+      if(error) throw error;
+
+      if(!data?.length){
+        setBadge("Supabase: inventario pendiente","warn");
+        const already=sessionStorage.getItem("cubica_inventory_migration_prompted");
+        if(forcePrompt || !already){
+          sessionStorage.setItem("cubica_inventory_migration_prompted","1");
+          const ok=confirm("Supabase todavía no tiene insumos ni recetas. ¿Migrar ahora el inventario actual de este navegador?");
+          if(ok) await migrateInventoryToSupabase();
+        }
+        return;
+      }
+      await loadInventoryFromSupabase();
+    }catch(err){
+      console.error("Revisión inventario Supabase",err);
+      setBadge("Supabase: inventario sin conexión","error");
+      toast("No se pudo revisar el inventario de Supabase.");
+    }
+  }
+
   window.addEventListener("cubica:auth-ready", async(e)=>{
     if(e.detail?.role!=="admin") return;
+    // Espera un instante para que toda la app termine de inicializarse antes de preguntar.
+    setTimeout(()=>inspectInventoryAndOfferMigration({forcePrompt:false}),500);
+  });
 
-    // Si Supabase todavía no tiene insumos, ofrecer migrar lo local.
-    const {data,error}=await client.from("supplies").select("id").limit(1);
-    if(error){
-      console.error(error);
-      return;
+  document.addEventListener("DOMContentLoaded",()=>{
+    const badge=document.getElementById("server-sync-badge");
+    if(badge){
+      badge.onclick=async()=>{
+        if(session?.role!=="admin"){
+          toast("El estado de datos se gestiona desde Supabase.");
+          return;
+        }
+        await inspectInventoryAndOfferMigration({forcePrompt:true});
+      };
     }
-    if(!data?.length && !sessionStorage.getItem("cubica_inventory_migration_prompted")){
-      sessionStorage.setItem("cubica_inventory_migration_prompted","1");
-      setTimeout(async()=>{
-        if(!confirm("Supabase todavía no tiene insumos ni recetas. ¿Migrar ahora el inventario actual de este navegador?")) return;
-        try{ await migrateInventoryToSupabase(); }
-        catch(err){ console.error(err); toast("No se pudo migrar el inventario: "+(err.message||"error desconocido")); }
-      },350);
-      return;
-    }
-    await loadInventoryFromSupabase();
   });
 })();
