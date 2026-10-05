@@ -1,6 +1,7 @@
 /* Cúbica + Supabase
-   Etapa 1: autenticación real y detección de rol.
-   El catálogo y la gestión siguen usando el comportamiento actual hasta completar la migración.
+   Etapa 2: autenticación real + catálogo online.
+   Productos/categorías/colores se leen desde Supabase.
+   El administrador puede migrar el catálogo local actual una sola vez.
 */
 (function(){
   const cfg = window.CUBICA_CONFIG || {};
@@ -13,6 +14,15 @@
 
   const client = window.supabase.createClient(url, key);
   window.cubicaSupabase = client;
+
+  let catalogLoadedFromSupabase = false;
+  let catalogSyncTimer = null;
+  let catalogSyncing = false;
+  let catalogLoadInProgress = false;
+
+  function setDataBadge(text, mode="ok"){
+    if(typeof updateServerBadge === "function") updateServerBadge(text, mode);
+  }
 
   async function profileFor(user){
     if(!user) return null;
@@ -49,6 +59,213 @@
     if(showToast) toast(session.role === "admin" ? "Sesión de administrador iniciada" : "Sesión iniciada");
   }
 
+  function remoteProductToLocal(row, colorsByProduct, mediaByProduct, previousById){
+    const previous = previousById.get(row.id) || {};
+    const remoteMedia = mediaByProduct.get(row.id) || [];
+    return normalizeProduct({
+      id: row.id,
+      name: row.name,
+      category: row.category || "",
+      description: row.description || "",
+      price: Number(row.price) || 0,
+      stock: Number(row.stock) || 0,
+      colorMode: row.color_mode === "multiple" ? "multiple" : "single",
+      active: row.active !== false,
+      colors: (colorsByProduct.get(row.id) || []).map(c=>({name:c.name,hex:c.hex})),
+      // Las recetas se migran en la próxima etapa. Mientras tanto conservamos
+      // la receta local si existe en este navegador y el ID coincide.
+      recipe: Array.isArray(previous.recipe) ? previous.recipe : [],
+      // Si todavía no hay medios en Supabase, conservamos temporalmente los locales.
+      media: remoteMedia.length ? remoteMedia : (Array.isArray(previous.media) ? previous.media : [])
+    });
+  }
+
+  async function loadCatalogFromSupabase(){
+    if(catalogLoadInProgress) return;
+    catalogLoadInProgress = true;
+    try{
+      setDataBadge("Datos: Supabase…","pending");
+
+      const { data: rows, error: productError } = await client
+        .from("products")
+        .select("id,name,category,description,price,stock,color_mode,active")
+        .eq("active", true)
+        .order("created_at", { ascending:true });
+
+      if(productError) throw productError;
+
+      if(!rows?.length){
+        catalogLoadedFromSupabase = false;
+        setDataBadge("Supabase: catálogo pendiente","warn");
+
+        if(session?.role === "admin" && !sessionStorage.getItem("cubica_catalog_migration_prompted")){
+          sessionStorage.setItem("cubica_catalog_migration_prompted","1");
+          setTimeout(async()=>{
+            if(!confirm("La base de productos de Supabase está vacía. ¿Migrar ahora el catálogo actual de este navegador a Supabase?")) return;
+            try{
+              await migrateProductsToSupabase();
+            }catch(err){
+              console.error(err);
+              toast("No se pudo migrar el catálogo: "+(err.message||"error desconocido"));
+            }
+          },300);
+        }
+        return;
+      }
+
+      const ids = rows.map(r=>r.id);
+      const previousById = new Map((products||[]).map(p=>[p.id,p]));
+
+      const [{data:colors,error:colorError},{data:media,error:mediaError}] = await Promise.all([
+        client.from("product_colors").select("product_id,name,hex,sort_order").in("product_id",ids).order("sort_order"),
+        client.from("product_media").select("product_id,media_type,public_url,file_name,sort_order").in("product_id",ids).order("sort_order")
+      ]);
+      if(colorError) throw colorError;
+      if(mediaError) throw mediaError;
+
+      const colorsByProduct = new Map();
+      for(const c of colors||[]){
+        if(!colorsByProduct.has(c.product_id)) colorsByProduct.set(c.product_id,[]);
+        colorsByProduct.get(c.product_id).push(c);
+      }
+
+      const mediaByProduct = new Map();
+      for(const m of media||[]){
+        if(!m.public_url) continue;
+        if(!mediaByProduct.has(m.product_id)) mediaByProduct.set(m.product_id,[]);
+        mediaByProduct.get(m.product_id).push({
+          id:"remote-"+m.product_id+"-"+m.sort_order,
+          type:m.media_type,
+          src:m.public_url,
+          name:m.file_name||""
+        });
+      }
+
+      products = rows.map(r=>remoteProductToLocal(r,colorsByProduct,mediaByProduct,previousById));
+      writeLocal(STORAGE.products,products);
+      catalogLoadedFromSupabase = true;
+      setDataBadge("Datos: Supabase","ok");
+      renderProducts();
+      if(session?.role==="admin") renderFinishedStock();
+    }catch(err){
+      console.error("Catálogo Supabase",err);
+      catalogLoadedFromSupabase = false;
+      setDataBadge("Supabase: sin conexión","error");
+    }finally{
+      catalogLoadInProgress = false;
+    }
+  }
+
+  function productRows(list){
+    return list.map(p=>({
+      id:String(p.id),
+      name:String(p.name||""),
+      category:p.category||null,
+      description:String(p.description||""),
+      price:Number(p.price)||0,
+      stock:Math.max(0,Math.trunc(Number(p.stock)||0)),
+      color_mode:p.colorMode==="multiple"?"multiple":"single",
+      active:p.active!==false
+    }));
+  }
+
+  async function ensureProductCategories(list){
+    const names=[...new Set(list.map(p=>String(p.category||"").trim()).filter(Boolean))];
+    if(!names.length) return;
+    const payload=names.map((name,i)=>({name,sort_order:(i+1)*10,active:true}));
+    const {error}=await client.from("product_categories").upsert(payload,{onConflict:"name"});
+    if(error) throw error;
+  }
+
+  async function syncProductChildren(list){
+    for(const p of list){
+      let r=await client.from("product_colors").delete().eq("product_id",String(p.id));
+      if(r.error) throw r.error;
+      const colors=(Array.isArray(p.colors)?p.colors:[])
+        .filter(c=>c?.name)
+        .map((c,i)=>({product_id:String(p.id),name:String(c.name),hex:/^#[0-9a-f]{6}$/i.test(c.hex||"")?c.hex:"#ffffff",sort_order:i}));
+      if(colors.length){
+        r=await client.from("product_colors").insert(colors);
+        if(r.error) throw r.error;
+      }
+
+      // Medios pequeños pueden migrarse como URL existente.
+      // Data URLs grandes quedan para la etapa de Supabase Storage.
+      r=await client.from("product_media").delete().eq("product_id",String(p.id));
+      if(r.error) throw r.error;
+      const media=(Array.isArray(p.media)?p.media:[])
+        .filter(m=>m?.src && (!String(m.src).startsWith("data:") || String(m.src).length<250000))
+        .map((m,i)=>({
+          product_id:String(p.id),
+          media_type:m.type==="video"?"video":"image",
+          storage_path:"legacy/"+String(p.id)+"/"+i,
+          public_url:String(m.src),
+          file_name:String(m.name||""),
+          sort_order:i
+        }));
+      if(media.length){
+        r=await client.from("product_media").insert(media);
+        if(r.error) throw r.error;
+      }
+    }
+  }
+
+  async function saveProductsToSupabase(list,{removeMissing=true}={}){
+    if(session?.role!=="admin") return;
+    if(catalogSyncing) return;
+    catalogSyncing=true;
+    try{
+      await ensureProductCategories(list);
+
+      if(removeMissing){
+        const {data:existing,error}=await client.from("products").select("id");
+        if(error) throw error;
+        const keep=new Set(list.map(p=>String(p.id)));
+        const remove=(existing||[]).map(x=>x.id).filter(id=>!keep.has(String(id)));
+        if(remove.length){
+          const d=await client.from("products").delete().in("id",remove);
+          if(d.error) throw d.error;
+        }
+      }
+
+      const rows=productRows(list);
+      if(rows.length){
+        const {error}=await client.from("products").upsert(rows,{onConflict:"id"});
+        if(error) throw error;
+      }
+      await syncProductChildren(list);
+      catalogLoadedFromSupabase=true;
+      setDataBadge("Datos: Supabase","ok");
+    }finally{
+      catalogSyncing=false;
+    }
+  }
+
+  async function migrateProductsToSupabase(){
+    if(session?.role!=="admin") throw new Error("Solo el administrador puede migrar productos.");
+    if(!Array.isArray(products)||!products.length) throw new Error("No hay productos locales para migrar.");
+    setDataBadge("Supabase: migrando…","pending");
+    await saveProductsToSupabase(products,{removeMissing:false});
+    await loadCatalogFromSupabase();
+    toast("Catálogo migrado a Supabase correctamente.");
+  }
+  window.migrateCubicaProductsToSupabase=migrateProductsToSupabase;
+
+  // Cada cambio de productos hecho desde el panel admin se replica a Supabase.
+  window.cubicaOnLocalWrite = function(key,value){
+    if(key!==STORAGE.products || session?.role!=="admin") return;
+    clearTimeout(catalogSyncTimer);
+    catalogSyncTimer=setTimeout(async()=>{
+      try{
+        await saveProductsToSupabase(value,{removeMissing:true});
+      }catch(err){
+        console.error("Sincronización de productos",err);
+        setDataBadge("Supabase: sin sincronizar","error");
+        toast("El cambio quedó local, pero no pudo sincronizarse con Supabase.");
+      }
+    },500);
+  };
+
   document.addEventListener("DOMContentLoaded", async () => {
     const form = $("login-form");
     if(form){
@@ -56,32 +273,30 @@
         e.preventDefault();
         const email = $("login-user").value.trim();
         const password = $("login-password").value;
-
         const btn = e.submitter || form.querySelector('button[type="submit"]');
         const old = btn?.textContent || "Iniciar sesión";
-        if(btn){ btn.disabled = true; btn.textContent = "Ingresando…"; }
+        if(btn){ btn.disabled=true; btn.textContent="Ingresando…"; }
 
         try{
-          const { data, error } = await client.auth.signInWithPassword({ email, password });
+          const {data,error}=await client.auth.signInWithPassword({email,password});
           if(error) throw error;
-          await applySupabaseSession(data.session, true);
+          await applySupabaseSession(data.session,true);
+          await loadCatalogFromSupabase();
           showSection("store");
         }catch(err){
           console.error(err);
-          toast(err?.message === "Invalid login credentials"
-            ? "Email o contraseña incorrectos."
-            : "No se pudo iniciar sesión.");
+          toast(err?.message==="Invalid login credentials"?"Email o contraseña incorrectos.":"No se pudo iniciar sesión.");
         }finally{
-          if(btn){ btn.disabled = false; btn.textContent = old; }
+          if(btn){btn.disabled=false;btn.textContent=old;}
         }
       };
     }
 
-    const logout = $("logout-btn");
+    const logout=$("logout-btn");
     if(logout){
-      logout.onclick = async () => {
+      logout.onclick=async()=>{
         await client.auth.signOut();
-        session = null;
+        session=null;
         localStorage.removeItem(STORAGE.session);
         renderApp();
         showSection("store");
@@ -89,11 +304,14 @@
       };
     }
 
-    const { data } = await client.auth.getSession();
-    await applySupabaseSession(data.session, false);
+    const {data}=await client.auth.getSession();
+    await applySupabaseSession(data.session,false);
+    await loadCatalogFromSupabase();
 
-    client.auth.onAuthStateChange(async (_event, newSession) => {
-      await applySupabaseSession(newSession, false);
+    client.auth.onAuthStateChange(async(_event,newSession)=>{
+      await applySupabaseSession(newSession,false);
+      // Al recuperar la sesión al volver a una pestaña no se cambia la sección activa.
+      if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
     });
   });
 })();
