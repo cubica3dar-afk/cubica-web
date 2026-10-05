@@ -246,7 +246,7 @@ function renderProducts(){
   const list=products.filter(p=>{normalizeProduct(p); const hay=[p.name,p.category,p.description].join(" ").toLowerCase(); return (cat==="all"||p.category===cat)&&(!search||hay.includes(search));});
   $("product-grid").innerHTML=list.map(p=>{
     const firstImage=p.media.find(m=>m.type==="image");
-    const cover=firstImage?`<img class="product-cover" src="${firstImage.src}" alt="${escapeHtml(p.name)}">`:`<div class="product-icon">${iconFor(p.category)}</div>`;
+    const cover=firstImage?`<img class="product-cover" src="${firstImage.src}" alt="${escapeHtml(p.name)}" loading="lazy" decoding="async">`:`<div class="product-icon">${iconFor(p.category)}</div>`;
     return `<article class="product-card product-card-clickable" onclick="openProductDetail('${p.id}')">
       <div class="product-cover-wrap">${cover}${p.media.some(m=>m.type==="video")?'<span class="media-badge">▶ Video</span>':''}</div>
       <div class="product-meta">${escapeHtml(p.category)} · ${p.stock>0?`${p.stock} disponibles`:"Se fabrica a pedido"}</div>
@@ -390,14 +390,62 @@ async function fileToDataUrl(file, maxImageBytes=5*1024*1024, maxVideoBytes=8*10
 }
 function renderFinishedMedia(){
   const box=$('finished-media-preview'); if(!box)return;
-  box.innerHTML=finishedMedia.length?finishedMedia.map((m,i)=>`<div class="media-admin-card">${m.type==='image'?`<img src="${m.src}" alt="">`:`<video src="${m.src}" muted controls preload="metadata"></video>`}<div><span>${m.type==='image'?'Imagen':'Video'} ${i+1}</span><button type="button" class="btn ghost" onclick="removeFinishedMedia(${i})">×</button></div></div>`).join(''):'<div class="inline-empty">Todavía no agregaste imágenes ni videos.</div>';
+  box.innerHTML=finishedMedia.length?finishedMedia.map((m,i)=>{
+    const sourceLabel=m.source==='url'?'URL externa':m.source==='storage'?'Supabase':'Local';
+    const preview=m.type==='image'
+      ?`<img src="${m.src}" alt="" loading="lazy" decoding="async">`
+      :`<video src="${m.src}" muted controls preload="metadata"></video>`;
+    return `<div class="media-admin-card">${preview}<div><span>${m.type==='image'?'Imagen':'Video'} ${i+1}<small>${sourceLabel}</small></span><button type="button" class="btn ghost" onclick="removeFinishedMedia(${i})">×</button></div></div>`;
+  }).join(''):'<div class="inline-empty">Todavía no agregaste imágenes ni videos.</div>';
 }
 async function handleFinishedMediaInput(input,type){
   const files=[...input.files]; if(!files.length)return;
   const maxCount=type==='image'?6:2; const existing=finishedMedia.filter(m=>m.type===type).length;
   if(existing+files.length>maxCount){toast(`Podés agregar hasta ${maxCount} ${type==='image'?'imágenes':'videos'}.`);input.value='';return;}
-  try{for(const file of files){const src=await fileToDataUrl(file);finishedMedia.push({id:uid('m'),type,src,name:file.name});}renderFinishedMedia();}catch(err){toast(err.message)}
+  try{
+    for(const file of files){
+      if(window.CUBICA_CONFIG?.mode==='supabase'){
+        if(typeof window.cubicaUploadProductMedia!=='function') throw new Error('La subida a Supabase Storage todavía no está disponible.');
+        toast(`Subiendo ${file.name}…`);
+        const media=await window.cubicaUploadProductMedia(file,type);
+        finishedMedia.push(media);
+      }else{
+        const src=await fileToDataUrl(file);
+        finishedMedia.push({id:uid('m'),type,src,name:file.name,source:'local'});
+      }
+    }
+    renderFinishedMedia();
+  }catch(err){
+    console.error(err);
+    toast(err.message||'No se pudo subir el archivo.');
+  }
   input.value='';
+}
+function addFinishedMediaUrl(){
+  const input=$('finished-media-url');
+  const type=$('finished-media-url-type')?.value==='video'?'video':'image';
+  const value=(input?.value||'').trim();
+  if(!value)return toast('Pegá una URL de imagen o video.');
+
+  let parsed;
+  try{parsed=new URL(value);}catch{return toast('La URL no es válida.');}
+  if(!['http:','https:'].includes(parsed.protocol))return toast('La URL debe comenzar con http:// o https://');
+
+  const maxCount=type==='image'?6:2;
+  const existing=finishedMedia.filter(m=>m.type===type).length;
+  if(existing>=maxCount)return toast(`Podés agregar hasta ${maxCount} ${type==='image'?'imágenes':'videos'}.`);
+
+  finishedMedia.push({
+    id:uid('m'),
+    type,
+    src:value,
+    name:type==='image'?'Imagen por URL':'Video por URL',
+    storagePath:`external/${uid('u')}`,
+    source:'url'
+  });
+  input.value='';
+  renderFinishedMedia();
+  toast(type==='image'?'Imagen por URL agregada.':'Video por URL agregado.');
 }
 function removeFinishedMedia(index){finishedMedia.splice(index,1);renderFinishedMedia()}
 function openProductDetail(id){
@@ -406,8 +454,8 @@ function openProductDetail(id){
 function renderProductDetail(){
   const p=products.find(x=>x.id===detailProductId);if(!p)return;normalizeProduct(p);
   const media=p.media?.length?p.media:[{type:'placeholder'}]; if(detailMediaIndex>=media.length)detailMediaIndex=0; const m=media[detailMediaIndex];
-  const viewer=m.type==='image'?`<img src="${m.src}" alt="${escapeHtml(p.name)}">`:m.type==='video'?`<video src="${m.src}" controls playsinline></video>`:`<div class="product-detail-placeholder">${iconFor(p.category)}</div>`;
-  const thumbs=media.map((x,i)=>`<button class="detail-thumb ${i===detailMediaIndex?'active':''}" onclick="setProductMedia(${i})">${x.type==='image'?`<img src="${x.src}" alt="">`:`<span>▶</span>`}</button>`).join('');
+  const viewer=m.type==='image'?`<img src="${m.src}" alt="${escapeHtml(p.name)}" decoding="async">`:m.type==='video'?`<video src="${m.src}" controls playsinline preload="metadata"></video>`:`<div class="product-detail-placeholder">${iconFor(p.category)}</div>`;
+  const thumbs=media.map((x,i)=>`<button class="detail-thumb ${i===detailMediaIndex?'active':''}" onclick="setProductMedia(${i})">${x.type==='image'?`<img src="${x.src}" alt="" loading="lazy" decoding="async">`:`<span>▶</span>`}</button>`).join('');
   let colors='';
   if(p.colors?.length){
     if(p.colorMode==='multiple'){
@@ -763,6 +811,7 @@ document.addEventListener("DOMContentLoaded",async()=>{
   $("finished-search").oninput=renderFinishedStock;$("finished-category-filter").onchange=renderFinishedStock;
   $("finished-images").addEventListener("change",e=>handleFinishedMediaInput(e.target,"image"));
   $("finished-videos").addEventListener("change",e=>handleFinishedMediaInput(e.target,"video"));
+  $("add-finished-media-url")?.addEventListener("click",addFinishedMediaUrl);
   $("supply-search").oninput=renderSupplies;$("supply-category-filter").onchange=renderSupplies;
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
   $("checkout-btn").onclick=()=>cart.length?openModal("checkout-modal"):toast("El carrito está vacío.");
