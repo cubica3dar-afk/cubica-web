@@ -750,11 +750,14 @@ document.addEventListener("DOMContentLoaded",async()=>{
     showSection("store");
     window.scrollTo({top:0,behavior:"smooth"});
   };
-  $("login-form").addEventListener("submit",e=>{e.preventDefault();const u=$("login-user").value.trim(),p=$("login-password").value;
-    const accounts={admin:{password:"cubica123",role:"admin",username:"admin"},cliente:{password:"cliente123",role:"customer",username:"cliente",email:"cliente@ejemplo.com"}};
-    const a=accounts[u];if(!a||a.password!==p)return toast("Usuario o contraseña incorrectos.");session={username:a.username,role:a.role,email:a.email||""};write(STORAGE.session,session);renderApp();showSection("store");toast("Sesión iniciada");
-  });
-  $("logout-btn").onclick=()=>{localStorage.removeItem(STORAGE.session);session=null;renderApp();showSection("store");toast("Sesión cerrada")};
+  // En modo Supabase, el login/logout real lo instala supabase-bridge.js.
+  if(CUBICA_RUNTIME.mode!=="supabase"){
+    $("login-form").addEventListener("submit",e=>{e.preventDefault();const u=$("login-user").value.trim(),p=$("login-password").value;
+      const accounts={admin:{password:"cubica123",role:"admin",username:"admin"},cliente:{password:"cliente123",role:"customer",username:"cliente",email:"cliente@ejemplo.com"}};
+      const a=accounts[u];if(!a||a.password!==p)return toast("Usuario o contraseña incorrectos.");session={username:a.username,role:a.role,email:a.email||""};write(STORAGE.session,session);renderApp();showSection("store");toast("Sesión iniciada");
+    });
+    $("logout-btn").onclick=()=>{localStorage.removeItem(STORAGE.session);session=null;renderApp();showSection("store");toast("Sesión cerrada")};
+  }
   $("cart-icon-btn").onclick=()=>showSection("cart");
   $("product-search").oninput=renderProducts;$("product-category").onchange=renderProducts;
   $("finished-search").oninput=renderFinishedStock;$("finished-category-filter").onchange=renderFinishedStock;
@@ -788,7 +791,9 @@ document.addEventListener("DOMContentLoaded",async()=>{
   initBudgetDefaults();
   if(window.__cubicaMigratedFromBrowser)toast("Datos del navegador migrados a la Raspberry Pi.");
   const syncBadge=$("server-sync-badge");
-  if(syncBadge)syncBadge.onclick=async()=>{
+  // Este comportamiento es solo para el backend Raspberry/Flask.
+  // En modo Supabase, supabase-inventory.js instala su propio comportamiento.
+  if(syncBadge && CUBICA_RUNTIME.mode!=="supabase")syncBadge.onclick=async()=>{
     if(serverStateInitialized)return toast("Productos, insumos, ventas y presupuestos se guardan en la Raspberry.");
     if(!confirm("¿Migrar los datos actuales de este navegador a la Raspberry Pi?"))return;
     try{await migrateCurrentBrowserToServer(false);toast("Datos migrados correctamente a la Raspberry.");}
