@@ -84,6 +84,9 @@ function queueServerWrite(localKey,value){
 function write(key,value){
   writeLocal(key,value);
   queueServerWrite(key,value);
+  if(typeof window.cubicaOnLocalWrite==="function"){
+    try{ window.cubicaOnLocalWrite(key,value); }catch(err){ console.error("Hook de persistencia Cúbica",err); }
+  }
 }
 async function migrateCurrentBrowserToServer(force=false){
   if(!HAS_BACKEND) throw new Error("GitHub Pages no tiene base de datos de servidor configurada.");
