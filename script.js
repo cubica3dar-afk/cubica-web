@@ -153,6 +153,8 @@ let orders = read(STORAGE.orders, []);
 let cart = read(STORAGE.cart, []);
 let session = read(STORAGE.session, null);
 let salesPeriod = "day";
+let analyticsRange = "30d";
+let analyticsView = "summary";
 
 function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;$("toast-container").appendChild(el);setTimeout(()=>el.remove(),3000)}
 function initData(){
@@ -179,17 +181,53 @@ const WELCOME_MESSAGES = [
 ];
 
 function navItems(){
-  const base=[["store","Tienda"],["login","Ingresar"]];
-  if(session) base.splice(2,0,["orders",session.role==="admin"?"Ventas / Pedidos":"Mis pedidos"]);
-  if(session?.role==="admin") base.push(["stock-finished","Terminados"],["stock-supplies","Insumos"],["budget","Presupuestos"],["analytics","Análisis"]);
-  return base;
+  // La barra superior queda deliberadamente limpia. La gestión vive en el panel lateral.
+  return [["store","Tienda"]];
 }
 function setupNav(){
-  const nav=$("main-nav");nav.innerHTML="";
-  navItems().forEach(([id,label])=>{const b=document.createElement("button");b.textContent=label;b.dataset.section=id;b.onclick=()=>showSection(id);nav.appendChild(b)});
+  const nav=$("main-nav"); if(!nav)return;
+  nav.innerHTML="";
+  navItems().forEach(([id,label])=>{
+    const b=document.createElement("button");
+    b.textContent=label;b.dataset.section=id;b.onclick=()=>showSection(id);nav.appendChild(b);
+  });
   updateCartBadge();
 }
+function openAccountSidebar(){
+  if(!session){showSection("login");return;}
+  const sidebar=$("account-sidebar"), overlay=$("account-sidebar-overlay");
+  if(!sidebar||!overlay)return;
+  renderAccountSidebar();
+  sidebar.classList.add("open");
+  sidebar.setAttribute("aria-hidden","false");
+  overlay.classList.remove("hidden");
+  requestAnimationFrame(()=>overlay.classList.add("visible"));
+  document.body.classList.add("sidebar-open");
+}
+function closeAccountSidebar(){
+  const sidebar=$("account-sidebar"), overlay=$("account-sidebar-overlay");
+  if(!sidebar||!overlay)return;
+  sidebar.classList.remove("open");
+  sidebar.setAttribute("aria-hidden","true");
+  overlay.classList.remove("visible");
+  setTimeout(()=>{if(!sidebar.classList.contains("open"))overlay.classList.add("hidden");},180);
+  document.body.classList.remove("sidebar-open");
+}
+function renderAccountSidebar(){
+  const name=$("sidebar-user-name"), role=$("sidebar-user-role"), email=$("sidebar-user-email");
+  if(name)name.textContent=session?.username||"Visitante";
+  if(role)role.textContent=session?(session.role==="admin"?"Administrador":"Cliente"):"Sin sesión iniciada";
+  if(email)email.textContent=session?.email||"";
+  const img=$("sidebar-avatar-img"), fallback=$("sidebar-avatar-fallback");
+  if(img&&fallback){
+    if(session?.avatarUrl){img.src=session.avatarUrl;img.classList.remove("hidden");fallback.classList.add("hidden");}
+    else{img.removeAttribute("src");img.classList.add("hidden");fallback.classList.remove("hidden");}
+  }
+  document.querySelectorAll(".account-sidebar .admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"));
+  document.querySelectorAll(".account-sidebar .session-only").forEach(el=>el.classList.toggle("hidden",!session));
+}
 function showSection(id){
+  const requested=id;
   const section=$("section-"+id);
   if(!section)return;
   if(id==="orders" && !session){
@@ -200,12 +238,15 @@ function showSection(id){
     toast("Esta sección es exclusiva del administrador.");
     id="login";
   }
-  document.querySelectorAll(".page-section").forEach(s=>s.classList.add("hidden"));
+  document.querySelectorAll(".page-section").forEach(sec=>sec.classList.add("hidden"));
   $("section-"+id).classList.remove("hidden");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
+  document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.classList.toggle("active",b.dataset.sidebarSection===id));
+  closeAccountSidebar();
   if(id==="store") renderProducts(); if(id==="cart") renderCart(); if(id==="orders") renderOrders();
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();
+  if(requested==="store" && typeof window.cubicaTrackEvent==="function") window.cubicaTrackEvent("page_view",null,{section:"store"});
 }
 function renderWelcome(){
   const message=$("welcome-message");
@@ -219,13 +260,18 @@ function renderWelcome(){
 }
 function renderApp(){
   $("app").classList.remove("hidden");
-  $("user-badge").textContent=session?(session.role==="admin"?"Administrador":"Cliente"):"";
-  $("logout-btn").classList.toggle("hidden",!session);
+  const logout=$("logout-btn"); if(logout)logout.classList.toggle("hidden",!session);
+
+  const topImg=$("profile-avatar-top"), topFallback=$("profile-icon-fallback"), profileBtn=$("profile-btn");
+  if(profileBtn)profileBtn.title=session?(session.role==="admin"?"Administrador":"Mi cuenta"):"Ingresar";
+  if(topImg&&topFallback){
+    if(session?.avatarUrl){topImg.src=session.avatarUrl;topImg.classList.remove("hidden");topFallback.classList.add("hidden");}
+    else{topImg.removeAttribute("src");topImg.classList.add("hidden");topFallback.classList.remove("hidden");}
+  }
 
   // No quitar .hidden de las secciones de página al refrescar la sesión.
-  // showSection() es el único responsable de decidir qué sección está visible.
-  // Esto evita que al volver a la pestaña se muestren todas las secciones admin juntas.
   document.querySelectorAll(".admin-only").forEach(el=>{
+    if(el.closest?.("#account-sidebar")) return;
     if(el.classList.contains("page-section")){
       if(session?.role!=="admin") el.classList.add("hidden");
     }else{
@@ -233,6 +279,7 @@ function renderApp(){
     }
   });
 
+  renderAccountSidebar();
   setupNav();
   renderProducts();
   renderCart();
