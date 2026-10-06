@@ -335,7 +335,7 @@ body{overflow-x:hidden}
 /* Cuenta compacta + panel lateral */
 .profile-icon-btn{width:42px;height:42px;border:1px solid var(--line);border-radius:50%;padding:0;overflow:hidden;background:rgba(255,255,255,.045);color:#fff;display:grid;place-items:center;cursor:pointer;transition:.18s transform,.18s background,.18s border-color}
 .profile-icon-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.28);transform:translateY(-1px)}
-.profile-icon-fallback{font-size:20px;line-height:1}
+.profile-icon-fallback{font-size:20px;line-height:1;display:grid;place-items:center}.profile-icon-fallback svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}.sidebar-avatar-fallback{display:grid;place-items:center}.sidebar-avatar-fallback svg{width:31px;height:31px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
 .profile-avatar-top{width:100%;height:100%;object-fit:cover;display:block}
 .account-sidebar-overlay{position:fixed;inset:0;z-index:89;background:rgba(4,5,12,.6);opacity:0;transition:opacity .18s ease;backdrop-filter:blur(2px)}
 .account-sidebar-overlay.visible{opacity:1}
