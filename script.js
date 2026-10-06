@@ -295,7 +295,7 @@ function renderProducts(){
     const firstImage=p.media.find(m=>m.type==="image");
     const cover=firstImage?`<img class="product-cover" src="${firstImage.src}" alt="${escapeHtml(p.name)}" loading="lazy" decoding="async">`:`<div class="product-icon">${iconFor(p.category)}</div>`;
     return `<article class="product-card product-card-clickable" onclick="openProductDetail('${p.id}')">
-      <div class="product-cover-wrap">${cover}${p.media.some(m=>m.type==="video")?'<span class="media-badge">▶ Video</span>':''}</div>
+      <div class="product-cover-wrap">${cover}${p.media.some(m=>m.type==="video"||m.type==="social")?'<span class="media-badge">▶ Video</span>':''}</div>
       <div class="product-meta">${escapeHtml(p.category)} · ${p.stock>0?`${p.stock} disponibles`:"Se fabrica a pedido"}</div>
       <h3>${escapeHtml(p.name)}</h3>
       <div class="price">${money(p.price)}</div>
@@ -310,7 +310,9 @@ function addToCart(id, qtyOverride=null, colorOverride=null){
   const color=colorOverride ?? (p.colors?.[0]?.name||"");
   const existing=cart.find(x=>x.productId===id && (x.color||"")===color); const next=(existing?.qty||0)+q;
   if(existing)existing.qty=next;else cart.push({productId:id,qty:q,color});
-  write(STORAGE.cart,cart);toast("Producto agregado al carrito");renderCart();updateCartBadge();
+  write(STORAGE.cart,cart);
+  if(typeof window.cubicaTrackEvent==="function")window.cubicaTrackEvent("add_to_cart",id,{qty:q,color,price:Number(p.price)||0});
+  toast("Producto agregado al carrito");renderCart();updateCartBadge();
 }
 function updateCartBadge(){
   const badge=$("cart-badge");
@@ -592,7 +594,10 @@ function addFinishedMediaUrl(){
 }
 function removeFinishedMedia(index){finishedMedia.splice(index,1);renderFinishedMedia()}
 function openProductDetail(id){
-  const p=products.find(x=>x.id===id);if(!p)return;normalizeProduct(p);detailProductId=id;detailMediaIndex=0;detailSelectedColor=p.colors?.[0]?.name||'';detailSelectedColors=p.colors?.length?[p.colors[0].name]:[];renderProductDetail();openModal('product-detail-modal');
+  const p=products.find(x=>x.id===id);if(!p)return;
+  normalizeProduct(p);detailProductId=id;detailMediaIndex=0;detailSelectedColor=p.colors?.[0]?.name||'';detailSelectedColors=p.colors?.length?[p.colors[0].name]:[];
+  renderProductDetail();openModal('product-detail-modal');
+  if(typeof window.cubicaTrackEvent==="function")window.cubicaTrackEvent("product_view",id,{name:p.name,category:p.category});
 }
 function renderProductDetail(){
   const p=products.find(x=>x.id===detailProductId);if(!p)return;normalizeProduct(p);
@@ -1170,6 +1175,23 @@ document.addEventListener("DOMContentLoaded",async()=>{
     $("logout-btn").onclick=()=>{localStorage.removeItem(STORAGE.session);session=null;renderApp();showSection("store");toast("Sesión cerrada")};
   }
   $("cart-icon-btn").onclick=()=>showSection("cart");
+  $("profile-btn")?.addEventListener("click",()=>session?openAccountSidebar():showSection("login"));
+  $("account-sidebar-close")?.addEventListener("click",closeAccountSidebar);
+  $("account-sidebar-overlay")?.addEventListener("click",closeAccountSidebar);
+  document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.addEventListener("click",()=>showSection(b.dataset.sidebarSection)));
+  $("sidebar-avatar-button")?.addEventListener("click",()=>{if(session?.role==="admin")$("profile-avatar-input")?.click();});
+  $("profile-avatar-input")?.addEventListener("change",async e=>{
+    const file=e.target.files?.[0]; if(!file)return;
+    if(typeof window.cubicaUploadProfileAvatar!=="function"){toast("La foto de perfil requiere Supabase.");e.target.value="";return;}
+    try{
+      toast("Subiendo foto de perfil…");
+      const avatar=await window.cubicaUploadProfileAvatar(file);
+      if(session){session.avatarUrl=avatar.publicUrl;session.avatarPath=avatar.path;writeLocal(STORAGE.session,session);}
+      renderApp();renderAccountSidebar();toast("Foto de perfil actualizada.");
+    }catch(err){console.error(err);toast(err.message||"No se pudo subir la foto de perfil.");}
+    e.target.value="";
+  });
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeAccountSidebar();});
   $("product-search").oninput=renderProducts;$("product-category").onchange=renderProducts;
   $("finished-search").oninput=renderFinishedStock;$("finished-category-filter").onchange=renderFinishedStock;
   $("finished-images").addEventListener("change",e=>handleFinishedMediaInput(e.target,"image"));
@@ -1177,7 +1199,11 @@ document.addEventListener("DOMContentLoaded",async()=>{
   $("add-finished-media-url")?.addEventListener("click",addFinishedMediaUrl);
   $("supply-search").oninput=renderSupplies;$("supply-category-filter").onchange=renderSupplies;
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
-  $("checkout-btn").onclick=()=>cart.length?openModal("checkout-modal"):toast("El carrito está vacío.");
+  $("checkout-btn").onclick=()=>{
+    if(!cart.length)return toast("El carrito está vacío.");
+    if(typeof window.cubicaTrackEvent==="function")window.cubicaTrackEvent("checkout_started",null,{items:cart.reduce((a,x)=>a+(Number(x.qty)||0),0)});
+    openModal("checkout-modal");
+  };
   $("checkout-form").onsubmit=submitOrder;
   document.querySelectorAll("[data-close-modal]").forEach(b=>b.onclick=()=>closeModal(b.dataset.closeModal));
   document.querySelectorAll("[data-open-modal]").forEach(b=>b.onclick=()=>{
@@ -1199,7 +1225,8 @@ document.addEventListener("DOMContentLoaded",async()=>{
   $("add-budget-supply").onclick=()=>{budgetRows.push({id:"",qty:1});renderBudgetSupplyRows();calculateBudget()};
   $("save-budget").onclick=saveBudget;$("copy-budget").onclick=copyBudget;
   document.querySelectorAll(".period-tabs .tab[data-period]").forEach(t=>t.onclick=()=>{salesPeriod=t.dataset.period;document.querySelectorAll(".period-tabs .tab[data-period]").forEach(x=>x.classList.toggle("active",x===t));renderOrders();});
-  document.querySelectorAll(".analytics-tabs .tab").forEach(t=>t.onclick=()=>{salesPeriod=t.dataset.analysisPeriod;document.querySelectorAll(".analytics-tabs .tab").forEach(x=>x.classList.toggle("active",x===t));renderAnalytics();});
+  document.querySelectorAll("[data-analytics-range]").forEach(t=>t.onclick=()=>{analyticsRange=t.dataset.analyticsRange;renderAnalytics();});
+  document.querySelectorAll("[data-analytics-view]").forEach(t=>t.onclick=()=>{analyticsView=t.dataset.analyticsView;renderAnalytics();});
   initBudgetDefaults();
   if(window.__cubicaMigratedFromBrowser)toast("Datos del navegador migrados a la Raspberry Pi.");
   const syncBadge=$("server-sync-badge");
