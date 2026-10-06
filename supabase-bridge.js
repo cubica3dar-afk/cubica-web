@@ -53,7 +53,9 @@
       username: profile?.display_name || sbSession.user.email || "usuario",
       email: sbSession.user.email || profile?.email || "",
       role: profile?.role === "admin" ? "admin" : "customer",
-      supabaseUserId: sbSession.user.id
+      supabaseUserId: sbSession.user.id,
+      avatarUrl: sbSession.user.user_metadata?.avatar_url || "",
+      avatarPath: sbSession.user.user_metadata?.avatar_path || ""
     };
     writeLocal(STORAGE.session, session);
     renderApp();
@@ -325,6 +327,52 @@
     };
   }
   window.cubicaUploadProductMedia=uploadProductMedia;
+
+  async function uploadProfileAvatar(file){
+    if(session?.role!=="admin") throw new Error("Solo el administrador puede cambiar la foto de perfil.");
+    if(!file) throw new Error("Archivo inválido.");
+    const allowed=["image/jpeg","image/png","image/webp"];
+    if(!allowed.includes(file.type)) throw new Error("Usá una imagen JPG, PNG o WEBP.");
+    if(file.size>3*1024*1024) throw new Error("La foto de perfil no puede superar 3 MB.");
+
+    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const token=(globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2)).replace(/-/g,"");
+    const path=`profiles/${session.supabaseUserId}/avatar-${Date.now()}-${token}.${ext}`;
+    const oldPath=session.avatarPath||"";
+
+    const {error:uploadError}=await client.storage.from("product-media").upload(path,file,{
+      cacheControl:"3600",
+      upsert:false,
+      contentType:file.type
+    });
+    if(uploadError) throw uploadError;
+
+    const {data:publicData}=client.storage.from("product-media").getPublicUrl(path);
+    const publicUrl=publicData?.publicUrl;
+    if(!publicUrl){
+      await client.storage.from("product-media").remove([path]).catch(()=>{});
+      throw new Error("No se pudo obtener la URL de la foto.");
+    }
+
+    const {data:updateData,error:updateError}=await client.auth.updateUser({
+      data:{avatar_url:publicUrl,avatar_path:path}
+    });
+    if(updateError){
+      await client.storage.from("product-media").remove([path]).catch(()=>{});
+      throw updateError;
+    }
+
+    if(oldPath && oldPath!==path && oldPath.startsWith("profiles/")){
+      const {error:removeError}=await client.storage.from("product-media").remove([oldPath]);
+      if(removeError) console.warn("No se pudo borrar el avatar anterior:",removeError);
+    }
+
+    session.avatarUrl=publicUrl;
+    session.avatarPath=path;
+    writeLocal(STORAGE.session,session);
+    return {publicUrl,path,user:updateData?.user||null};
+  }
+  window.cubicaUploadProfileAvatar=uploadProfileAvatar;
 
   async function migrateProductsToSupabase(){
     if(session?.role!=="admin") throw new Error("Solo el administrador puede migrar productos.");
