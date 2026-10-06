@@ -327,6 +327,13 @@
       }
       if(session?.role==="admin") await loadSalesFromSupabase({migrateLocal:false});
 
+      if(typeof window.cubicaTrackEvent==="function"){
+        window.cubicaTrackEvent("purchase",null,{
+          order_number:order.orderNumber||"",
+          total:Number(order.total)||0,
+          units:items.reduce((sum,item)=>sum+(Number(item.qty)||0),0)
+        });
+      }
       toast(`${order.orderNumber||"Pedido registrado"}: pedido guardado en Cúbica.`);
       e.target.reset();
     }catch(err){
