@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261005-mobile1">
+  <link rel="stylesheet" href="styles.css?v=20261006-dashboard1">
 
   <script type="importmap">
   {
@@ -38,11 +38,51 @@
       <nav id="main-nav" class="nav"></nav>
       <div class="top-actions">
         <button id="server-sync-badge" class="sync-badge hidden" type="button" title="Estado de almacenamiento">Datos: conectando…</button>
-        <span id="user-badge" class="user-badge"></span>
         <button id="cart-icon-btn" class="cart-icon-btn" type="button" aria-label="Carrito de compras" title="Carrito de compras"><span class="cart-icon" aria-hidden="true">🛒</span><span id="cart-badge" class="cart-badge hidden">0</span></button>
-        <button id="logout-btn" class="btn ghost hidden">Salir</button>
+        <button id="profile-btn" class="profile-icon-btn" type="button" aria-label="Cuenta" title="Cuenta">
+          <span id="profile-icon-fallback" class="profile-icon-fallback" aria-hidden="true">👤</span>
+          <img id="profile-avatar-top" class="profile-avatar-top hidden" alt="Foto de perfil">
+        </button>
       </div>
     </header>
+
+    <div id="account-sidebar-overlay" class="account-sidebar-overlay hidden"></div>
+    <aside id="account-sidebar" class="account-sidebar" aria-hidden="true">
+      <div class="account-sidebar-head">
+        <div>
+          <p class="eyebrow">CUENTA</p>
+          <h2 id="sidebar-title">Mi cuenta</h2>
+        </div>
+        <button id="account-sidebar-close" class="sidebar-close" type="button" aria-label="Cerrar menú">×</button>
+      </div>
+
+      <div class="sidebar-profile">
+        <button id="sidebar-avatar-button" class="sidebar-avatar-button" type="button" title="Cambiar foto de perfil">
+          <span id="sidebar-avatar-fallback" aria-hidden="true">👤</span>
+          <img id="sidebar-avatar-img" class="hidden" alt="Foto de perfil">
+          <span class="avatar-edit-badge">✎</span>
+        </button>
+        <input id="profile-avatar-input" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <div class="sidebar-profile-copy">
+          <strong id="sidebar-user-name">Visitante</strong>
+          <span id="sidebar-user-role">Sin sesión iniciada</span>
+          <small id="sidebar-user-email"></small>
+        </div>
+      </div>
+
+      <nav id="account-sidebar-nav" class="account-sidebar-nav">
+        <button type="button" data-sidebar-section="store"><span>⌂</span><span>Tienda</span></button>
+        <button type="button" data-sidebar-section="orders" class="session-only"><span>▤</span><span>Ventas / Pedidos</span></button>
+        <button type="button" data-sidebar-section="stock-finished" class="admin-only"><span>▣</span><span>Terminados</span></button>
+        <button type="button" data-sidebar-section="stock-supplies" class="admin-only"><span>◫</span><span>Insumos</span></button>
+        <button type="button" data-sidebar-section="budget" class="admin-only"><span>⌁</span><span>Presupuestos</span></button>
+        <button type="button" data-sidebar-section="analytics" class="admin-only"><span>⌗</span><span>Análisis</span></button>
+      </nav>
+
+      <div class="account-sidebar-footer">
+        <button id="logout-btn" class="btn ghost full hidden" type="button">Cerrar sesión</button>
+      </div>
+    </aside>
 
     <main class="container">
       <section id="section-login" class="page-section hidden">
@@ -126,17 +166,66 @@
       </section>
 
       <section id="section-analytics" class="page-section hidden admin-only">
-        <div class="section-head">
-          <div><p class="eyebrow">DATOS</p><h2>Análisis</h2><p class="muted">Visualizá la cantidad de ventas según el período y los horarios en que se realizaron los pedidos.</p></div>
-          <div class="period-tabs analytics-tabs">
-            <button class="tab active" data-analysis-period="day">Días</button>
-            <button class="tab" data-analysis-period="month">Meses</button>
-            <button class="tab" data-analysis-period="year">Años</button>
+        <div class="section-head analytics-head">
+          <div>
+            <p class="eyebrow">DATOS</p>
+            <h2>Análisis</h2>
+            <p class="muted">Ventas, productos, clientes y capacidad de producción en un solo lugar.</p>
+          </div>
+          <div class="analytics-range" aria-label="Período del análisis">
+            <button class="tab" data-analytics-range="today">Hoy</button>
+            <button class="tab" data-analytics-range="7d">7 días</button>
+            <button class="tab active" data-analytics-range="30d">30 días</button>
+            <button class="tab" data-analytics-range="month">Mes</button>
+            <button class="tab" data-analytics-range="year">Año</button>
+            <button class="tab" data-analytics-range="all">Todo</button>
           </div>
         </div>
-        <div class="analytics-grid">
-          <article class="chart-card"><div class="chart-head"><div><h3>Ventas a través del tiempo</h3><span id="sales-chart-caption" class="muted">Cantidad de pedidos por día</span></div></div><div class="chart-wrap"><svg id="sales-chart" viewBox="0 0 900 360" role="img" aria-label="Gráfico de ventas"></svg></div></article>
-          <article class="chart-card"><div class="chart-head"><div><h3>Horario semanal de compras</h3><span class="muted">Cada punto representa un pedido. X = día de la semana · Y = hora.</span></div></div><div class="chart-wrap"><svg id="weekly-time-chart" viewBox="0 0 900 360" role="img" aria-label="Gráfico de horarios de compra"></svg></div></article>
+
+        <div class="analytics-view-tabs">
+          <button class="analytics-view-tab active" data-analytics-view="summary">Resumen</button>
+          <button class="analytics-view-tab" data-analytics-view="sales">Ventas</button>
+          <button class="analytics-view-tab" data-analytics-view="products">Productos</button>
+          <button class="analytics-view-tab" data-analytics-view="customers">Clientes</button>
+          <button class="analytics-view-tab" data-analytics-view="production">Producción</button>
+        </div>
+
+        <div id="analytics-kpis" class="analytics-kpi-grid"></div>
+
+        <div id="analytics-panel-summary" class="analytics-panel">
+          <div class="analytics-grid analytics-grid-main">
+            <article class="chart-card">
+              <div class="chart-head"><div><h3>Ventas a través del tiempo</h3><span id="sales-chart-caption" class="muted">Facturación del período</span></div></div>
+              <div class="chart-wrap"><svg id="sales-chart" viewBox="0 0 900 360" role="img" aria-label="Gráfico de ventas"></svg></div>
+            </article>
+            <article class="chart-card">
+              <div class="chart-head"><div><h3>Horario semanal de compras</h3><span class="muted">Cada punto representa un pedido. X = día · Y = hora.</span></div></div>
+              <div class="chart-wrap"><svg id="weekly-time-chart" viewBox="0 0 900 360" role="img" aria-label="Gráfico de horarios de compra"></svg></div>
+            </article>
+          </div>
+          <div id="analytics-summary-cards" class="analytics-summary-cards"></div>
+        </div>
+
+        <div id="analytics-panel-sales" class="analytics-panel hidden">
+          <div id="analytics-sales-breakdown" class="analytics-detail-grid"></div>
+        </div>
+
+        <div id="analytics-panel-products" class="analytics-panel hidden">
+          <div class="analytics-section-card">
+            <div class="analytics-card-head"><div><h3>Rendimiento por producto</h3><p class="muted">Unidades, facturación, costo de receta y margen estimado.</p></div></div>
+            <div id="analytics-products-table" class="table-wrap analytics-table-wrap"></div>
+          </div>
+        </div>
+
+        <div id="analytics-panel-customers" class="analytics-panel hidden">
+          <div class="analytics-section-card">
+            <div class="analytics-card-head"><div><h3>Clientes</h3><p class="muted">Frecuencia de compra, gasto acumulado y clientes recurrentes.</p></div></div>
+            <div id="analytics-customers-table" class="table-wrap analytics-table-wrap"></div>
+          </div>
+        </div>
+
+        <div id="analytics-panel-production" class="analytics-panel hidden">
+          <div id="analytics-production-grid" class="analytics-detail-grid"></div>
         </div>
       </section>
 
@@ -498,8 +587,8 @@
 
   <script src="github-config.js?v=20261005-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20261005-6"></script>
-  <script src="supabase-bridge.js?v=20261005-6"></script>
+  <script src="script.js?v=20261006-dashboard1"></script>
+  <script src="supabase-bridge.js?v=20261006-dashboard1"></script>
   <script src="supabase-inventory.js?v=20261005-4"></script>
   <script src="supabase-sales.js?v=20261005-2"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
