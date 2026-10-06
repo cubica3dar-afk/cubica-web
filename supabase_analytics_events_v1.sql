@@ -25,6 +25,11 @@ create index if not exists analytics_events_product_id_idx
 
 alter table public.analytics_events enable row level security;
 
+grant usage on schema private to authenticated;
+grant execute on function private.is_admin() to authenticated;
+revoke select, insert, update, delete on public.analytics_events from anon;
+grant select on public.analytics_events to authenticated;
+
 drop policy if exists "cubica_analytics_admin_read" on public.analytics_events;
 create policy "cubica_analytics_admin_read"
 on public.analytics_events
