@@ -708,38 +708,154 @@ function saveFinishedProduct(e){
 }
 function renderSupplyCategoryControls(){
   const filter=$("supply-category-filter");
-  const current=filter.value;
-  filter.innerHTML='<option value="all">Todas las categorías</option>'+supplyCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-  filter.value=supplyCategories.includes(current)?current:"all";
+  if(filter){
+    const current=filter.value;
+    filter.innerHTML='<option value="all">Todas las categorías</option>'+supplyCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    filter.value=supplyCategories.includes(current)?current:"all";
+  }
   const select=$("supply-category");
-  const selected=select.value;
-  select.innerHTML=supplyCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-  select.value=supplyCategories.includes(selected)?selected:(supplyCategories[0]||"");
-  $("supply-category-list").innerHTML=supplyCategories.map(c=>{
+  if(select){
+    const selected=select.value;
+    select.innerHTML=supplyCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    select.value=supplyCategories.includes(selected)?selected:(supplyCategories.includes("Otros")?"Otros":(supplyCategories[0]||""));
+  }
+  const list=$("supply-category-list");
+  if(list)list.innerHTML=supplyCategories.map(c=>{
     const count=supplies.filter(s=>s.category===c).length;
     const locked=DEFAULT_SUPPLY_CATEGORIES.includes(c);
     return `<div class="category-chip"><span>${escapeHtml(c)} <small>${count}</small></span><button class="category-delete ${locked?"disabled":""}" ${locked?"disabled":""} title="${locked?"Categoría base":"Eliminar categoría"}" onclick="deleteSupplyCategory('${escapeHtml(c)}')">×</button></div>`;
   }).join("");
 }
-function renderSupplies(){
-  renderSupplyCategoryControls();
-  const search=($("supply-search").value||"").trim().toLowerCase();
-  const cat=$("supply-category-filter").value;
-  const filtered=supplies.filter(s=>{
-    const matchesText=!search || s.name.toLowerCase().includes(search) || s.category.toLowerCase().includes(search);
-    const matchesCategory=cat==="all" || s.category===cat;
-    return matchesText && matchesCategory;
-  });
-  const total=supplies.reduce((a,s)=>a+s.cost*s.qty,0);
-  const filteredTotal=filtered.reduce((a,s)=>a+s.cost*s.qty,0);
-  $("stock-value-card").innerHTML=`<span>Valor acumulado en depósito</span><strong>${money(total)}</strong><span>${supplies.length} insumos registrados · costo unitario × cantidad${filtered.length!==supplies.length?` · vista filtrada: ${money(filteredTotal)}`:""}</span>`;
-  $("supplies-stock-table").innerHTML=`<table><thead><tr><th>Insumo</th><th>Categoría</th><th>Costo unitario</th><th>Cantidad</th><th>Valor</th><th></th></tr></thead><tbody>
-  ${filtered.length ? filtered.map(s=>`<tr><td>${escapeHtml(s.name)}</td><td><select onchange="updateSupply('${s.id}','category',this.value)">${supplyCategories.map(c=>`<option value="${escapeHtml(c)}" ${s.category===c?"selected":""}>${escapeHtml(c)}</option>`).join("")}</select></td><td><input type="number" min="0" step="0.01" value="${s.cost}" onchange="updateSupply('${s.id}','cost',this.value)"></td>
-  <td><input type="number" min="0" step="0.01" value="${s.qty}" onchange="updateSupply('${s.id}','qty',this.value)"></td><td>${money(s.cost*s.qty)}</td>
-  <td><button class="btn ghost" onclick="deleteSupply('${s.id}')">Eliminar</button></td></tr>`).join("") : `<tr><td colspan="6" class="empty-table">No se encontraron insumos con esos filtros.</td></tr>`}</tbody></table>`;
+function supplyDetailHtml(s){
+  if(String(s.category||"").toLowerCase()!=="filamentos")return '<span class="muted">—</span>';
+  const material=escapeHtml(s.materialType||"Sin material");
+  const color=s.colorName?escapeHtml(s.colorName):escapeHtml(s.colorHex||"#ffffff");
+  return `<div class="supply-filament-detail"><span class="supply-color-dot" style="--supply-color:${escapeHtml(s.colorHex||"#ffffff")}"></span><span><strong>${material}</strong><small>${color}</small></span></div>`;
 }
-function updateSupply(id,key,val){const s=supplies.find(x=>x.id===id);if(!s)return;s[key]=(key==="cost"||key==="qty")?Number(val):val;write(STORAGE.supplies,supplies);renderSupplies();renderBudget()}
-function deleteSupply(id){if(!confirm("¿Eliminar este insumo?"))return;supplies=supplies.filter(s=>s.id!==id);write(STORAGE.supplies,supplies);renderSupplies();renderBudget()}
+function renderSupplies(){
+  supplies=supplies.map(normalizeSupply);
+  renderSupplyCategoryControls();
+  const search=(($("supply-search")?.value)||"").trim().toLowerCase();
+  const cat=$("supply-category-filter")?.value||"all";
+  const filtered=supplies.filter(s=>{
+    const hay=[s.name,s.category,s.materialType,s.colorName,s.colorHex].join(" ").toLowerCase();
+    return (!search||hay.includes(search)) && (cat==="all"||s.category===cat);
+  });
+  const total=supplies.reduce((a,s)=>a+supplyCostForQty(s,s.qty),0);
+  const filteredTotal=filtered.reduce((a,s)=>a+supplyCostForQty(s,s.qty),0);
+  $("stock-value-card").innerHTML=`<span>Valor acumulado en depósito</span><strong>${money(total)}</strong><span>${supplies.length} insumos registrados${filtered.length!==supplies.length?` · vista filtrada: ${money(filteredTotal)}`:""}</span>`;
+  $("supplies-stock-table").innerHTML=`<table><thead><tr><th>Insumo</th><th>Categoría</th><th>Detalle</th><th>Costo</th><th>Cantidad</th><th>Valor</th><th></th></tr></thead><tbody>
+  ${filtered.length ? filtered.map(s=>`<tr>
+    <td><strong>${escapeHtml(s.name)}</strong></td>
+    <td>${escapeHtml(s.category)}</td>
+    <td>${supplyDetailHtml(s)}</td>
+    <td>${money(s.cost)} <small class="table-unit">${escapeHtml(supplyCostLabel(s))}</small></td>
+    <td>${Number(s.qty).toLocaleString("es-AR",{maximumFractionDigits:2})} <small class="table-unit">${escapeHtml(supplyUnitLabel(s.unit,s.qty))}</small></td>
+    <td>${money(supplyCostForQty(s,s.qty))}</td>
+    <td class="table-actions"><button class="btn ghost" onclick="editSupply('${s.id}')">Editar</button><button class="btn ghost danger-button" onclick="deleteSupply('${s.id}')">Eliminar</button></td>
+  </tr>`).join("") : `<tr><td colspan="7" class="empty-table">No se encontraron insumos con esos filtros.</td></tr>`}</tbody></table>`;
+}
+function updateSupply(id,key,val){
+  const supply=supplies.find(x=>x.id===id);if(!supply)return;
+  supply[key]=(key==="cost"||key==="qty")?Number(val):val;
+  Object.assign(supply,normalizeSupply(supply));
+  write(STORAGE.supplies,supplies);renderSupplies();renderBudget();
+}
+function resetSupplyForm(){
+  const form=$("supply-form");if(!form)return;
+  form.reset();
+  $("supply-id").value="";
+  $("supply-modal-title").textContent="Nuevo insumo";
+  $("supply-submit").textContent="Agregar insumo";
+  renderSupplyCategoryControls();
+  $("supply-category").value=supplyCategories.includes("Otros")?"Otros":(supplyCategories[0]||"");
+  $("supply-unit").value="unidades";
+  $("supply-color").value="#ffffff";
+  $("supply-color-name").value="";
+  $("supply-material").value="PLA";
+  $("supply-material-custom").value="";
+  updateSupplyFilamentFields();
+}
+function updateSupplyFilamentFields({fromCategoryChange=false}={}){
+  const category=$("supply-category")?.value||"";
+  const isFilament=category==="Filamentos";
+  $("supply-filament-fields")?.classList.toggle("hidden",!isFilament);
+  if(isFilament && fromCategoryChange && $("supply-unit")?.value==="unidades")$("supply-unit").value="gramos";
+  const custom=$("supply-material")?.value==="__other";
+  $("supply-material-custom-wrap")?.classList.toggle("hidden",!custom);
+  const help=$("supply-cost-help");
+  if(help){
+    const unit=$("supply-unit")?.value||"unidades";
+    help.textContent=isFilament&&unit==="gramos"
+      ?"Para filamento medido en gramos, ingresá el precio por kilogramo."
+      :`Costo por ${supplyUnitLabel(unit,1)}.`;
+  }
+}
+function editSupply(id){
+  const supply=supplies.find(x=>x.id===id);if(!supply)return;
+  const s=normalizeSupply(supply);
+  renderSupplyCategoryControls();
+  $("supply-id").value=s.id;
+  $("supply-modal-title").textContent="Editar insumo";
+  $("supply-submit").textContent="Guardar cambios";
+  $("supply-name").value=s.name||"";
+  $("supply-category").value=s.category;
+  $("supply-cost").value=s.cost;
+  $("supply-qty").value=s.qty;
+  $("supply-unit").value=s.unit;
+  const standard=["PLA","ASA","PETG"];
+  if(standard.includes(s.materialType)){
+    $("supply-material").value=s.materialType;
+    $("supply-material-custom").value="";
+  }else{
+    $("supply-material").value="__other";
+    $("supply-material-custom").value=s.materialType||"";
+  }
+  $("supply-color").value=s.colorHex||"#ffffff";
+  $("supply-color-name").value=s.colorName||"";
+  updateSupplyFilamentFields();
+  openModal("supply-modal");
+}
+function saveSupplyForm(e){
+  e.preventDefault();
+  const id=$("supply-id").value;
+  const category=$("supply-category").value;
+  const isFilament=category==="Filamentos";
+  let materialType="";
+  if(isFilament){
+    materialType=$("supply-material").value==="__other"?$("supply-material-custom").value.trim():$("supply-material").value;
+    if(!materialType)return toast("Indicá el tipo de material del filamento.");
+  }
+  const data=normalizeSupply({
+    id:id||uid("s"),
+    name:$("supply-name").value.trim(),
+    category,
+    cost:Number($("supply-cost").value)||0,
+    qty:Number($("supply-qty").value)||0,
+    unit:$("supply-unit").value,
+    materialType,
+    colorName:isFilament?$("supply-color-name").value.trim():"",
+    colorHex:isFilament?$("supply-color").value:"#ffffff"
+  });
+  if(!data.name)return toast("El insumo necesita un nombre.");
+  if(id){
+    const index=supplies.findIndex(x=>x.id===id);if(index<0)return;
+    supplies[index]={...supplies[index],...data,id};
+    toast("Insumo actualizado");
+  }else{
+    supplies.push(data);
+    toast("Insumo agregado");
+  }
+  write(STORAGE.supplies,supplies);
+  e.target.reset();
+  closeModal("supply-modal");
+  renderSupplies();renderBudget();renderFinishedRecipe();
+}
+function deleteSupply(id){
+  if(!confirm("¿Eliminar este insumo?"))return;
+  supplies=supplies.filter(s=>s.id!==id);
+  write(STORAGE.supplies,supplies);renderSupplies();renderBudget();renderFinishedRecipe();
+}
 function addSupplyCategory(name){
   name=name.trim().replace(/\s+/g," ");
   if(!name)return toast("Escribí un nombre para la categoría.");
