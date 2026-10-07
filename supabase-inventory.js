@@ -13,12 +13,26 @@
     if(typeof updateServerBadge==="function") updateServerBadge(text,mode);
   }
 
+  async function fetchSuppliesCompat(){
+    let result=await client.from("supplies")
+      .select("id,name,category,cost,qty,unit,material_type,color_name,color_hex,active")
+      .eq("active",true)
+      .order("created_at");
+    if(result.error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(result.error.message||""))){
+      result=await client.from("supplies")
+        .select("id,name,category,cost,qty,unit,active")
+        .eq("active",true)
+        .order("created_at");
+    }
+    return result;
+  }
+
   async function loadInventoryFromSupabase(){
     if(session?.role!=="admin") return;
     try{
       const [{data:cats,error:catErr},{data:sup,error:supErr},{data:recipes,error:recErr}] = await Promise.all([
         client.from("supply_categories").select("name,sort_order,active").eq("active",true).order("sort_order"),
-        client.from("supplies").select("id,name,category,cost,qty,unit,active").eq("active",true).order("created_at"),
+        fetchSuppliesCompat(),
         client.from("product_recipes").select("product_id,supply_id,qty_per_unit")
       ]);
       if(catErr) throw catErr;
@@ -26,13 +40,16 @@
       if(recErr) throw recErr;
 
       supplyCategories = (cats||[]).map(x=>x.name);
-      supplies = (sup||[]).map(x=>({
+      supplies = (sup||[]).map(x=>normalizeSupply({
         id:x.id,
         name:x.name,
         category:x.category||"Otros",
         cost:Number(x.cost)||0,
         qty:Number(x.qty)||0,
-        unit:x.unit||"u"
+        unit:x.unit||"unidades",
+        materialType:x.material_type||"",
+        colorName:x.color_name||"",
+        colorHex:x.color_hex||"#ffffff"
       }));
 
       const recipesByProduct=new Map();
@@ -76,15 +93,21 @@
   }
 
   async function saveSuppliesToSupabase(list,{removeMissing=true}={}){
-    const rows=(list||[]).map(s=>({
-      id:String(s.id),
-      name:String(s.name||""),
-      category:s.category||null,
-      cost:Number(s.cost)||0,
-      qty:Number(s.qty)||0,
-      unit:String(s.unit||"u"),
-      active:s.active!==false
-    }));
+    const rows=(list||[]).map(raw=>{
+      const s=normalizeSupply(raw);
+      return {
+        id:String(s.id),
+        name:String(s.name||""),
+        category:s.category||null,
+        cost:Number(s.cost)||0,
+        qty:Number(s.qty)||0,
+        unit:String(s.unit||"unidades"),
+        material_type:s.category==="Filamentos"?(s.materialType||null):null,
+        color_name:s.category==="Filamentos"?(s.colorName||null):null,
+        color_hex:s.category==="Filamentos"?(s.colorHex||"#ffffff"):null,
+        active:s.active!==false
+      };
+    });
 
     if(removeMissing){
       const {data:existing,error}=await client.from("supplies").select("id");
@@ -98,7 +121,12 @@
     }
 
     if(rows.length){
-      const {error}=await client.from("supplies").upsert(rows,{onConflict:"id"});
+      let {error}=await client.from("supplies").upsert(rows,{onConflict:"id"});
+      if(error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(error.message||""))){
+        const legacyRows=rows.map(({material_type,color_name,color_hex,...rest})=>rest);
+        const retry=await client.from("supplies").upsert(legacyRows,{onConflict:"id"});
+        error=retry.error;
+      }
       if(error) throw error;
     }
   }
