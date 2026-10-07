@@ -39,7 +39,17 @@ const initialSupplies = [
   ["Filamento ASA Fremover ($/kg)","Filamento",21000],["Filamento PLA GST3D ($/kg)","Filamento",16990],
   ["Filamento ASA GST3D ($/kg)","Filamento",20828],["Caja + bolsa presentación","Packaging",1200],
   ["Bolsa transparente","Packaging",1000]
-].map((s,i)=>({id:"s"+i,name:s[0],category:s[1],cost:s[2],qty:0}));
+].map((s,i)=>({
+  id:"s"+i,
+  name:s[0],
+  category:s[1]==="Filamento"?"Filamentos":s[1],
+  cost:s[2],
+  qty:0,
+  unit:s[1]==="Filamento"?"gramos":"unidades",
+  materialType:s[1]==="Filamento"?(s[0].toUpperCase().includes("ASA")?"ASA":"PLA"):"",
+  colorName:"",
+  colorHex:"#ffffff"
+}));
 
 const DEFAULT_SUPPLY_CATEGORIES = ["Filamentos","Electrónica","Cajas","Electricidad","Iluminación","Packaging","Otros"];
 const DEFAULT_FINISHED_CATEGORIES = ["Figuras","Veladores","Decoración","Accesorios"];
@@ -157,9 +167,45 @@ let analyticsRange = "30d";
 let analyticsView = "summary";
 
 function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;$("toast-container").appendChild(el);setTimeout(()=>el.remove(),3000)}
+function normalizeSupply(s){
+  const category=s?.category==="Filamento"?"Filamentos":(s?.category||"Otros");
+  let unit=String(s?.unit||"").toLowerCase();
+  if(["u","unidad","unit","units",""].includes(unit))unit="unidades";
+  if(["g","gr","gramo","gramos"].includes(unit))unit="gramos";
+  if(["centimetros","centímetros","cms"].includes(unit))unit="cm";
+  if(["metro","metros","mts"].includes(unit))unit="m";
+  if(!["unidades","gramos","cm","m"].includes(unit))unit=category==="Filamentos"?"gramos":"unidades";
+  return {
+    ...s,
+    category,
+    cost:Number(s?.cost)||0,
+    qty:Number(s?.qty)||0,
+    unit,
+    materialType:String(s?.materialType??s?.material_type??""),
+    colorName:String(s?.colorName??s?.color_name??""),
+    colorHex:/^#[0-9a-f]{6}$/i.test(String(s?.colorHex??s?.color_hex??""))?String(s?.colorHex??s?.color_hex):"#ffffff"
+  };
+}
+function supplyUnitLabel(unit,qty=null){
+  const labels={unidades:"unidades",gramos:"g",cm:"cm",m:"m"};
+  const label=labels[unit]||"unidades";
+  if(unit==="unidades" && Number(qty)===1)return "unidad";
+  return label;
+}
+function supplyCostForQty(s,qty){
+  const amount=Number(qty)||0,cost=Number(s?.cost)||0;
+  // En filamentos medidos en gramos, el costo histórico de Cúbica está cargado por kg.
+  if(String(s?.category||"").toLowerCase().startsWith("filament") && s?.unit==="gramos")return cost*(amount/1000);
+  return cost*amount;
+}
+function supplyCostLabel(s){
+  if(String(s?.category||"").toLowerCase().startsWith("filament") && s?.unit==="gramos")return "por kg";
+  const unit=supplyUnitLabel(s?.unit,1);
+  return "por "+unit;
+}
 function initData(){
   products = products.map(p=>normalizeProduct(p));
-  supplies = supplies.map(s => ({...s, category: s.category === "Filamento" ? "Filamentos" : s.category}));
+  supplies = supplies.map(normalizeSupply);
   supplyCategories = [...new Set([...DEFAULT_SUPPLY_CATEGORIES, ...supplyCategories, ...supplies.map(s=>s.category).filter(Boolean)])];
   writeLocal(STORAGE.products,products); writeLocal(STORAGE.supplies,supplies); writeLocal(STORAGE.supplyCategories,supplyCategories);
 }
