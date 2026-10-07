@@ -1348,6 +1348,12 @@ document.addEventListener("DOMContentLoaded",async()=>{
     $("logout-btn").onclick=()=>{localStorage.removeItem(STORAGE.session);session=null;renderApp();showSection("store");toast("Sesión cerrada")};
   }
   $("cart-icon-btn").onclick=()=>showSection("cart");
+  const brandHome=$("brand-home");
+  if(brandHome){
+    const goStore=()=>{showSection("store");window.scrollTo({top:0,behavior:"smooth"});};
+    brandHome.addEventListener("click",goStore);
+    brandHome.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();goStore();}});
+  }
   $("profile-btn")?.addEventListener("click",()=>session?openAccountSidebar():showSection("login"));
   $("account-sidebar-close")?.addEventListener("click",closeAccountSidebar);
   $("account-sidebar-overlay")?.addEventListener("click",closeAccountSidebar);
@@ -1382,6 +1388,7 @@ document.addEventListener("DOMContentLoaded",async()=>{
   document.querySelectorAll("[data-open-modal]").forEach(b=>b.onclick=()=>{
     try {
       if(b.dataset.openModal==="finished-modal") resetFinishedProductForm();
+      if(b.dataset.openModal==="supply-modal") resetSupplyForm();
       openModal(b.dataset.openModal);
     } catch(err) {
       console.error("No se pudo abrir el modal", err);
@@ -1391,7 +1398,10 @@ document.addEventListener("DOMContentLoaded",async()=>{
   $("finished-form").onsubmit=saveFinishedProduct;
   $("add-finished-color").onclick=addFinishedColor;
   $("add-finished-supply").onclick=addFinishedRecipeRow;
-  $("supply-form").onsubmit=e=>{e.preventDefault();supplies.push({id:uid("s"),name:$("supply-name").value,category:$("supply-category").value,cost:Number($("supply-cost").value),qty:Number($("supply-qty").value)});write(STORAGE.supplies,supplies);e.target.reset();closeModal("supply-modal");renderSupplies();renderBudget();toast("Insumo agregado")};
+  $("supply-form").onsubmit=saveSupplyForm;
+  $("supply-category").addEventListener("change",()=>updateSupplyFilamentFields({fromCategoryChange:true}));
+  $("supply-unit").addEventListener("change",()=>updateSupplyFilamentFields());
+  $("supply-material").addEventListener("change",()=>updateSupplyFilamentFields());
   $("supply-category-form").onsubmit=e=>{e.preventDefault();addSupplyCategory($("new-supply-category").value);e.target.reset();closeModal("supply-category-modal");};
   $("budget-form").addEventListener("input",calculateBudget);$("budget-form").addEventListener("change",calculateBudget);
   $("budget-form").onsubmit=e=>{e.preventDefault();calculateBudget();toast("Presupuesto calculado")};
@@ -1414,4 +1424,4 @@ document.addEventListener("DOMContentLoaded",async()=>{
 });
 function initBudgetDefaults(){ if(!window.budgetRows.length)window.budgetRows=[{id:"",qty:1}];}
 window.addToCart=addToCart;window.changeCart=changeCart;window.removeCart=removeCart;window.updateProduct=updateProduct;window.deleteProduct=deleteProduct;window.editProduct=editProduct;window.removeFinishedColor=removeFinishedColor;window.updateFinishedRecipe=updateFinishedRecipe;window.removeFinishedRecipe=removeFinishedRecipe;
-window.updateSupply=updateSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
+window.updateSupply=updateSupply;window.editSupply=editSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
