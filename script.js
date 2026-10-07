@@ -454,11 +454,11 @@ function removeFinishedColor(index){finishedColors.splice(index,1);renderFinishe
 function renderFinishedRecipe(){
   const list=$("finished-recipe-list"),empty=$("finished-recipe-empty");
   if(!list||!empty)return;
-  const options=supplies.map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · stock ${Number(s.qty)||0} ${escapeHtml(supplyUnitLabel(s.unit,s.qty))}</option>`).join("");
   list.innerHTML=finishedRecipe.map((r,i)=>{
     const supply=supplies.find(s=>s.id===r.supplyId);
     const max=supply && Number(r.qty)>0?Math.floor((Number(supply.qty)||0)/Number(r.qty)):null;
     const unit=supply?supplyUnitLabel(supply.unit,r.qty):"";
+    const options=supplies.map(s=>`<option value="${s.id}" ${String(s.id)===String(r.supplyId)?"selected":""}>${escapeHtml(s.name)} · stock ${Number(s.qty)||0} ${escapeHtml(supplyUnitLabel(s.unit,s.qty))}</option>`).join("");
     return `<div class="recipe-row"><select onchange="updateFinishedRecipe(${i},'supplyId',this.value)"><option value="">Seleccionar insumo...</option>${options}</select><input type="number" min="0.0001" step="0.01" value="${r.qty}" onchange="updateFinishedRecipe(${i},'qty',this.value)" placeholder="Cantidad/u"><span class="recipe-stock">${supply?`Por producto: <strong>${Number(r.qty)||0} ${escapeHtml(unit)}</strong> · Stock: <strong>${Number(supply.qty)||0} ${escapeHtml(supplyUnitLabel(supply.unit,supply.qty))}</strong> · ${max===null?'—':`hasta ${max} u.`}`:"Sin seleccionar"}</span><button type="button" class="btn ghost" onclick="removeFinishedRecipe(${i})">×</button></div>`;
   }).join("");
   empty.classList.toggle("hidden",finishedRecipe.length>0);
