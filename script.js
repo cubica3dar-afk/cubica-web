@@ -1148,12 +1148,13 @@ function renderAnalytics(){
   const prevUnits=previous.reduce((a,o)=>a+(o.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
   const productRows=analyticsProductRows(mine);
   const recipeCost=productRows.reduce((a,r)=>a+r.cost,0);
-  const estimatedProfit=revenue-recipeCost;
+  const costDataComplete=productRows.length>0 && productRows.every(r=>r.costComplete);
+  const estimatedProfit=costDataComplete?revenue-recipeCost:null;
 
   const kpis=$("analytics-kpis");
   if(kpis)kpis.innerHTML=
     `<article class="analytics-kpi"><span>Facturación</span><strong>${money(revenue)}</strong>${analyticsRange!=="all"?variationHtml(revenue,prevRevenue):"<small>Histórico completo</small>"}</article>`+
-    `<article class="analytics-kpi"><span>Ganancia estimada*</span><strong>${money(estimatedProfit)}</strong><small>Venta − costo de recetas registradas</small></article>`+
+    `<article class="analytics-kpi"><span>Ganancia estimada*</span><strong>${revenue===0?money(0):(costDataComplete?money(estimatedProfit):"Datos incompletos")}</strong><small>${costDataComplete?"Venta − costo de recetas registradas":"Faltan costos o recetas en productos vendidos"}</small></article>`+
     `<article class="analytics-kpi"><span>Pedidos</span><strong>${mine.length}</strong>${analyticsRange!=="all"?variationHtml(mine.length,prevOrders):"<small>Total histórico</small>"}</article>`+
     `<article class="analytics-kpi"><span>Ticket promedio</span><strong>${money(ticket)}</strong><small>Promedio por pedido</small></article>`+
     `<article class="analytics-kpi"><span>Unidades</span><strong>${units}</strong>${analyticsRange!=="all"?variationHtml(units,prevUnits):"<small>Unidades vendidas</small>"}</article>`+
@@ -1181,7 +1182,7 @@ function renderAnalytics(){
     <article class="analytics-mini-card"><span>Producto líder</span><strong>${best?escapeHtml(best.name):"Sin ventas"}</strong><small>${best?`${best.units} u. · ${money(best.revenue)}`:"Todavía no hay datos en el período."}</small></article>
     <article class="analytics-mini-card"><span>Clientes recurrentes</span><strong>${recurring}</strong><small>${customerRows.length?Math.round(recurring/customerRows.length*100):0}% de los clientes del período</small></article>
     <article class="analytics-mini-card funnel-card"><span>Embudo de tienda</span><strong>${sessions||"—"} visitas → ${productViews||"—"} vistas → ${adds||"—"} carritos → ${purchases||"—"} compras</strong><small>${events.length?"Datos de navegación registrados en Supabase.":"Se activará cuando ejecutes el SQL de analítica."}</small></article>
-    <article class="analytics-mini-card"><span>Margen de receta*</span><strong>${revenue>0?((estimatedProfit/revenue)*100).toFixed(1):"0"}%</strong><small>*Estimación según los insumos/recetas cargados; no incluye costos no registrados.</small></article>`;
+    <article class="analytics-mini-card"><span>Margen de receta*</span><strong>${revenue===0?"—":costDataComplete?((estimatedProfit/revenue)*100).toFixed(1)+"%":"Sin costo suficiente"}</strong><small>${costDataComplete?"*Estimación según los insumos/recetas cargados; no incluye costos no registrados.":"Completá la receta y los costos de los productos vendidos para calcularlo."}</small></article>`;
 
   const salesBox=$("analytics-sales-breakdown");
   if(salesBox){
@@ -1191,7 +1192,7 @@ function renderAnalytics(){
   }
 
   const productsBox=$("analytics-products-table");
-  if(productsBox)productsBox.innerHTML=`<table><thead><tr><th>Producto</th><th>Unidades</th><th>Pedidos</th><th>Facturación</th><th>Costo receta*</th><th>Ganancia est.*</th><th>Margen est.</th></tr></thead><tbody>${productRows.length?productRows.map(r=>`<tr><td><strong>${escapeHtml(r.name)}</strong></td><td>${r.units}</td><td>${r.orders}</td><td>${money(r.revenue)}</td><td>${money(r.cost)}</td><td>${money(r.profit)}</td><td>${r.revenue?r.margin.toFixed(1):"0"}%</td></tr>`).join(""):`<tr><td colspan="7" class="empty-table">No hay ventas en este período.</td></tr>`}</tbody></table>`;
+  if(productsBox)productsBox.innerHTML=`<table><thead><tr><th>Producto</th><th>Unidades</th><th>Pedidos</th><th>Facturación</th><th>Costo receta*</th><th>Ganancia est.*</th><th>Margen est.</th></tr></thead><tbody>${productRows.length?productRows.map(r=>`<tr><td><strong>${escapeHtml(r.name)}</strong></td><td>${r.units}</td><td>${r.orders}</td><td>${money(r.revenue)}</td><td>${r.costComplete?money(r.cost):'<span class="muted">Sin datos</span>'}</td><td>${r.costComplete?money(r.profit):'<span class="muted">Sin datos</span>'}</td><td>${r.costComplete&&r.margin!==null?r.margin.toFixed(1)+"%":'<span class="muted">Sin datos</span>'}</td></tr>`).join(""):`<tr><td colspan="7" class="empty-table">No hay ventas en este período.</td></tr>`}</tbody></table>`;
 
   const customersBox=$("analytics-customers-table");
   if(customersBox)customersBox.innerHTML=`<table><thead><tr><th>Cliente</th><th>Pedidos</th><th>Gasto</th><th>Ticket prom.</th><th>Tipo</th><th>Última compra</th></tr></thead><tbody>${customerRows.length?customerRows.map(c=>`<tr><td><strong>${escapeHtml(c.name)}</strong><small class="analytics-cell-sub">${escapeHtml(c.email)}</small></td><td>${c.orders}</td><td>${money(c.revenue)}</td><td>${money(c.ticket)}</td><td><span class="analytics-pill ${c.recurrent?"good":""}">${c.recurrent?"Recurrente":"Nuevo"}</span></td><td>${formatDate(c.last)}</td></tr>`).join(""):`<tr><td colspan="6" class="empty-table">No hay clientes en este período.</td></tr>`}</tbody></table>`;
@@ -1203,8 +1204,8 @@ function renderAnalytics(){
     const noSales=products.filter(p=>!productRows.some(r=>String(r.id)===String(p.id))).length;
     production.innerHTML=`
       <article class="analytics-section-card span-2"><div class="analytics-card-head"><div><h3>Capacidad actual por insumos</h3><p class="muted">Productos con menor capacidad primero.</p></div></div><div class="production-list">${capacities.length?capacities.slice(0,10).map(x=>`<div><span><strong>${escapeHtml(x.p.name)}</strong><small>${x.cap.bottlenecks.length?`Limita: ${escapeHtml(x.cap.bottlenecks.join(", "))}`:"Receta completa"}</small></span><b class="${x.cap.capacity<=2?"danger":x.cap.capacity<=5?"warn":""}">${x.cap.capacity} u.</b></div>`).join(""):'<p class="muted">Todavía no hay recetas cargadas.</p>'}</div></article>
-      <article class="analytics-section-card"><div class="analytics-card-head"><div><h3>Insumos más consumidos</h3><p class="muted">${analyticsRangeLabel()}</p></div></div><div class="ranking-list">${consumed.length?consumed.map((x,i)=>`<div><span><b>#${i+1}</b> ${escapeHtml(x.name)}</span><strong>${Number(x.qty).toFixed(2)} <small>· ${money(x.cost)}</small></strong></div>`).join(""):'<p class="muted">Sin consumo calculable.</p>'}</div></article>
-      <article class="analytics-section-card"><div class="analytics-card-head"><div><h3>Inventario</h3></div></div><div class="analytics-stat-stack"><div><span>Valor de insumos</span><strong>${money(supplies.reduce((a,x)=>a+(Number(x.cost)||0)*(Number(x.qty)||0),0))}</strong></div><div><span>Productos sin ventas</span><strong>${noSales}</strong></div><div><span>Productos sin receta</span><strong>${products.filter(p=>!p.recipe?.length).length}</strong></div></div></article>`;
+      <article class="analytics-section-card"><div class="analytics-card-head"><div><h3>Insumos más consumidos</h3><p class="muted">${analyticsRangeLabel()}</p></div></div><div class="ranking-list">${consumed.length?consumed.map((x,i)=>`<div><span><b>#${i+1}</b> ${escapeHtml(x.name)}</span><strong>${Number(x.qty).toFixed(2)} ${escapeHtml(supplyUnitLabel(x.unit,x.qty))} <small>· ${money(x.cost)}</small></strong></div>`).join(""):'<p class="muted">Sin consumo calculable.</p>'}</div></article>
+      <article class="analytics-section-card"><div class="analytics-card-head"><div><h3>Inventario</h3></div></div><div class="analytics-stat-stack"><div><span>Valor de insumos</span><strong>${money(supplies.reduce((a,x)=>a+supplyCostForQty(x,x.qty),0))}</strong></div><div><span>Productos sin ventas</span><strong>${noSales}</strong></div><div><span>Productos sin receta</span><strong>${products.filter(p=>!p.recipe?.length).length}</strong></div></div></article>`;
   }
 
   document.querySelectorAll(".analytics-panel").forEach(p=>p.classList.toggle("hidden",p.id!==`analytics-panel-${analyticsView}`));
