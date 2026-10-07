@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261006-dashboard3">
+  <link rel="stylesheet" href="styles.css?v=20261007-inventory1">
 
   <script type="importmap">
   {
@@ -31,7 +31,7 @@
 
   <div id="app" class="hidden">
     <header class="topbar">
-      <div class="brand">
+      <div id="brand-home" class="brand brand-home" role="button" tabindex="0" aria-label="Ir a la tienda">
         <img src="assets/logo.jpg" alt="Cúbica">
         <div><strong>Cúbica</strong><small>Impresión 3D</small></div>
       </div>
@@ -557,17 +557,63 @@
   </div>
 
   <div id="supply-modal" class="modal hidden">
-    <div class="modal-card">
+    <div class="modal-card supply-modal-card">
       <button class="modal-close" data-close-modal="supply-modal">×</button>
-      <h2>Nuevo insumo</h2>
+      <p class="eyebrow">INVENTARIO · INSUMO</p>
+      <h2 id="supply-modal-title">Nuevo insumo</h2>
       <form id="supply-form" class="form-grid">
-        <label>Insumo<input id="supply-name" required></label>
+        <input id="supply-id" type="hidden">
+        <label class="full-span">Insumo
+          <input id="supply-name" required placeholder="Ej.: PLA negro, interruptor, cable...">
+        </label>
         <label>Categoría
           <select id="supply-category"></select>
         </label>
-        <label>Costo unitario<input id="supply-cost" type="number" min="0" step="0.01" required></label>
-        <label>Cantidad<input id="supply-qty" type="number" min="0" step="0.01" value="0" required></label>
-        <button class="btn primary full" type="submit">Agregar</button>
+        <label>Costo unitario
+          <input id="supply-cost" type="number" min="0" step="0.01" required>
+          <small id="supply-cost-help">Costo por unidad del insumo.</small>
+        </label>
+        <div class="supply-quantity-field">
+          <label>Cantidad
+            <input id="supply-qty" type="number" min="0" step="0.01" value="0" required>
+          </label>
+          <label>Medida
+            <select id="supply-unit">
+              <option value="unidades">Unidades</option>
+              <option value="gramos">Gramos</option>
+              <option value="cm">Centímetros</option>
+              <option value="m">Metros</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="supply-filament-fields" class="full-span filament-fields hidden">
+          <div class="filament-fields-head">
+            <strong>Detalles del filamento</strong>
+            <small>Estos campos aparecen únicamente para la categoría Filamentos.</small>
+          </div>
+          <div class="filament-fields-grid">
+            <label>Tipo de material
+              <select id="supply-material">
+                <option value="PLA">PLA</option>
+                <option value="ASA">ASA</option>
+                <option value="PETG">PETG</option>
+                <option value="__other">Otro material...</option>
+              </select>
+            </label>
+            <label id="supply-material-custom-wrap" class="hidden">Material personalizado
+              <input id="supply-material-custom" maxlength="40" placeholder="Ej.: TPU, ABS, Nylon...">
+            </label>
+            <label>Color
+              <div class="supply-color-row">
+                <input id="supply-color" type="color" value="#ffffff" aria-label="Color del filamento">
+                <input id="supply-color-name" maxlength="40" placeholder="Nombre opcional, ej.: Negro">
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button id="supply-submit" class="btn primary full" type="submit">Agregar insumo</button>
       </form>
     </div>
   </div>
@@ -587,9 +633,9 @@
 
   <script src="github-config.js?v=20261005-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20261006-dashboard2"></script>
+  <script src="script.js?v=20261007-inventory1"></script>
   <script src="supabase-bridge.js?v=20261006-dashboard2"></script>
-  <script src="supabase-inventory.js?v=20261005-4"></script>
+  <script src="supabase-inventory.js?v=20261007-inventory1"></script>
   <script src="supabase-sales.js?v=20261006-dashboard2"></script>
   <script src="supabase-analytics.js?v=20261006-1"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
