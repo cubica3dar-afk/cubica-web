@@ -432,3 +432,39 @@ body.sidebar-open{overflow:hidden}
 @media(max-width:380px){
   .analytics-kpi-grid{grid-template-columns:1fr}
 }
+
+
+/* Inventario avanzado + ajustes visuales */
+.brand-home{cursor:pointer;border-radius:12px;padding:4px 6px;margin:-4px -6px;transition:background .15s}
+.brand-home:hover,.brand-home:focus-visible{background:rgba(255,255,255,.06);outline:none}
+.supply-modal-card{width:min(720px,100%)}
+.supply-quantity-field{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:10px;align-items:end}
+.supply-quantity-field>label{margin:0}
+.filament-fields{border:1px solid var(--line);border-radius:16px;padding:16px;background:rgba(255,255,255,.025)}
+.filament-fields-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:13px}
+.filament-fields-head strong,.filament-fields-head small{display:block}
+.filament-fields-head small{color:var(--muted);font-size:11px;text-align:right}
+.filament-fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;align-items:end}
+.supply-color-row{display:grid;grid-template-columns:54px minmax(0,1fr);gap:8px;align-items:center;margin-top:6px}
+.supply-color-row input[type=color]{width:54px;height:43px;padding:4px;cursor:pointer}
+.supply-filament-detail{display:flex;align-items:center;gap:8px;min-width:120px}
+.supply-filament-detail>span:last-child strong,.supply-filament-detail>span:last-child small{display:block}
+.supply-filament-detail>span:last-child small{color:var(--muted);font-size:10px;margin-top:2px}
+.supply-color-dot{width:22px;height:22px;flex:0 0 22px;border-radius:50%;background:var(--supply-color);border:1px solid rgba(255,255,255,.4);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.table-unit{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.danger-button:hover{background:rgba(220,80,80,.15);color:#ffc4c4}
+
+/* El gráfico semanal debe adaptarse al ancho de su tarjeta, sin scroll interno. */
+.analytics-grid-main{grid-template-columns:repeat(2,minmax(0,1fr))}
+#weekly-time-chart{min-width:0!important;width:100%!important}
+#weekly-time-chart~*{max-width:100%}
+
+@media(max-width:1100px){
+  .analytics-grid-main{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  .supply-quantity-field{grid-template-columns:1fr}
+  .filament-fields-grid{grid-template-columns:1fr}
+  .filament-fields-head{display:block}
+  .filament-fields-head small{text-align:left;margin-top:4px}
+}
