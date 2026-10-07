@@ -453,11 +453,13 @@ function addFinishedColor(){
 function removeFinishedColor(index){finishedColors.splice(index,1);renderFinishedColors()}
 function renderFinishedRecipe(){
   const list=$("finished-recipe-list"),empty=$("finished-recipe-empty");
-  const options=supplies.map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · stock ${Number(s.qty)||0}</option>`).join("");
+  if(!list||!empty)return;
+  const options=supplies.map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · stock ${Number(s.qty)||0} ${escapeHtml(supplyUnitLabel(s.unit,s.qty))}</option>`).join("");
   list.innerHTML=finishedRecipe.map((r,i)=>{
     const supply=supplies.find(s=>s.id===r.supplyId);
     const max=supply && Number(r.qty)>0?Math.floor((Number(supply.qty)||0)/Number(r.qty)):null;
-    return `<div class="recipe-row"><select onchange="updateFinishedRecipe(${i},'supplyId',this.value)"><option value="">Seleccionar insumo...</option>${options}</select><input type="number" min="0.0001" step="0.01" value="${r.qty}" onchange="updateFinishedRecipe(${i},'qty',this.value)" placeholder="Cantidad/u"><span class="recipe-stock">${supply?`Stock: <strong>${Number(supply.qty)||0}</strong> · ${max===null?'—':`hasta ${max} u.`}`:"Sin seleccionar"}</span><button type="button" class="btn ghost" onclick="removeFinishedRecipe(${i})">×</button></div>`;
+    const unit=supply?supplyUnitLabel(supply.unit,r.qty):"";
+    return `<div class="recipe-row"><select onchange="updateFinishedRecipe(${i},'supplyId',this.value)"><option value="">Seleccionar insumo...</option>${options}</select><input type="number" min="0.0001" step="0.01" value="${r.qty}" onchange="updateFinishedRecipe(${i},'qty',this.value)" placeholder="Cantidad/u"><span class="recipe-stock">${supply?`Por producto: <strong>${Number(r.qty)||0} ${escapeHtml(unit)}</strong> · Stock: <strong>${Number(supply.qty)||0} ${escapeHtml(supplyUnitLabel(supply.unit,supply.qty))}</strong> · ${max===null?'—':`hasta ${max} u.`}`:"Sin seleccionar"}</span><button type="button" class="btn ghost" onclick="removeFinishedRecipe(${i})">×</button></div>`;
   }).join("");
   empty.classList.toggle("hidden",finishedRecipe.length>0);
   updateFinishedCapacityPreview();
@@ -873,7 +875,7 @@ function deleteSupplyCategory(name){
 }
 function renderBudget(){
   const mat=$("budget-material");const current=mat.value;
-  mat.innerHTML=supplies.filter(s=>s.category.toLowerCase().startsWith("filamento")).map(s=>`<option value="${s.cost}">${escapeHtml(s.name)} — ${money(s.cost)}/kg</option>`).join("");
+  mat.innerHTML=supplies.filter(s=>s.category.toLowerCase().startsWith("filamento")).map(s=>`<option value="${s.cost}">${escapeHtml(s.name)}${s.materialType?` · ${escapeHtml(s.materialType)}`:""} — ${money(s.cost)}${s.unit==="gramos"?"/kg":` ${escapeHtml(supplyCostLabel(s))}`}</option>`).join("");
   if(current)mat.value=current;
   renderBudgetSupplyRows();
   calculateBudget();
@@ -985,29 +987,38 @@ function validAnalyticsOrders(list){
 function analyticsRangeLabel(range=analyticsRange){
   return ({today:"Hoy","7d":"Últimos 7 días","30d":"Últimos 30 días",month:"Este mes",year:"Este año",all:"Todo el historial"})[range]||"Período";
 }
-function estimateRecipeUnitCost(product){
-  if(!product?.recipe?.length)return 0;
-  return product.recipe.reduce((sum,r)=>{
+function recipeCostInfo(product){
+  if(!product?.recipe?.length)return {cost:0,complete:false};
+  let cost=0,complete=true;
+  for(const r of product.recipe){
     const supply=supplies.find(s=>s.id===r.supplyId);
-    if(!supply)return sum;
     const qty=Number(r.qty)||0;
-    const isFilament=String(supply.category||"").toLowerCase().startsWith("filament");
-    return sum + (Number(supply.cost)||0)*(isFilament?qty/1000:qty);
-  },0);
+    if(!supply || qty<=0 || !(Number(supply.cost)>0)){complete=false;continue;}
+    cost+=supplyCostForQty(supply,qty);
+  }
+  return {cost,complete};
 }
+function estimateRecipeUnitCost(product){return recipeCostInfo(product).cost}
 function analyticsProductRows(list){
   const map=new Map();
   for(const o of list){
     for(const i of (o.items||[])){
       const key=String(i.productId||i.name||"producto");
-      if(!map.has(key))map.set(key,{id:i.productId||"",name:i.name||"Producto",units:0,revenue:0,orders:new Set(),cost:0});
+      if(!map.has(key))map.set(key,{id:i.productId||"",name:i.name||"Producto",units:0,revenue:0,orders:new Set(),cost:0,costComplete:true});
       const row=map.get(key), qty=Number(i.qty)||0, price=Number(i.price)||0;
       row.units+=qty;row.revenue+=qty*price;row.orders.add(o.id);
       const p=products.find(x=>String(x.id)===String(i.productId));
-      row.cost+=estimateRecipeUnitCost(p)*qty;
+      const info=recipeCostInfo(p);
+      row.cost+=info.cost*qty;
+      if(!info.complete)row.costComplete=false;
     }
   }
-  return [...map.values()].map(r=>({...r,orders:r.orders.size,profit:r.revenue-r.cost,margin:r.revenue>0?((r.revenue-r.cost)/r.revenue)*100:0})).sort((a,b)=>b.revenue-a.revenue);
+  return [...map.values()].map(r=>({
+    ...r,
+    orders:r.orders.size,
+    profit:r.costComplete?r.revenue-r.cost:null,
+    margin:r.costComplete&&r.revenue>0?((r.revenue-r.cost)/r.revenue)*100:null
+  })).sort((a,b)=>b.revenue-a.revenue);
 }
 function analyticsCustomerRows(periodOrders,allOrders){
   const allMap=new Map();
@@ -1029,10 +1040,9 @@ function analyticsSupplyConsumption(productRows){
     const p=products.find(x=>String(x.id)===String(row.id)); if(!p)continue;
     for(const r of (p.recipe||[])){
       const supply=supplies.find(x=>x.id===r.supplyId);if(!supply)continue;
-      if(!map.has(supply.id))map.set(supply.id,{name:supply.name,category:supply.category,qty:0,cost:0});
-      const x=map.get(supply.id), used=(Number(r.qty)||0)*row.units;
-      const isFilament=String(supply.category||"").toLowerCase().startsWith("filament");
-      x.qty+=used;x.cost+=(Number(supply.cost)||0)*(isFilament?used/1000:used);
+      if(!map.has(supply.id))map.set(supply.id,{name:supply.name,category:supply.category,unit:supply.unit,qty:0,cost:0});
+      const x=map.get(supply.id),used=(Number(r.qty)||0)*row.units;
+      x.qty+=used;x.cost+=supplyCostForQty(supply,used);
     }
   }
   return [...map.values()].sort((a,b)=>b.cost-a.cost);
