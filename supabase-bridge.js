@@ -164,7 +164,11 @@
         });
       }
 
-      products = rows.map(r=>remoteProductToLocal(r,colorsByProduct,mediaByProduct,previousById));
+      products = rows.map((r,i)=>{
+        const p=remoteProductToLocal(r,colorsByProduct,mediaByProduct,previousById);
+        if(!(p.sortOrder>0)) p.sortOrder=(i+1)*10;
+        return p;
+      });
       writeLocal(STORAGE.products,products);
       catalogLoadedFromSupabase = true;
       setDataBadge("Datos: Supabase","ok");
