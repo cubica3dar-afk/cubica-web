@@ -20,6 +20,7 @@
       date:row.created_at,
       customerName:row.customer_name,
       customerEmail:row.customer_email,
+      userId:row.user_id||"",
       phone:row.phone||"",
       payment:row.payment||"",
       notes:row.notes||"",
@@ -54,7 +55,7 @@
   async function fetchRemoteSales(){
     const [{data:orderRows,error:orderErr},{data:quoteRows,error:quoteErr}]=await Promise.all([
       client.from("orders")
-        .select("id,order_number,client_order_id,created_at,customer_name,customer_email,phone,payment,notes,total,status,username,supply_plan,internal_email_sent,customer_email_sent,email_errors,order_items(id,product_id,name,color,qty,unit_price,line_total)")
+        .select("id,order_number,client_order_id,user_id,created_at,customer_name,customer_email,phone,payment,notes,total,status,username,supply_plan,internal_email_sent,customer_email_sent,email_errors,order_items(id,product_id,name,color,qty,unit_price,line_total)")
         .order("created_at",{ascending:false}),
       client.from("quotes")
         .select("id,created_at,title,data,summary,created_by")
@@ -173,6 +174,32 @@
     }
   }
   window.loadCubicaSalesFromSupabase=loadSalesFromSupabase;
+
+  async function loadCustomerOrdersFromSupabase(){
+    if(session?.role!=="customer" || salesLoading) return;
+    salesLoading=true;
+    try{
+      const {data,error}=await client
+        .from("orders")
+        .select("id,order_number,client_order_id,user_id,created_at,customer_name,customer_email,phone,payment,notes,total,status,username,supply_plan,order_items(id,product_id,name,color,qty,unit_price,line_total)")
+        .order("created_at",{ascending:false});
+      if(error) throw error;
+
+      orders=(data||[]).map(remoteOrderToLocal);
+      writeLocal(STORAGE.orders,orders);
+      salesReady=true;
+      renderOrders();
+    }catch(err){
+      console.error("Pedidos del cliente",err);
+      const msg=String(err?.message||"");
+      if(/permission|policy|row-level|42501/i.test(msg)){
+        toast("Falta activar el acceso seguro a tus pedidos en Supabase.");
+      }
+    }finally{
+      salesLoading=false;
+    }
+  }
+  window.loadCubicaCustomerOrdersFromSupabase=loadCustomerOrdersFromSupabase;
 
   async function saveBudgetSupabase(){
     const b=window.lastBudget;
@@ -326,6 +353,7 @@
         renderProducts();
       }
       if(session?.role==="admin") await loadSalesFromSupabase({migrateLocal:false});
+      else if(session?.role==="customer") await loadCustomerOrdersFromSupabase();
 
       if(typeof window.cubicaTrackEvent==="function"){
         window.cubicaTrackEvent("purchase",null,{
@@ -346,6 +374,14 @@
 
   window.addEventListener("cubica:auth-ready",async(e)=>{
     if(e.detail?.role==="admin") await loadSalesFromSupabase({migrateLocal:true});
+    if(e.detail?.role==="customer"){
+      if(typeof window.cubicaClaimCustomerGuestOrders==="function")await window.cubicaClaimCustomerGuestOrders();
+      await loadCustomerOrdersFromSupabase();
+    }
+    if(!e.detail?.role){
+      orders=[];
+      writeLocal(STORAGE.orders,orders);
+    }
   });
 
   document.addEventListener("DOMContentLoaded",()=>{
