@@ -468,3 +468,23 @@ body.sidebar-open{overflow:hidden}
   .filament-fields-head{display:block}
   .filament-fields-head small{text-align:left;margin-top:4px}
 }
+
+
+/* Orden y marca de insumos */
+.supply-toolbar{grid-template-columns:minmax(240px,1fr) minmax(160px,220px) minmax(170px,220px)}
+.supply-sort-hint{margin:-4px 0 12px;font-size:11px}
+.supply-order-col{width:92px}
+.supply-order-cell{white-space:nowrap}
+.supply-order-buttons{display:flex;gap:4px}
+.supply-move{width:34px;min-width:34px;height:32px;padding:0;display:grid;place-items:center;font-size:15px}
+.supply-move:disabled{opacity:.28;cursor:not-allowed}
+@media(max-width:900px){
+  .supply-toolbar{grid-template-columns:1fr 1fr}
+  .supply-toolbar .inventory-search{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .supply-toolbar{grid-template-columns:1fr}
+  .supply-toolbar .inventory-search{grid-column:auto}
+  .supply-order-col{width:78px}
+  .supply-move{width:31px;min-width:31px}
+}
