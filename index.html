@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261007-inventory2">
+  <link rel="stylesheet" href="styles.css?v=20261008-supplies-sort1">
 
   <script type="importmap">
   {
@@ -249,10 +249,20 @@
             <button class="btn primary" data-open-modal="supply-modal">+ Insumo</button>
           </div>
         </div>
-        <div class="inventory-toolbar">
-          <div class="inventory-search"><span>⌕</span><input id="supply-search" placeholder="Buscar insumo por nombre o categoría..."></div>
+        <div class="inventory-toolbar supply-toolbar">
+          <div class="inventory-search"><span>⌕</span><input id="supply-search" placeholder="Buscar insumo por nombre, marca, material o categoría..."></div>
           <select id="supply-category-filter"><option value="all">Todas las categorías</option></select>
+          <select id="supply-sort" aria-label="Ordenar insumos">
+            <option value="manual">Orden personalizado</option>
+            <option value="category">Categoría</option>
+            <option value="name">Nombre A–Z</option>
+            <option value="stock-desc">Mayor stock</option>
+            <option value="stock-asc">Menor stock</option>
+            <option value="cost-desc">Mayor costo</option>
+            <option value="cost-asc">Menor costo</option>
+          </select>
         </div>
+        <p id="supply-sort-hint" class="supply-sort-hint muted">En “Orden personalizado” podés mover cada insumo con las flechas ↑ y ↓.</p>
         <div id="supply-category-list" class="category-list"></div>
         <div id="stock-value-card" class="deposit-value"></div>
         <div id="supplies-stock-table" class="table-wrap"></div>
@@ -601,6 +611,9 @@
                 <option value="__other">Otro material...</option>
               </select>
             </label>
+            <label>Marca
+              <input id="supply-brand" maxlength="60" placeholder="Ej.: GST3D, Fremover, Grilon3...">
+            </label>
             <label id="supply-material-custom-wrap" class="hidden">Material personalizado
               <input id="supply-material-custom" maxlength="40" placeholder="Ej.: TPU, ABS, Nylon...">
             </label>
@@ -633,9 +646,9 @@
 
   <script src="github-config.js?v=20261005-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20261007-inventory3"></script>
+  <script src="script.js?v=20261008-supplies-sort1"></script>
   <script src="supabase-bridge.js?v=20261006-dashboard2"></script>
-  <script src="supabase-inventory.js?v=20261007-inventory2"></script>
+  <script src="supabase-inventory.js?v=20261008-supplies-sort1"></script>
   <script src="supabase-sales.js?v=20261006-dashboard2"></script>
   <script src="supabase-analytics.js?v=20261006-1"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
