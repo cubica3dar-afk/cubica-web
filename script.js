@@ -165,6 +165,7 @@ let session = read(STORAGE.session, null);
 let salesPeriod = "day";
 let analyticsRange = "30d";
 let analyticsView = "summary";
+let supplySortMode = localStorage.getItem("cubica_supply_sort") || "manual";
 
 function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;$("toast-container").appendChild(el);setTimeout(()=>el.remove(),3000)}
 function normalizeSupply(s){
@@ -182,8 +183,10 @@ function normalizeSupply(s){
     qty:Number(s?.qty)||0,
     unit,
     materialType:String(s?.materialType??s?.material_type??""),
+    brand:String(s?.brand??""),
     colorName:String(s?.colorName??s?.color_name??""),
-    colorHex:/^#[0-9a-f]{6}$/i.test(String(s?.colorHex??s?.color_hex??""))?String(s?.colorHex??s?.color_hex):"#ffffff"
+    colorHex:/^#[0-9a-f]{6}$/i.test(String(s?.colorHex??s?.color_hex??""))?String(s?.colorHex??s?.color_hex):"#ffffff",
+    sortOrder:Number(s?.sortOrder??s?.sort_order)||0
   };
 }
 function supplyUnitLabel(unit,qty=null){
@@ -205,7 +208,11 @@ function supplyCostLabel(s){
 }
 function initData(){
   products = products.map(p=>normalizeProduct(p));
-  supplies = supplies.map(normalizeSupply);
+  supplies = supplies.map((raw,i)=>{
+    const item=normalizeSupply(raw);
+    if(!(item.sortOrder>0)) item.sortOrder=(i+1)*10;
+    return item;
+  });
   supplyCategories = [...new Set([...DEFAULT_SUPPLY_CATEGORIES, ...supplyCategories, ...supplies.map(s=>s.category).filter(Boolean)])];
   writeLocal(STORAGE.products,products); writeLocal(STORAGE.supplies,supplies); writeLocal(STORAGE.supplyCategories,supplyCategories);
 }
@@ -731,31 +738,78 @@ function renderSupplyCategoryControls(){
 function supplyDetailHtml(s){
   if(String(s.category||"").toLowerCase()!=="filamentos")return '<span class="muted">—</span>';
   const material=escapeHtml(s.materialType||"Sin material");
+  const brand=s.brand?escapeHtml(s.brand):"Sin marca";
   const color=s.colorName?escapeHtml(s.colorName):escapeHtml(s.colorHex||"#ffffff");
-  return `<div class="supply-filament-detail"><span class="supply-color-dot" style="--supply-color:${escapeHtml(s.colorHex||"#ffffff")}"></span><span><strong>${material}</strong><small>${color}</small></span></div>`;
+  return `<div class="supply-filament-detail"><span class="supply-color-dot" style="--supply-color:${escapeHtml(s.colorHex||"#ffffff")}"></span><span><strong>${material} · ${brand}</strong><small>${color}</small></span></div>`;
+}
+function sortedSuppliesForView(list,mode=supplySortMode){
+  const copy=[...(list||[])];
+  const byText=(a,b)=>String(a||"").localeCompare(String(b||""),"es",{sensitivity:"base"});
+  if(mode==="category")return copy.sort((a,b)=>byText(a.category,b.category)||byText(a.name,b.name));
+  if(mode==="name")return copy.sort((a,b)=>byText(a.name,b.name));
+  if(mode==="stock-desc")return copy.sort((a,b)=>(Number(b.qty)||0)-(Number(a.qty)||0)||byText(a.name,b.name));
+  if(mode==="stock-asc")return copy.sort((a,b)=>(Number(a.qty)||0)-(Number(b.qty)||0)||byText(a.name,b.name));
+  if(mode==="cost-desc")return copy.sort((a,b)=>(Number(b.cost)||0)-(Number(a.cost)||0)||byText(a.name,b.name));
+  if(mode==="cost-asc")return copy.sort((a,b)=>(Number(a.cost)||0)-(Number(b.cost)||0)||byText(a.name,b.name));
+  return copy.sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||byText(a.name,b.name));
+}
+function moveSupply(id,direction){
+  if(supplySortMode!=="manual")return;
+  const ordered=sortedSuppliesForView(supplies,"manual");
+  const index=ordered.findIndex(x=>String(x.id)===String(id));
+  const target=index+(direction<0?-1:1);
+  if(index<0||target<0||target>=ordered.length)return;
+  [ordered[index],ordered[target]]=[ordered[target],ordered[index]];
+  ordered.forEach((item,i)=>item.sortOrder=(i+1)*10);
+  supplies=ordered;
+  write(STORAGE.supplies,supplies);
+  renderSupplies();
 }
 function renderSupplies(){
   supplies=supplies.map(normalizeSupply);
   renderSupplyCategoryControls();
+
+  const sortSelect=$("supply-sort");
+  if(sortSelect){
+    sortSelect.value=[...sortSelect.options].some(o=>o.value===supplySortMode)?supplySortMode:"manual";
+    supplySortMode=sortSelect.value;
+  }
+
   const search=(($("supply-search")?.value)||"").trim().toLowerCase();
   const cat=$("supply-category-filter")?.value||"all";
   const filtered=supplies.filter(s=>{
-    const hay=[s.name,s.category,s.materialType,s.colorName,s.colorHex].join(" ").toLowerCase();
+    const hay=[s.name,s.category,s.brand,s.materialType,s.colorName,s.colorHex].join(" ").toLowerCase();
     return (!search||hay.includes(search)) && (cat==="all"||s.category===cat);
   });
+  const ordered=sortedSuppliesForView(filtered,supplySortMode);
+  const canManualReorder=supplySortMode==="manual" && !search && cat==="all";
+
+  const hint=$("supply-sort-hint");
+  if(hint){
+    hint.textContent=supplySortMode==="manual"
+      ? (canManualReorder?"Usá ↑ y ↓ para definir el orden personalizado. Se guarda en Supabase.":"Quitá la búsqueda y el filtro de categoría para reordenar manualmente.")
+      : "Este orden es solo una vista. Elegí “Orden personalizado” para guardar tu propio orden.";
+  }
+
   const total=supplies.reduce((a,s)=>a+supplyCostForQty(s,s.qty),0);
   const filteredTotal=filtered.reduce((a,s)=>a+supplyCostForQty(s,s.qty),0);
   $("stock-value-card").innerHTML=`<span>Valor acumulado en depósito</span><strong>${money(total)}</strong><span>${supplies.length} insumos registrados${filtered.length!==supplies.length?` · vista filtrada: ${money(filteredTotal)}`:""}</span>`;
-  $("supplies-stock-table").innerHTML=`<table><thead><tr><th>Insumo</th><th>Categoría</th><th>Detalle</th><th>Costo</th><th>Cantidad</th><th>Valor</th><th></th></tr></thead><tbody>
-  ${filtered.length ? filtered.map(s=>`<tr>
-    <td><strong>${escapeHtml(s.name)}</strong></td>
-    <td>${escapeHtml(s.category)}</td>
-    <td>${supplyDetailHtml(s)}</td>
-    <td>${money(s.cost)} <small class="table-unit">${escapeHtml(supplyCostLabel(s))}</small></td>
-    <td>${Number(s.qty).toLocaleString("es-AR",{maximumFractionDigits:2})} <small class="table-unit">${escapeHtml(supplyUnitLabel(s.unit,s.qty))}</small></td>
-    <td>${money(supplyCostForQty(s,s.qty))}</td>
-    <td class="table-actions"><button class="btn ghost" onclick="editSupply('${s.id}')">Editar</button><button class="btn ghost danger-button" onclick="deleteSupply('${s.id}')">Eliminar</button></td>
-  </tr>`).join("") : `<tr><td colspan="7" class="empty-table">No se encontraron insumos con esos filtros.</td></tr>`}</tbody></table>`;
+
+  $("supplies-stock-table").innerHTML=`<table><thead><tr><th class="supply-order-col">Orden</th><th>Insumo</th><th>Categoría</th><th>Detalle</th><th>Costo</th><th>Cantidad</th><th>Valor</th><th></th></tr></thead><tbody>
+  ${ordered.length ? ordered.map((item,rowIndex)=>`<tr>
+    <td class="supply-order-cell">
+      ${supplySortMode==="manual"?
+        `<div class="supply-order-buttons"><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',-1)" ${!canManualReorder||rowIndex===0?"disabled":""} title="Subir insumo">↑</button><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',1)" ${!canManualReorder||rowIndex===ordered.length-1?"disabled":""} title="Bajar insumo">↓</button></div>`
+        :`<span class="muted">${rowIndex+1}</span>`}
+    </td>
+    <td><strong>${escapeHtml(item.name)}</strong></td>
+    <td>${escapeHtml(item.category)}</td>
+    <td>${supplyDetailHtml(item)}</td>
+    <td>${money(item.cost)} <small class="table-unit">${escapeHtml(supplyCostLabel(item))}</small></td>
+    <td>${Number(item.qty).toLocaleString("es-AR",{maximumFractionDigits:2})} <small class="table-unit">${escapeHtml(supplyUnitLabel(item.unit,item.qty))}</small></td>
+    <td>${money(supplyCostForQty(item,item.qty))}</td>
+    <td class="table-actions"><button class="btn ghost" onclick="editSupply('${item.id}')">Editar</button><button class="btn ghost danger-button" onclick="deleteSupply('${item.id}')">Eliminar</button></td>
+  </tr>`).join("") : `<tr><td colspan="8" class="empty-table">No se encontraron insumos con esos filtros.</td></tr>`}</tbody></table>`;
 }
 function updateSupply(id,key,val){
   const supply=supplies.find(x=>x.id===id);if(!supply)return;
@@ -776,6 +830,7 @@ function resetSupplyForm(){
   $("supply-color-name").value="";
   $("supply-material").value="PLA";
   $("supply-material-custom").value="";
+  $("supply-brand").value="";
   updateSupplyFilamentFields();
 }
 function updateSupplyFilamentFields({fromCategoryChange=false}={}){
@@ -813,6 +868,7 @@ function editSupply(id){
     $("supply-material").value="__other";
     $("supply-material-custom").value=s.materialType||"";
   }
+  $("supply-brand").value=s.brand||"";
   $("supply-color").value=s.colorHex||"#ffffff";
   $("supply-color-name").value=s.colorName||"";
   updateSupplyFilamentFields();
@@ -836,8 +892,10 @@ function saveSupplyForm(e){
     qty:Number($("supply-qty").value)||0,
     unit:$("supply-unit").value,
     materialType,
+    brand:isFilament?$("supply-brand").value.trim():"",
     colorName:isFilament?$("supply-color-name").value.trim():"",
-    colorHex:isFilament?$("supply-color").value:"#ffffff"
+    colorHex:isFilament?$("supply-color").value:"#ffffff",
+    sortOrder:id?(supplies.find(x=>x.id===id)?.sortOrder||0):(Math.max(0,...supplies.map(x=>Number(x.sortOrder)||0))+10)
   });
   if(!data.name)return toast("El insumo necesita un nombre.");
   if(id){
@@ -1377,6 +1435,8 @@ document.addEventListener("DOMContentLoaded",async()=>{
   $("finished-videos").addEventListener("change",e=>handleFinishedMediaInput(e.target,"video"));
   $("add-finished-media-url")?.addEventListener("click",addFinishedMediaUrl);
   $("supply-search").oninput=renderSupplies;$("supply-category-filter").onchange=renderSupplies;
+  $("supply-sort").value=supplySortMode;
+  $("supply-sort").onchange=e=>{supplySortMode=e.target.value;localStorage.setItem("cubica_supply_sort",supplySortMode);renderSupplies();};
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
   $("checkout-btn").onclick=()=>{
     if(!cart.length)return toast("El carrito está vacío.");
@@ -1424,4 +1484,4 @@ document.addEventListener("DOMContentLoaded",async()=>{
 });
 function initBudgetDefaults(){ if(!window.budgetRows.length)window.budgetRows=[{id:"",qty:1}];}
 window.addToCart=addToCart;window.changeCart=changeCart;window.removeCart=removeCart;window.updateProduct=updateProduct;window.deleteProduct=deleteProduct;window.editProduct=editProduct;window.removeFinishedColor=removeFinishedColor;window.updateFinishedRecipe=updateFinishedRecipe;window.removeFinishedRecipe=removeFinishedRecipe;
-window.updateSupply=updateSupply;window.editSupply=editSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
+window.updateSupply=updateSupply;window.editSupply=editSupply;window.moveSupply=moveSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
