@@ -507,3 +507,23 @@ body.sidebar-open{overflow:hidden}
   .pagination-controls{justify-content:center}
   .pagination-btn{min-width:34px;height:34px;padding:0 8px}
 }
+
+
+/* Orden y paginación de productos terminados */
+.finished-toolbar{grid-template-columns:minmax(240px,1fr) minmax(160px,220px) minmax(170px,220px)}
+.finished-sort-hint{margin:-4px 0 12px;font-size:11px}
+.finished-order-col{width:92px}
+.finished-order-cell{white-space:nowrap}
+.finished-order-buttons{display:flex;gap:4px}
+.finished-move{width:34px;min-width:34px;height:32px;padding:0;display:grid;place-items:center;font-size:15px}
+.finished-move:disabled{opacity:.28;cursor:not-allowed}
+@media(max-width:900px){
+  .finished-toolbar{grid-template-columns:1fr 1fr}
+  .finished-toolbar .inventory-search{grid-column:1/-1}
+}
+@media(max-width:600px){
+  .finished-toolbar{grid-template-columns:1fr}
+  .finished-toolbar .inventory-search{grid-column:auto}
+  .finished-order-col{width:78px}
+  .finished-move{width:31px;min-width:31px}
+}
