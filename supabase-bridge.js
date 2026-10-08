@@ -49,19 +49,39 @@
     }
 
     const profile = await profileFor(sbSession.user);
+    const metadata=sbSession.user.user_metadata||{};
+    const provider=sbSession.user.app_metadata?.provider||metadata.provider||"";
     session = {
-      username: profile?.display_name || sbSession.user.email || "usuario",
+      username: profile?.display_name || metadata.full_name || metadata.name || sbSession.user.email || "usuario",
       email: sbSession.user.email || profile?.email || "",
       role: profile?.role === "admin" ? "admin" : "customer",
       supabaseUserId: sbSession.user.id,
-      avatarUrl: sbSession.user.user_metadata?.avatar_url || "",
-      avatarPath: sbSession.user.user_metadata?.avatar_path || ""
+      avatarUrl: metadata.avatar_url || metadata.picture || "",
+      avatarPath: metadata.avatar_path || "",
+      authProvider: provider
     };
     writeLocal(STORAGE.session, session);
     renderApp();
     window.dispatchEvent(new CustomEvent("cubica:auth-ready",{detail:{role:session.role}}));
     if(showToast) toast(session.role === "admin" ? "Sesión de administrador iniciada" : "Sesión iniciada");
   }
+
+  async function claimCustomerGuestOrders(){
+    if(session?.role!=="customer") return 0;
+    try{
+      const {data,error}=await client.rpc("claim_my_guest_orders");
+      if(error){
+        const missing=/claim_my_guest_orders|PGRST202|Could not find the function/i.test(String(error.message||"")+" "+String(error.code||""));
+        if(!missing) console.warn("No se pudieron vincular pedidos anteriores:",error);
+        return 0;
+      }
+      return Number(data)||0;
+    }catch(err){
+      console.warn("No se pudieron vincular pedidos anteriores:",err);
+      return 0;
+    }
+  }
+  window.cubicaClaimCustomerGuestOrders=claimCustomerGuestOrders;
 
   function remoteProductToLocal(row, colorsByProduct, mediaByProduct, previousById){
     const previous = previousById.get(row.id) || {};
@@ -423,7 +443,43 @@
     },500);
   };
 
+  async function signInWithGoogle(){
+    const redirectTo=window.location.origin+window.location.pathname;
+    const {data,error}=await client.auth.signInWithOAuth({
+      provider:"google",
+      options:{
+        redirectTo,
+        queryParams:{prompt:"select_account"}
+      }
+    });
+    if(error) throw error;
+    return data;
+  }
+  window.cubicaSignInWithGoogle=signInWithGoogle;
+
   document.addEventListener("DOMContentLoaded", async () => {
+    const googleBtn=$("google-login-btn");
+    if(googleBtn){
+      googleBtn.onclick=async()=>{
+        const old=googleBtn.innerHTML;
+        googleBtn.disabled=true;
+        googleBtn.classList.add("loading");
+        try{
+          googleBtn.querySelector("span").textContent="Abriendo Google…";
+          await signInWithGoogle();
+        }catch(err){
+          console.error(err);
+          googleBtn.innerHTML=old;
+          googleBtn.disabled=false;
+          googleBtn.classList.remove("loading");
+          const msg=String(err?.message||"");
+          toast(/provider.*enabled|Unsupported provider/i.test(msg)
+            ?"Todavía falta habilitar Google en Supabase."
+            :"No se pudo iniciar sesión con Google.");
+        }
+      };
+    }
+
     const form = $("login-form");
     if(form){
       form.onsubmit = async (e) => {
@@ -463,12 +519,18 @@
 
     const {data}=await client.auth.getSession();
     await applySupabaseSession(data.session,false);
+    if(session?.role==="customer") await claimCustomerGuestOrders();
     await loadCatalogFromSupabase();
 
-    client.auth.onAuthStateChange(async(_event,newSession)=>{
+    client.auth.onAuthStateChange(async(event,newSession)=>{
       await applySupabaseSession(newSession,false);
+      if(newSession?.user && session?.role==="customer"){
+        const claimed=await claimCustomerGuestOrders();
+        if(event==="SIGNED_IN" && claimed>0)toast(`Vinculamos ${claimed} pedido${claimed===1?"":"s"} anterior${claimed===1?"":"es"} a tu cuenta.`);
+      }
       // Al recuperar la sesión al volver a una pestaña no se cambia la sección activa.
       if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
+      if(event==="SIGNED_IN" && session?.role==="customer") showSection("store");
     });
   });
 })();
