@@ -75,6 +75,7 @@
       stock: Number(row.stock) || 0,
       colorMode: row.color_mode === "multiple" ? "multiple" : "single",
       active: row.active !== false,
+      sortOrder: Number(row.sort_order)||0,
       colors: (colorsByProduct.get(row.id) || []).map(c=>({name:c.name,hex:c.hex})),
       // Las recetas se migran en la próxima etapa. Mientras tanto conservamos
       // la receta local si existe en este navegador y el ID coincide.
@@ -84,17 +85,30 @@
     });
   }
 
+  async function fetchProductsCompat(){
+    let result=await client
+      .from("products")
+      .select("id,name,category,description,price,stock,color_mode,active,sort_order")
+      .eq("active", true)
+      .order("created_at", { ascending:true });
+
+    if(result.error && /sort_order|column .* does not exist/i.test(String(result.error.message||""))){
+      result=await client
+        .from("products")
+        .select("id,name,category,description,price,stock,color_mode,active")
+        .eq("active", true)
+        .order("created_at", { ascending:true });
+    }
+    return result;
+  }
+
   async function loadCatalogFromSupabase(){
     if(catalogLoadInProgress) return;
     catalogLoadInProgress = true;
     try{
       setDataBadge("Datos: Supabase…","pending");
 
-      const { data: rows, error: productError } = await client
-        .from("products")
-        .select("id,name,category,description,price,stock,color_mode,active")
-        .eq("active", true)
-        .order("created_at", { ascending:true });
+      const { data: rows, error: productError } = await fetchProductsCompat();
 
       if(productError) throw productError;
 
@@ -174,6 +188,7 @@
       price:Number(p.price)||0,
       stock:Math.max(0,Math.trunc(Number(p.stock)||0)),
       color_mode:p.colorMode==="multiple"?"multiple":"single",
+      sort_order:Number(p.sortOrder)||0,
       active:p.active!==false
     }));
   }
@@ -278,7 +293,12 @@
 
       const rows=productRows(list);
       if(rows.length){
-        const {error}=await client.from("products").upsert(rows,{onConflict:"id"});
+        let {error}=await client.from("products").upsert(rows,{onConflict:"id"});
+        if(error && /sort_order|column .* does not exist/i.test(String(error.message||""))){
+          const legacyRows=rows.map(({sort_order,...rest})=>rest);
+          const retry=await client.from("products").upsert(legacyRows,{onConflict:"id"});
+          error=retry.error;
+        }
         if(error) throw error;
       }
       await syncProductChildren(list);
