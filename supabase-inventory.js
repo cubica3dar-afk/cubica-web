@@ -14,15 +14,27 @@
   }
 
   async function fetchSuppliesCompat(){
+    // v2: marca + orden personalizado.
     let result=await client.from("supplies")
-      .select("id,name,category,cost,qty,unit,material_type,color_name,color_hex,active")
+      .select("id,name,category,cost,qty,unit,material_type,brand,color_name,color_hex,sort_order,active")
       .eq("active",true)
-      .order("created_at");
+      .order("sort_order",{ascending:true})
+      .order("created_at",{ascending:true});
+
+    if(result.error && /brand|sort_order|column .* does not exist/i.test(String(result.error.message||""))){
+      // v1: material y color, todavía sin marca/orden.
+      result=await client.from("supplies")
+        .select("id,name,category,cost,qty,unit,material_type,color_name,color_hex,active")
+        .eq("active",true)
+        .order("created_at",{ascending:true});
+    }
+
     if(result.error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(result.error.message||""))){
+      // Compatibilidad con el esquema inicial.
       result=await client.from("supplies")
         .select("id,name,category,cost,qty,unit,active")
         .eq("active",true)
-        .order("created_at");
+        .order("created_at",{ascending:true});
     }
     return result;
   }
@@ -40,7 +52,7 @@
       if(recErr) throw recErr;
 
       supplyCategories = (cats||[]).map(x=>x.name);
-      supplies = (sup||[]).map(x=>normalizeSupply({
+      supplies = (sup||[]).map((x,i)=>normalizeSupply({
         id:x.id,
         name:x.name,
         category:x.category||"Otros",
@@ -48,8 +60,10 @@
         qty:Number(x.qty)||0,
         unit:x.unit||"unidades",
         materialType:x.material_type||"",
+        brand:x.brand||"",
         colorName:x.color_name||"",
-        colorHex:x.color_hex||"#ffffff"
+        colorHex:x.color_hex||"#ffffff",
+        sortOrder:Number(x.sort_order)||((i+1)*10)
       }));
 
       const recipesByProduct=new Map();
@@ -103,8 +117,10 @@
         qty:Number(s.qty)||0,
         unit:String(s.unit||"unidades"),
         material_type:s.category==="Filamentos"?(s.materialType||null):null,
+        brand:s.category==="Filamentos"?(s.brand||null):null,
         color_name:s.category==="Filamentos"?(s.colorName||null):null,
         color_hex:s.category==="Filamentos"?(s.colorHex||"#ffffff"):null,
+        sort_order:Number(s.sortOrder)||0,
         active:s.active!==false
       };
     });
@@ -122,11 +138,19 @@
 
     if(rows.length){
       let {error}=await client.from("supplies").upsert(rows,{onConflict:"id"});
-      if(error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(error.message||""))){
-        const legacyRows=rows.map(({material_type,color_name,color_hex,...rest})=>rest);
-        const retry=await client.from("supplies").upsert(legacyRows,{onConflict:"id"});
-        error=retry.error;
+
+      if(error && /brand|sort_order|column .* does not exist/i.test(String(error.message||""))){
+        const v1Rows=rows.map(({brand,sort_order,...rest})=>rest);
+        const retryV1=await client.from("supplies").upsert(v1Rows,{onConflict:"id"});
+        error=retryV1.error;
       }
+
+      if(error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(error.message||""))){
+        const legacyRows=rows.map(({material_type,brand,color_name,color_hex,sort_order,...rest})=>rest);
+        const retryLegacy=await client.from("supplies").upsert(legacyRows,{onConflict:"id"});
+        error=retryLegacy.error;
+      }
+
       if(error) throw error;
     }
   }
