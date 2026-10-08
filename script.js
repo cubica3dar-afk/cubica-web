@@ -168,8 +168,11 @@ let analyticsView = "summary";
 let supplySortMode = localStorage.getItem("cubica_supply_sort") || "manual";
 const PRODUCT_PAGE_SIZE = 12;
 const SUPPLY_PAGE_SIZE = 12;
+const FINISHED_PAGE_SIZE = 12;
 let productPage = 1;
 let supplyPage = 1;
+let finishedPage = 1;
+let finishedSortMode = localStorage.getItem("cubica_finished_sort") || "manual";
 
 function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;$("toast-container").appendChild(el);setTimeout(()=>el.remove(),3000)}
 function normalizeSupply(s){
@@ -212,6 +215,11 @@ function supplyCostLabel(s){
 }
 function initData(){
   products = products.map(p=>normalizeProduct(p));
+  products = products.map((p,i)=>{
+    const item=normalizeProduct(p);
+    if(!(item.sortOrder>0)) item.sortOrder=(i+1)*10;
+    return item;
+  });
   supplies = supplies.map((raw,i)=>{
     const item=normalizeSupply(raw);
     if(!(item.sortOrder>0)) item.sortOrder=(i+1)*10;
@@ -463,6 +471,7 @@ function normalizeProduct(p){
   p.recipe=Array.isArray(p.recipe)?p.recipe:[];
   p.media=Array.isArray(p.media)?p.media:[];
   p.description=typeof p.description==="string"?p.description:"";
+  p.sortOrder=Number(p.sortOrder??p.sort_order)||0;
   return p;
 }
 function productCapacity(recipe){
@@ -478,23 +487,99 @@ function productCapacity(recipe){
   const capacity=Math.min(...details.map(x=>x.possible));
   return {capacity,bottlenecks:details.filter(x=>x.possible===capacity).map(x=>x.supply.name)};
 }
+function sortedFinishedForView(list,mode=finishedSortMode){
+  const copy=[...(list||[])];
+  const byText=(a,b)=>String(a||"").localeCompare(String(b||""),"es",{sensitivity:"base"});
+  if(mode==="category")return copy.sort((a,b)=>byText(a.category,b.category)||byText(a.name,b.name));
+  if(mode==="name")return copy.sort((a,b)=>byText(a.name,b.name));
+  if(mode==="stock-desc")return copy.sort((a,b)=>(Number(b.stock)||0)-(Number(a.stock)||0)||byText(a.name,b.name));
+  if(mode==="stock-asc")return copy.sort((a,b)=>(Number(a.stock)||0)-(Number(b.stock)||0)||byText(a.name,b.name));
+  if(mode==="price-desc")return copy.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0)||byText(a.name,b.name));
+  if(mode==="price-asc")return copy.sort((a,b)=>(Number(a.price)||0)-(Number(b.price)||0)||byText(a.name,b.name));
+  return copy.sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||byText(a.name,b.name));
+}
+function moveFinishedProduct(id,direction){
+  if(finishedSortMode!=="manual")return;
+  const ordered=sortedFinishedForView(products,"manual");
+  const index=ordered.findIndex(x=>String(x.id)===String(id));
+  const target=index+(direction<0?-1:1);
+  if(index<0||target<0||target>=ordered.length)return;
+  [ordered[index],ordered[target]]=[ordered[target],ordered[index]];
+  ordered.forEach((item,i)=>item.sortOrder=(i+1)*10);
+  write(STORAGE.products,products);
+  renderFinishedStock();
+}
+function setFinishedPage(page){
+  finishedPage=Math.max(1,Math.trunc(Number(page)||1));
+  renderFinishedStock();
+  const toolbar=$("section-stock-finished")?.querySelector(".inventory-toolbar");
+  toolbar?.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function renderFinishedStock(){
   products.forEach(normalizeProduct);
   const search=(($('finished-search')?.value)||'').trim().toLowerCase();
-  const cat=$('finished-category-filter')?.value||'all';
-  const filtered=products.filter(p=>{const hay=[p.name,p.category,p.description].join(' ').toLowerCase();return (cat==='all'||p.category===cat)&&(!search||hay.includes(search));});
+
   const filter=$('finished-category-filter');
-  if(filter){const current=filter.value;const cats=finishedCategories();filter.innerHTML='<option value="all">Todas las categorías</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');filter.value=cats.includes(current)?current:'all';}
-  $('finished-stock-table').innerHTML=`<table><thead><tr><th>Producto</th><th>Categoría</th><th>Color(es)</th><th>Precio</th><th>Stock</th><th>Capacidad por insumos</th><th>Valor stock</th><th></th></tr></thead><tbody>
-  ${filtered.map(p=>{
+  if(filter){
+    const current=filter.value;
+    const cats=finishedCategories();
+    filter.innerHTML='<option value="all">Todas las categorías</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    filter.value=cats.includes(current)?current:'all';
+  }
+  const cat=filter?.value||'all';
+
+  const sortSelect=$("finished-sort");
+  if(sortSelect){
+    sortSelect.value=[...sortSelect.options].some(o=>o.value===finishedSortMode)?finishedSortMode:"manual";
+    finishedSortMode=sortSelect.value;
+  }
+
+  const filtered=products.filter(p=>{
+    const hay=[p.name,p.category,p.description].join(' ').toLowerCase();
+    return (cat==='all'||p.category===cat)&&(!search||hay.includes(search));
+  });
+  const ordered=sortedFinishedForView(filtered,finishedSortMode);
+  const canManualReorder=finishedSortMode==="manual" && !search && cat==="all";
+
+  const totalPages=Math.max(1,Math.ceil(ordered.length/FINISHED_PAGE_SIZE));
+  finishedPage=Math.min(Math.max(1,finishedPage),totalPages);
+  const pageStart=(finishedPage-1)*FINISHED_PAGE_SIZE;
+  const pageItems=ordered.slice(pageStart,pageStart+FINISHED_PAGE_SIZE);
+
+  const hint=$("finished-sort-hint");
+  if(hint){
+    hint.textContent=finishedSortMode==="manual"
+      ? (canManualReorder?"Usá ↑ y ↓ para definir el orden personalizado. Se guarda en Supabase.":"Quitá la búsqueda y el filtro de categoría para reordenar manualmente.")
+      : "Este orden es solo una vista. Elegí “Orden personalizado” para guardar tu propio orden.";
+  }
+
+  $('finished-stock-table').innerHTML=`<table><thead><tr><th class="finished-order-col">Orden</th><th>Producto</th><th>Categoría</th><th>Color(es)</th><th>Precio</th><th>Stock</th><th>Capacidad por insumos</th><th>Valor stock</th><th></th></tr></thead><tbody>
+  ${pageItems.length?pageItems.map((p,rowIndex)=>{
+    const globalIndex=pageStart+rowIndex;
     const cap=productCapacity(p.recipe);
     const colors=p.colors?.length?p.colors.map(c=>`<span class="mini-color" title="${escapeHtml(c.name||'Color')}" style="--mini-color:${escapeHtml(c.hex||'#fff')}"></span>`).join(''):`<span class="muted">—</span>`;
     const capacity=cap.capacity===null?`<span class="muted">Sin receta</span>`:`<span class="${cap.capacity===0?'stock-low':'stock-ok'}">${cap.capacity} u.</span><small class="capacity-note">${cap.bottlenecks.length?`Limita: ${escapeHtml(cap.bottlenecks.join(', '))}`:''}</small>`;
     const mediaCount=p.media?.length||0;
-    return `<tr><td><div class="finished-name-cell">${p.media?.find(m=>m.type==='image')?`<img src="${p.media.find(m=>m.type==='image').src}" alt="">`:''}<div><strong>${escapeHtml(p.name)}</strong><small class="capacity-note">${p.recipe?.length||0} insumo(s) · ${mediaCount} medio(s)</small></div></div></td><td>${escapeHtml(p.category)}</td><td><div class="mini-colors">${colors}</div></td><td><input type="number" min="0" value="${p.price}" onchange="updateProduct('${p.id}','price',this.value)"></td>
-    <td><input type="number" min="0" value="${p.stock}" onchange="updateProduct('${p.id}','stock',this.value)"></td><td>${capacity}</td><td>${money(p.price*p.stock)}</td>
-    <td class="table-actions"><button class="btn ghost" onclick="editProduct('${p.id}')">Editar</button><button class="btn ghost" onclick="deleteProduct('${p.id}')">Eliminar</button></td></tr>`;
-  }).join('')}</tbody></table>`;
+    return `<tr>
+      <td class="finished-order-cell">
+        ${finishedSortMode==="manual"
+          ?`<div class="finished-order-buttons"><button class="btn ghost finished-move" onclick="moveFinishedProduct('${p.id}',-1)" ${!canManualReorder||globalIndex===0?"disabled":""} title="Subir producto">↑</button><button class="btn ghost finished-move" onclick="moveFinishedProduct('${p.id}',1)" ${!canManualReorder||globalIndex===ordered.length-1?"disabled":""} title="Bajar producto">↓</button></div>`
+          :`<span class="muted">${globalIndex+1}</span>`}
+      </td>
+      <td><div class="finished-name-cell">${p.media?.find(m=>m.type==='image')?`<img src="${p.media.find(m=>m.type==='image').src}" alt="">`:''}<div><strong>${escapeHtml(p.name)}</strong><small class="capacity-note">${p.recipe?.length||0} insumo(s) · ${mediaCount} medio(s)</small></div></div></td>
+      <td>${escapeHtml(p.category)}</td><td><div class="mini-colors">${colors}</div></td><td><input type="number" min="0" value="${p.price}" onchange="updateProduct('${p.id}','price',this.value)"></td>
+      <td><input type="number" min="0" value="${p.stock}" onchange="updateProduct('${p.id}','stock',this.value)"></td><td>${capacity}</td><td>${money(p.price*p.stock)}</td>
+      <td class="table-actions"><button class="btn ghost" onclick="editProduct('${p.id}')">Editar</button><button class="btn ghost" onclick="deleteProduct('${p.id}')">Eliminar</button></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="9" class="empty-table">No se encontraron productos terminados con esos filtros.</td></tr>`}</tbody></table>`;
+
+  renderPagination("finished-pagination",{
+    page:finishedPage,
+    totalPages,
+    totalItems:ordered.length,
+    pageSize:FINISHED_PAGE_SIZE,
+    setter:"setFinishedPage"
+  });
 }
 function updateProduct(id,key,val){const p=products.find(x=>x.id===id);if(!p)return;p[key]=key==="price"||key==="stock"?Number(val):val;write(STORAGE.products,products);renderFinishedStock();renderProducts()}
 function deleteProduct(id){if(!confirm("¿Eliminar este producto?"))return;products=products.filter(p=>p.id!==id);write(STORAGE.products,products);renderFinishedStock();renderProducts()}
@@ -773,7 +858,7 @@ function saveFinishedProduct(e){
   if(id){
     const p=products.find(x=>x.id===id);if(!p)return;Object.assign(p,{name,category,price,stock,description,colorMode,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m}))});toast("Producto actualizado");
   }else{
-    products.push({id:uid("p"),name,category,price,stock,description,colorMode,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m}))});toast("Producto agregado");
+    products.push({id:uid("p"),name,category,price,stock,description,colorMode,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m})),sortOrder:Math.max(0,...products.map(x=>Number(x.sortOrder)||0))+10});toast("Producto agregado");
   }
   write(STORAGE.products,products);e.target.reset();closeModal("finished-modal");renderFinishedStock();renderProducts();
 }
@@ -1515,7 +1600,10 @@ document.addEventListener("DOMContentLoaded",async()=>{
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeAccountSidebar();});
   $("product-search").oninput=()=>{productPage=1;renderProducts();};
   $("product-category").onchange=()=>{productPage=1;renderProducts();};
-  $("finished-search").oninput=renderFinishedStock;$("finished-category-filter").onchange=renderFinishedStock;
+  $("finished-search").oninput=()=>{finishedPage=1;renderFinishedStock();};
+  $("finished-category-filter").onchange=()=>{finishedPage=1;renderFinishedStock();};
+  $("finished-sort").value=finishedSortMode;
+  $("finished-sort").onchange=e=>{finishedSortMode=e.target.value;finishedPage=1;localStorage.setItem("cubica_finished_sort",finishedSortMode);renderFinishedStock();};
   $("finished-images").addEventListener("change",e=>handleFinishedMediaInput(e.target,"image"));
   $("finished-videos").addEventListener("change",e=>handleFinishedMediaInput(e.target,"video"));
   $("add-finished-media-url")?.addEventListener("click",addFinishedMediaUrl);
@@ -1570,4 +1658,4 @@ document.addEventListener("DOMContentLoaded",async()=>{
 });
 function initBudgetDefaults(){ if(!window.budgetRows.length)window.budgetRows=[{id:"",qty:1}];}
 window.addToCart=addToCart;window.changeCart=changeCart;window.removeCart=removeCart;window.updateProduct=updateProduct;window.deleteProduct=deleteProduct;window.editProduct=editProduct;window.removeFinishedColor=removeFinishedColor;window.updateFinishedRecipe=updateFinishedRecipe;window.removeFinishedRecipe=removeFinishedRecipe;
-window.setProductPage=setProductPage;window.setSupplyPage=setSupplyPage;window.updateSupply=updateSupply;window.editSupply=editSupply;window.moveSupply=moveSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
+window.setProductPage=setProductPage;window.setSupplyPage=setSupplyPage;window.setFinishedPage=setFinishedPage;window.moveFinishedProduct=moveFinishedProduct;window.updateSupply=updateSupply;window.editSupply=editSupply;window.moveSupply=moveSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
