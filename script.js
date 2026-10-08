@@ -289,7 +289,12 @@ function renderAccountSidebar(){
     else{img.removeAttribute("src");img.classList.add("hidden");fallback.classList.remove("hidden");}
   }
   document.querySelectorAll(".account-sidebar .admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"));
+  document.querySelectorAll(".account-sidebar .customer-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="customer"));
   document.querySelectorAll(".account-sidebar .session-only").forEach(el=>el.classList.toggle("hidden",!session));
+  const ordersLabel=$("sidebar-orders-label");
+  if(ordersLabel)ordersLabel.textContent=session?.role==="admin"?"Ventas / Pedidos":"Mis pedidos";
+  const editBadge=$("avatar-edit-badge");
+  if(editBadge)editBadge.classList.toggle("hidden",session?.role!=="admin");
 }
 function showSection(id){
   const requested=id;
@@ -303,12 +308,16 @@ function showSection(id){
     toast("Esta sección es exclusiva del administrador.");
     id="login";
   }
+  if(id==="profile" && session?.role!=="customer"){
+    id=session?"store":"login";
+  }
   document.querySelectorAll(".page-section").forEach(sec=>sec.classList.add("hidden"));
   $("section-"+id).classList.remove("hidden");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.classList.toggle("active",b.dataset.sidebarSection===id));
   closeAccountSidebar();
   if(id==="store") renderProducts(); if(id==="cart") renderCart(); if(id==="orders") renderOrders();
+  if(id==="profile") renderCustomerProfile();
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();
   if(requested==="store" && typeof window.cubicaTrackEvent==="function") window.cubicaTrackEvent("page_view",null,{section:"store"});
@@ -321,6 +330,25 @@ function renderWelcome(){
     if(WELCOME_MESSAGES.length>1 && index===previous) index=(index+1)%WELCOME_MESSAGES.length;
     sessionStorage.setItem("cubica_welcome_index",index);
     message.textContent=WELCOME_MESSAGES[index];
+  }
+}
+function renderCustomerProfile(){
+  if(session?.role!=="customer")return;
+  const name=$("profile-page-name"),email=$("profile-page-email"),provider=$("profile-page-provider");
+  if(name)name.textContent=session.username||"Cliente";
+  if(email)email.textContent=session.email||"";
+  if(provider)provider.textContent=session.authProvider==="google"?"Google":"Cuenta Cúbica";
+  const img=$("profile-page-avatar"),fallback=$("profile-page-avatar-fallback");
+  if(img&&fallback){
+    if(session.avatarUrl){
+      img.src=session.avatarUrl;
+      img.classList.remove("hidden");
+      fallback.classList.add("hidden");
+    }else{
+      img.removeAttribute("src");
+      img.classList.add("hidden");
+      fallback.classList.remove("hidden");
+    }
   }
 }
 function renderApp(){
@@ -343,8 +371,17 @@ function renderApp(){
       el.classList.toggle("hidden",session?.role!=="admin");
     }
   });
+  document.querySelectorAll(".customer-only").forEach(el=>{
+    if(el.closest?.("#account-sidebar")) return;
+    if(el.classList.contains("page-section")){
+      if(session?.role!=="customer") el.classList.add("hidden");
+    }else{
+      el.classList.toggle("hidden",session?.role!=="customer");
+    }
+  });
 
   renderAccountSidebar();
+  renderCustomerProfile();
   setupNav();
   renderProducts();
   renderCart();
@@ -1161,22 +1198,35 @@ function saveBudget(){const b=window.lastBudget;if(!b)return;const qs=read(STORA
 async function copyBudget(){await navigator.clipboard.writeText(budgetSummary());toast("Resumen copiado")}
 
 function renderOrders(){
-  const mine=session.role==="admin"?orders:orders.filter(o=>o.customerEmail===session.email||o.username===session.username);
+  if(!session)return;
+  const isAdmin=session.role==="admin";
+  const mine=isAdmin?orders:orders.filter(o=>String(o.customerEmail||"").toLowerCase()===String(session.email||"").toLowerCase()||o.userId===session.supabaseUserId);
+
+  const eyebrow=$("orders-eyebrow"),title=$("orders-title"),subtitle=$("orders-subtitle");
+  if(eyebrow)eyebrow.textContent=isAdmin?"VENTAS":"CUENTA";
+  if(title)title.textContent=isAdmin?"Ventas / Pedidos":"Mis pedidos";
+  if(subtitle)subtitle.textContent=isAdmin?"Historial agrupable por día, mes y año.":"Consultá tus compras realizadas con esta cuenta y su estado.";
+
   const groups={};
   mine.forEach(o=>{
     const d=new Date(o.date),key=salesPeriod==="day"?todayKey(o.date):salesPeriod==="month"?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`:String(d.getFullYear());
     (groups[key]??=[]).push(o);
   });
-  const revenue=mine.reduce((a,o)=>a+Number(o.total||0),0),units=mine.reduce((a,o)=>a+o.items.reduce((x,i)=>x+(Number(i.qty)||0),0),0);
+  const revenue=mine.reduce((a,o)=>a+Number(o.total||0),0),units=mine.reduce((a,o)=>a+(o.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
   const cash=mine.filter(o=>o.payment==="Efectivo").reduce((a,o)=>a+Number(o.total||0),0);
   const transfer=mine.filter(o=>o.payment==="Transferencia").reduce((a,o)=>a+Number(o.total||0),0);
-  $("sales-kpis").innerHTML=`<div class="kpi"><span>Pedidos</span><strong>${mine.length}</strong></div><div class="kpi"><span>Unidades</span><strong>${units}</strong></div><div class="kpi"><span>Facturación total</span><strong>${money(revenue)}</strong></div><div class="kpi"><span>Período</span><strong>${salesPeriod==="day"?"Día":salesPeriod==="month"?"Mes":"Año"}</strong></div>`;
-  $("payment-breakdown").innerHTML=`<div class="payment-card"><span>💵 Efectivo</span><strong>${money(cash)}</strong></div><div class="payment-card"><span>🏦 Transferencia</span><strong>${money(transfer)}</strong></div><div class="payment-card total"><span>Total</span><strong>${money(cash+transfer)}</strong></div>`;
+
+  $("sales-kpis").innerHTML=isAdmin
+    ?`<div class="kpi"><span>Pedidos</span><strong>${mine.length}</strong></div><div class="kpi"><span>Unidades</span><strong>${units}</strong></div><div class="kpi"><span>Facturación total</span><strong>${money(revenue)}</strong></div><div class="kpi"><span>Período</span><strong>${salesPeriod==="day"?"Día":salesPeriod==="month"?"Mes":"Año"}</strong></div>`
+    :`<div class="kpi"><span>Mis pedidos</span><strong>${mine.length}</strong></div><div class="kpi"><span>Unidades compradas</span><strong>${units}</strong></div><div class="kpi"><span>Total comprado</span><strong>${money(revenue)}</strong></div><div class="kpi"><span>Período</span><strong>${salesPeriod==="day"?"Día":salesPeriod==="month"?"Mes":"Año"}</strong></div>`;
+
+  $("payment-breakdown").innerHTML=`<div class="payment-card"><span>💵 Efectivo</span><strong>${money(cash)}</strong></div><div class="payment-card"><span>🏦 Transferencia</span><strong>${money(transfer)}</strong></div><div class="payment-card total"><span>${isAdmin?"Total":"Compras"}</span><strong>${money(cash+transfer)}</strong></div>`;
+
   $("orders-list").innerHTML=Object.keys(groups).sort().reverse().map(k=>`<div><h3>${escapeHtml(k)}</h3>${groups[k].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`
     <article class="order-card"><div class="order-head"><div><strong>${escapeHtml(String(o.orderNumber||o.id).startsWith("CUB-")?(o.orderNumber||o.id):`#${String(o.id).slice(-8).toUpperCase()}`)}</strong><div class="muted">${formatDate(o.date)}</div></div><strong>${money(o.total)}</strong></div>
-    <div class="order-body"><div class="order-items">${o.items.map(i=>`${escapeHtml(i.name)}${i.color?` · ${escapeHtml(i.color)}`:''} × ${i.qty} — ${money(i.price*i.qty)}`).join("<br>")} </div>
-    <p class="muted">Cliente: ${escapeHtml(o.customerName)} · Pago: ${escapeHtml(o.payment)} · Estado: ${escapeHtml(o.status)}</p>
-    ${session.role==="admin"?`<button class="btn ghost" onclick="markOrder('${o.id}')">Marcar preparado</button>`:""}</div></article>`).join("")}</div>`).join("") || '<div class="card" style="padding:20px">Todavía no hay pedidos.</div>';
+    <div class="order-body"><div class="order-items">${(o.items||[]).map(i=>`${escapeHtml(i.name)}${i.color?` · ${escapeHtml(i.color)}`:''} × ${i.qty} — ${money(i.price*i.qty)}`).join("<br>")} </div>
+    <p class="muted">${isAdmin?`Cliente: ${escapeHtml(o.customerName)} · `:""}Pago: ${escapeHtml(o.payment)} · Estado: ${escapeHtml(o.status)}</p>
+    ${isAdmin?`<button class="btn ghost" onclick="markOrder('${o.id}')">Marcar preparado</button>`:""}</div></article>`).join("")}</div>`).join("") || '<div class="card" style="padding:20px">Todavía no hay pedidos asociados a esta cuenta.</div>';
 }
 function markOrder(id){const o=orders.find(x=>x.id===id);o.status=o.status==="Preparado"?"Pendiente":"Preparado";write(STORAGE.orders,orders);renderOrders()}
 
@@ -1614,6 +1664,18 @@ document.addEventListener("DOMContentLoaded",async()=>{
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
   $("checkout-btn").onclick=()=>{
     if(!cart.length)return toast("El carrito está vacío.");
+    if(session?.role==="customer"){
+      const name=$("customer-name"),email=$("customer-email");
+      if(name && !name.value)name.value=session.username||"";
+      if(email){
+        email.value=session.email||email.value;
+        email.readOnly=true;
+        email.title="El pedido quedará asociado a tu cuenta de Google.";
+      }
+    }else{
+      const email=$("customer-email");
+      if(email){email.readOnly=false;email.removeAttribute("title");}
+    }
     if(typeof window.cubicaTrackEvent==="function")window.cubicaTrackEvent("checkout_started",null,{items:cart.reduce((a,x)=>a+(Number(x.qty)||0),0)});
     openModal("checkout-modal");
   };
