@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261008-pagination2">
+  <link rel="stylesheet" href="styles.css?v=20261008-finished-sort1">
 
   <script type="importmap">
   {
@@ -238,8 +238,19 @@
         <div class="inventory-toolbar finished-toolbar">
           <div class="inventory-search"><span>⌕</span><input id="finished-search" placeholder="Buscar producto por nombre, categoría o descripción..."></div>
           <select id="finished-category-filter"><option value="all">Todas las categorías</option></select>
+          <select id="finished-sort" aria-label="Ordenar productos terminados">
+            <option value="manual">Orden personalizado</option>
+            <option value="category">Categoría</option>
+            <option value="name">Nombre A–Z</option>
+            <option value="stock-desc">Mayor stock</option>
+            <option value="stock-asc">Menor stock</option>
+            <option value="price-desc">Mayor precio</option>
+            <option value="price-asc">Menor precio</option>
+          </select>
         </div>
+        <p id="finished-sort-hint" class="finished-sort-hint muted">En “Orden personalizado” podés mover cada producto con las flechas ↑ y ↓.</p>
         <div id="finished-stock-table" class="table-wrap"></div>
+        <div id="finished-pagination" class="pagination hidden" aria-label="Paginación de productos terminados"></div>
       </section>
 
       <section id="section-stock-supplies" class="page-section hidden admin-only">
@@ -648,8 +659,8 @@
 
   <script src="github-config.js?v=20261005-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20261008-pagination2"></script>
-  <script src="supabase-bridge.js?v=20261006-dashboard2"></script>
+  <script src="script.js?v=20261008-finished-sort1"></script>
+  <script src="supabase-bridge.js?v=20261008-finished-sort1"></script>
   <script src="supabase-inventory.js?v=20261008-supplies-sort2"></script>
   <script src="supabase-sales.js?v=20261006-dashboard2"></script>
   <script src="supabase-analytics.js?v=20261006-1"></script>
