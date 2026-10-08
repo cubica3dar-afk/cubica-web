@@ -166,6 +166,10 @@ let salesPeriod = "day";
 let analyticsRange = "30d";
 let analyticsView = "summary";
 let supplySortMode = localStorage.getItem("cubica_supply_sort") || "manual";
+const PRODUCT_PAGE_SIZE = 12;
+const SUPPLY_PAGE_SIZE = 12;
+let productPage = 1;
+let supplyPage = 1;
 
 function toast(msg){const el=document.createElement("div");el.className="toast";el.textContent=msg;$("toast-container").appendChild(el);setTimeout(()=>el.remove(),3000)}
 function normalizeSupply(s){
@@ -337,14 +341,64 @@ function renderApp(){
   renderProducts();
   renderCart();
 }
+function paginationNumbers(totalPages,currentPage){
+  if(totalPages<=7)return Array.from({length:totalPages},(_,i)=>i+1);
+  const pages=[1];
+  const start=Math.max(2,currentPage-1);
+  const end=Math.min(totalPages-1,currentPage+1);
+  if(start>2)pages.push("…");
+  for(let p=start;p<=end;p++)pages.push(p);
+  if(end<totalPages-1)pages.push("…");
+  pages.push(totalPages);
+  return pages;
+}
+function renderPagination(id,{page,totalPages,totalItems,pageSize,setter}){
+  const box=$(id);if(!box)return;
+  if(totalItems<=pageSize || totalItems===0){
+    box.classList.add("hidden");
+    box.innerHTML="";
+    return;
+  }
+  const start=(page-1)*pageSize+1;
+  const end=Math.min(totalItems,page*pageSize);
+  const pages=paginationNumbers(totalPages,page);
+  box.classList.remove("hidden");
+  box.innerHTML=`
+    <div class="pagination-summary">Mostrando <strong>${start}–${end}</strong> de <strong>${totalItems}</strong></div>
+    <div class="pagination-controls">
+      <button class="pagination-btn pagination-arrow" type="button" onclick="${setter}(${page-1})" ${page<=1?"disabled":""} aria-label="Página anterior">‹</button>
+      ${pages.map(p=>p==="…"
+        ? '<span class="pagination-ellipsis">…</span>'
+        : `<button class="pagination-btn ${p===page?"active":""}" type="button" onclick="${setter}(${p})" ${p===page?'aria-current="page"':""}>${p}</button>`
+      ).join("")}
+      <button class="pagination-btn pagination-arrow" type="button" onclick="${setter}(${page+1})" ${page>=totalPages?"disabled":""} aria-label="Página siguiente">›</button>
+    </div>`;
+}
+function setProductPage(page){
+  productPage=Math.max(1,Math.trunc(Number(page)||1));
+  renderProducts();
+  const head=$("section-store")?.querySelector(".section-head");
+  head?.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function renderProducts(){
-  const search=($("product-search").value||"").trim().toLowerCase(), cat=$("product-category").value;
+  const search=($("product-search").value||"").trim().toLowerCase();
   const cats=[...new Set(products.map(p=>p.category).filter(Boolean))];
   const select=$("product-category");const current=select.value;
   select.innerHTML='<option value="all">Todas las categorías</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   select.value=cats.includes(current)?current:"all";
-  const list=products.filter(p=>{normalizeProduct(p); const hay=[p.name,p.category,p.description].join(" ").toLowerCase(); return (cat==="all"||p.category===cat)&&(!search||hay.includes(search));});
-  $("product-grid").innerHTML=list.map(p=>{
+  const cat=select.value;
+  const list=products.filter(p=>{
+    normalizeProduct(p);
+    const hay=[p.name,p.category,p.description].join(" ").toLowerCase();
+    return (cat==="all"||p.category===cat)&&(!search||hay.includes(search));
+  });
+
+  const totalPages=Math.max(1,Math.ceil(list.length/PRODUCT_PAGE_SIZE));
+  productPage=Math.min(Math.max(1,productPage),totalPages);
+  const start=(productPage-1)*PRODUCT_PAGE_SIZE;
+  const pageItems=list.slice(start,start+PRODUCT_PAGE_SIZE);
+
+  $("product-grid").innerHTML=pageItems.map(p=>{
     const firstImage=p.media.find(m=>m.type==="image");
     const cover=firstImage?`<img class="product-cover" src="${firstImage.src}" alt="${escapeHtml(p.name)}" loading="lazy" decoding="async">`:`<div class="product-icon">${iconFor(p.category)}</div>`;
     return `<article class="product-card product-card-clickable" onclick="openProductDetail('${p.id}')">
@@ -355,6 +409,14 @@ function renderProducts(){
       <div class="product-card-hint">Ver producto · fotos · colores · cantidad →</div>
     </article>`;
   }).join("") || '<div class="card" style="padding:25px">No hay productos que coincidan.</div>';
+
+  renderPagination("product-pagination",{
+    page:productPage,
+    totalPages,
+    totalItems:list.length,
+    pageSize:PRODUCT_PAGE_SIZE,
+    setter:"setProductPage"
+  });
 }
 function iconFor(cat){return cat==="Veladores"?"◉":cat==="Figuras"?"♟":cat==="Decoración"?"◇":"▣"}
 function addToCart(id, qtyOverride=null, colorOverride=null){
@@ -765,6 +827,12 @@ function moveSupply(id,direction){
   write(STORAGE.supplies,supplies);
   renderSupplies();
 }
+function setSupplyPage(page){
+  supplyPage=Math.max(1,Math.trunc(Number(page)||1));
+  renderSupplies();
+  const toolbar=$("section-stock-supplies")?.querySelector(".inventory-toolbar");
+  toolbar?.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function renderSupplies(){
   supplies=supplies.map(normalizeSupply);
   renderSupplyCategoryControls();
@@ -784,6 +852,11 @@ function renderSupplies(){
   const ordered=sortedSuppliesForView(filtered,supplySortMode);
   const canManualReorder=supplySortMode==="manual" && !search && cat==="all";
 
+  const totalPages=Math.max(1,Math.ceil(ordered.length/SUPPLY_PAGE_SIZE));
+  supplyPage=Math.min(Math.max(1,supplyPage),totalPages);
+  const pageStart=(supplyPage-1)*SUPPLY_PAGE_SIZE;
+  const pageItems=ordered.slice(pageStart,pageStart+SUPPLY_PAGE_SIZE);
+
   const hint=$("supply-sort-hint");
   if(hint){
     hint.textContent=supplySortMode==="manual"
@@ -796,20 +869,31 @@ function renderSupplies(){
   $("stock-value-card").innerHTML=`<span>Valor acumulado en depósito</span><strong>${money(total)}</strong><span>${supplies.length} insumos registrados${filtered.length!==supplies.length?` · vista filtrada: ${money(filteredTotal)}`:""}</span>`;
 
   $("supplies-stock-table").innerHTML=`<table><thead><tr><th class="supply-order-col">Orden</th><th>Insumo</th><th>Categoría</th><th>Detalle</th><th>Costo</th><th>Cantidad</th><th>Valor</th><th></th></tr></thead><tbody>
-  ${ordered.length ? ordered.map((item,rowIndex)=>`<tr>
-    <td class="supply-order-cell">
-      ${supplySortMode==="manual"?
-        `<div class="supply-order-buttons"><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',-1)" ${!canManualReorder||rowIndex===0?"disabled":""} title="Subir insumo">↑</button><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',1)" ${!canManualReorder||rowIndex===ordered.length-1?"disabled":""} title="Bajar insumo">↓</button></div>`
-        :`<span class="muted">${rowIndex+1}</span>`}
-    </td>
-    <td><strong>${escapeHtml(item.name)}</strong></td>
-    <td>${escapeHtml(item.category)}</td>
-    <td>${supplyDetailHtml(item)}</td>
-    <td>${money(item.cost)} <small class="table-unit">${escapeHtml(supplyCostLabel(item))}</small></td>
-    <td>${Number(item.qty).toLocaleString("es-AR",{maximumFractionDigits:2})} <small class="table-unit">${escapeHtml(supplyUnitLabel(item.unit,item.qty))}</small></td>
-    <td>${money(supplyCostForQty(item,item.qty))}</td>
-    <td class="table-actions"><button class="btn ghost" onclick="editSupply('${item.id}')">Editar</button><button class="btn ghost danger-button" onclick="deleteSupply('${item.id}')">Eliminar</button></td>
-  </tr>`).join("") : `<tr><td colspan="8" class="empty-table">No se encontraron insumos con esos filtros.</td></tr>`}</tbody></table>`;
+  ${pageItems.length ? pageItems.map((item,rowIndex)=>{
+    const globalIndex=pageStart+rowIndex;
+    return `<tr>
+      <td class="supply-order-cell">
+        ${supplySortMode==="manual"?
+          `<div class="supply-order-buttons"><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',-1)" ${!canManualReorder||globalIndex===0?"disabled":""} title="Subir insumo">↑</button><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',1)" ${!canManualReorder||globalIndex===ordered.length-1?"disabled":""} title="Bajar insumo">↓</button></div>`
+          :`<span class="muted">${globalIndex+1}</span>`}
+      </td>
+      <td><strong>${escapeHtml(item.name)}</strong></td>
+      <td>${escapeHtml(item.category)}</td>
+      <td>${supplyDetailHtml(item)}</td>
+      <td>${money(item.cost)} <small class="table-unit">${escapeHtml(supplyCostLabel(item))}</small></td>
+      <td>${Number(item.qty).toLocaleString("es-AR",{maximumFractionDigits:2})} <small class="table-unit">${escapeHtml(supplyUnitLabel(item.unit,item.qty))}</small></td>
+      <td>${money(supplyCostForQty(item,item.qty))}</td>
+      <td class="table-actions"><button class="btn ghost" onclick="editSupply('${item.id}')">Editar</button><button class="btn ghost danger-button" onclick="deleteSupply('${item.id}')">Eliminar</button></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty-table">No se encontraron insumos con esos filtros.</td></tr>`}</tbody></table>`;
+
+  renderPagination("supplies-pagination",{
+    page:supplyPage,
+    totalPages,
+    totalItems:ordered.length,
+    pageSize:SUPPLY_PAGE_SIZE,
+    setter:"setSupplyPage"
+  });
 }
 function updateSupply(id,key,val){
   const supply=supplies.find(x=>x.id===id);if(!supply)return;
@@ -1429,14 +1513,16 @@ document.addEventListener("DOMContentLoaded",async()=>{
     e.target.value="";
   });
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeAccountSidebar();});
-  $("product-search").oninput=renderProducts;$("product-category").onchange=renderProducts;
+  $("product-search").oninput=()=>{productPage=1;renderProducts();};
+  $("product-category").onchange=()=>{productPage=1;renderProducts();};
   $("finished-search").oninput=renderFinishedStock;$("finished-category-filter").onchange=renderFinishedStock;
   $("finished-images").addEventListener("change",e=>handleFinishedMediaInput(e.target,"image"));
   $("finished-videos").addEventListener("change",e=>handleFinishedMediaInput(e.target,"video"));
   $("add-finished-media-url")?.addEventListener("click",addFinishedMediaUrl);
-  $("supply-search").oninput=renderSupplies;$("supply-category-filter").onchange=renderSupplies;
+  $("supply-search").oninput=()=>{supplyPage=1;renderSupplies();};
+  $("supply-category-filter").onchange=()=>{supplyPage=1;renderSupplies();};
   $("supply-sort").value=supplySortMode;
-  $("supply-sort").onchange=e=>{supplySortMode=e.target.value;localStorage.setItem("cubica_supply_sort",supplySortMode);renderSupplies();};
+  $("supply-sort").onchange=e=>{supplySortMode=e.target.value;supplyPage=1;localStorage.setItem("cubica_supply_sort",supplySortMode);renderSupplies();};
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
   $("checkout-btn").onclick=()=>{
     if(!cart.length)return toast("El carrito está vacío.");
@@ -1484,4 +1570,4 @@ document.addEventListener("DOMContentLoaded",async()=>{
 });
 function initBudgetDefaults(){ if(!window.budgetRows.length)window.budgetRows=[{id:"",qty:1}];}
 window.addToCart=addToCart;window.changeCart=changeCart;window.removeCart=removeCart;window.updateProduct=updateProduct;window.deleteProduct=deleteProduct;window.editProduct=editProduct;window.removeFinishedColor=removeFinishedColor;window.updateFinishedRecipe=updateFinishedRecipe;window.removeFinishedRecipe=removeFinishedRecipe;
-window.updateSupply=updateSupply;window.editSupply=editSupply;window.moveSupply=moveSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
+window.setProductPage=setProductPage;window.setSupplyPage=setSupplyPage;window.updateSupply=updateSupply;window.editSupply=editSupply;window.moveSupply=moveSupply;window.deleteSupply=deleteSupply;window.openProductDetail=openProductDetail;window.setProductMedia=setProductMedia;window.changeProductMedia=changeProductMedia;window.selectProductColor=selectProductColor;window.toggleProductColor=toggleProductColor;window.deleteSupplyCategory=deleteSupplyCategory;window.removeBudgetRow=removeBudgetRow;window.updateBudgetRow=updateBudgetRow;window.markOrder=markOrder;
