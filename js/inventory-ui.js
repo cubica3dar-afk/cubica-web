@@ -3,6 +3,12 @@
    Usa el estado global de la aplicación (supplies, products, STORAGE, etc.).
 */
 
+
+/* Estado local del módulo de inventario. */
+const SUPPLY_PAGE_SIZE=12;
+let supplyPage=1;
+let supplySortMode=localStorage.getItem("cubica_supply_sort")||"manual";
+
 function renderSupplyCategoryControls(){
   const filter=$("supply-category-filter");
   if(filter){
