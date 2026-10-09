@@ -1,56 +1,47 @@
 # Módulos JavaScript de Cúbica
 
-Primera etapa de modularización: 2026-10-09.
+Refactorización consolidada: 2026-10-09.
 
-No se cambió el framework ni se migró a React/Vue. Los archivos siguen siendo scripts clásicos para minimizar riesgo durante la refactorización.
+El frontend continúa usando JavaScript nativo y scripts clásicos para mantener compatibilidad y reducir riesgo. La aplicación ya no depende de un backend general Raspberry/Flask/SQLite: los datos compartidos viven en Supabase.
 
 ## Orden de carga
 
-En `index.html`:
-
 1. `github-config.js`
 2. Supabase JS
-3. `script.js`
-4. `js/inventory-ui.js`
-5. `js/analytics-ui.js`
-6. `supabase-bridge.js`
-7. `supabase-inventory.js`
-8. `supabase-sales.js`
-9. `supabase-analytics.js`
-10. `viewer.js`
-11. `slicer.js`
+3. `js/core.js`
+4. `js/ui-shell.js`
+5. `js/store-ui.js`
+6. `js/products-ui.js`
+7. `js/inventory-ui.js`
+8. `js/budget-ui.js`
+9. `js/orders-ui.js`
+10. `js/analytics-ui.js`
+11. `js/app-init.js`
+12. `supabase-bridge.js`
+13. `supabase-inventory.js`
+14. `supabase-sales.js`
+15. `supabase-analytics.js`
+16. `viewer.js`
+17. `slicer.js`
 
-## inventory-ui.js
+## Responsabilidades
 
-Contiene la interfaz y lógica de:
-- categorías de insumos;
-- listado, búsqueda, filtros y paginación;
-- orden manual;
-- alta/edición/baja;
-- detalles de filamentos (material, marca, color);
-- unidades de medida.
+- **core.js**: estado compartido, localStorage temporal/caché, utilidades, formato y helpers de insumos.
+- **ui-shell.js**: navegación, sidebar, perfil visual, secciones, modales y paginación genérica.
+- **store-ui.js**: catálogo público y carrito.
+- **products-ui.js**: detalle de producto y administración de productos terminados, colores, recetas y medios.
+- **inventory-ui.js**: insumos, filtros, categorías, unidades, filamentos, edición y orden.
+- **budget-ui.js**: calculadora y representación de presupuestos.
+- **orders-ui.js**: historial de pedidos y planificación de insumos para fabricación.
+- **analytics-ui.js**: KPIs, tablas, gráficos y métricas.
+- **app-init.js**: listeners DOM y ensamblado de la interfaz.
 
-Usa el estado global definido por `script.js` y expone las funciones necesarias para handlers inline mediante `window.*`.
+Los archivos `supabase-*.js` son adaptadores de persistencia/autenticación y están separados por dominio.
 
-## analytics-ui.js
+## Persistencia
 
-Contiene:
-- filtros temporales de analytics;
-- cálculo de KPIs;
-- métricas de productos/clientes/producción;
-- gráficos SVG;
-- embudo;
-- tablas de análisis.
+`localStorage` ya no actúa como base compartida. Se utiliza como caché/estado temporal para una mejor experiencia del navegador. Supabase es la fuente central de catálogo, inventario, pedidos, presupuestos, perfiles y analítica.
 
-Consume `orders`, `products`, `supplies` y eventos cargados por `supabase-analytics.js`.
+## Slicer
 
-## Próximas extracciones recomendadas
-
-Sin urgencia, los siguientes candidatos naturales son:
-- `store-ui.js`
-- `products-admin-ui.js`
-- `orders-ui.js`
-- `budget-ui.js`
-- `auth-ui.js`
-
-Conviene hacerlo en cambios pequeños y verificables, no reescribir todo el frontend de una sola vez.
+El visor 3D es local. El slicing real puede conectarse en el futuro a un servicio dedicado mediante `slicerApiBase`. Ese servicio no forma parte de la persistencia principal de Cúbica.
