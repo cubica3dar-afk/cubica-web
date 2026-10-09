@@ -8,8 +8,8 @@
   };
   if (!els.file) return;
 
-  const HAS_SLICER_BACKEND = !!String(window.CUBICA_CONFIG?.apiBase || '').trim();
-  const apiUrl = path => window.cubicaApiUrl ? window.cubicaApiUrl(path) : path;
+  const HAS_SLICER_BACKEND = !!String(window.CUBICA_CONFIG?.slicerApiBase || '').trim();
+  const apiUrl = path => window.cubicaSlicerApiUrl ? window.cubicaSlicerApiUrl(path) : path;
   let selectedFile = null;
   let ironingMode = 'none';
   let materialMode = 'PLA';
@@ -30,7 +30,7 @@
       els.status.textContent='● Vista 3D disponible · slicing requiere backend';
       els.status.classList.add('ready');
       els.profile.innerHTML='<option value="github-static">Kobra S1 · backend no configurado</option>';
-      els.analyze.title='GitHub Pages no puede ejecutar OrcaSlicer. Configurá apiBase para habilitar el análisis.';
+      els.analyze.title='GitHub Pages no puede ejecutar OrcaSlicer. Configurá slicerApiBase para habilitar el análisis.';
       updateButton();
       return;
     }
