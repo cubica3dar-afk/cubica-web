@@ -1,40 +1,40 @@
-# Funciones de Cúbica en GitHub Pages
+# Mapa funcional de Cúbica
 
-## Funcionan directamente
-- HTML/CSS/JavaScript de la tienda.
-- Catálogo, buscador y filtros.
-- Carrito en el navegador.
-- Calculadora de presupuesto.
-- Gráficos y análisis sobre datos que estén en el navegador.
-- Vista 3D STL/3MF mediante Three.js.
-- Cambio visual de colores.
-- Enlaces a Instagram/MakerWorld.
+Estado: 2026-10-09.
 
-## Funcionan, pero solo en ESE navegador
-- Productos terminados.
-- Insumos.
-- Categorías.
-- Pedidos locales.
-- Presupuestos guardados.
+## Funciones que viven en GitHub Pages
 
-Estos datos usan localStorage si no hay backend. No se comparten entre PC/celular.
+El navegador se ocupa de:
+- interfaz y navegación;
+- catálogo y filtros;
+- carrito;
+- fichas de producto;
+- formularios administrativos;
+- cálculos de presupuestos;
+- gráficos y visualizaciones;
+- visor STL/3MF con Three.js.
 
-## No los puede ejecutar GitHub Pages por sí solo
-- Python / Flask (`app.py`).
-- SQLite en el servidor.
-- OrcaSlicer CLI.
-- SMTP/Gmail con contraseña de aplicación.
-- Guardado central de pedidos y stock.
-- Login/admin seguro.
+## Funciones que viven en Supabase
 
-## Reemplazo recomendado
-- Datos + stock + pedidos: Supabase Postgres o Cloudflare D1 + API.
-- Login real: Supabase Auth / Firebase Auth / proveedor equivalente.
-- Email de pedidos: función server-side/Edge Function con secretos, usando un proveedor de email.
-- Slicer real: servidor Docker/VPS separado con OrcaSlicer; el frontend de GitHub Pages llama a su API.
-- Alternativa de slicer: WASM en el navegador, posible pero más pesado y menos recomendable para móviles/modelos grandes.
+Supabase es responsable de:
+- autenticación;
+- perfiles y roles;
+- catálogo compartido;
+- stock;
+- insumos y recetas;
+- pedidos;
+- presupuestos;
+- analítica;
+- Storage de imágenes/videos;
+- permisos RLS;
+- funciones RPC seguras.
 
-## Arquitectura sugerida
-GitHub Pages (frontend)
-→ Supabase (datos, auth, pedidos, emails mediante Edge Function)
-→ API OrcaSlicer separada (solo para presupuesto 3D)
+## Persistencia local
+
+`localStorage` se utiliza como caché y para estado temporal, no como base de datos compartida.
+
+## Servicio de slicing futuro
+
+GitHub Pages no puede ejecutar OrcaSlicer CLI. Si se habilita slicing real, deberá utilizarse un servicio dedicado configurado con `slicerApiBase`.
+
+Ese servicio tendrá una responsabilidad aislada: analizar modelos y devolver métricas de impresión. No administrará usuarios, stock ni pedidos.
