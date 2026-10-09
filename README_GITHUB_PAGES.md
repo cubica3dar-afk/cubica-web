@@ -1,46 +1,87 @@
-# Cúbica — versión GitHub Pages
+# Cúbica — arquitectura web actual
 
-Esta carpeta está preparada para publicarse como sitio estático en GitHub Pages.
+Estado documentado: 2026-10-09.
 
-## Publicar
-1. Crear un repositorio en GitHub.
-2. Subir el contenido de esta carpeta a la raíz del repositorio.
-3. Ir a **Settings → Pages**.
-4. En **Build and deployment**, elegir **Deploy from a branch**.
-5. Elegir `main` y `/ (root)`.
-6. Guardar.
+Cúbica está publicada como frontend estático en GitHub Pages y utiliza Supabase como backend.
 
-GitHub Pages publicará `index.html`.
+## Arquitectura
 
-## Modo actual
-Con `github-config.js` y `apiBase: ""` la aplicación funciona sin backend:
-- tienda y catálogo
-- carrito
-- inventario local del navegador
-- calculadora de presupuestos
-- gráficos basados en datos locales
-- visor STL/3MF y cambio visual de colores
-
-No funcionan como servicio compartido:
-- SQLite / sincronización entre dispositivos
-- emails
-- pedidos centralizados
-- slicing real con OrcaSlicer
-- autenticación segura de administrador
-
-## Conectar un backend después
-Editar `github-config.js`:
-
-```js
-window.CUBICA_CONFIG = {
-  mode: "github-pages",
-  apiBase: "https://api.cubica3d.ar",
-  publicStore: true
-};
+```text
+GitHub Pages
+  ├─ HTML / CSS / JavaScript
+  ├─ Three.js para STL/3MF
+  └─ Supabase JS
+        ├─ PostgreSQL
+        ├─ Auth
+        ├─ Google OAuth
+        ├─ Storage
+        ├─ RPC
+        └─ RLS
 ```
 
-El backend deberá aceptar CORS desde el dominio de GitHub Pages o desde el dominio personalizado.
+El modo activo se define en `github-config.js`:
 
-## Seguridad
-No subas claves SMTP, contraseñas de aplicación, archivos `.env`, bases SQLite privadas ni secretos al repositorio.
-La contraseña de administrador actual del demo vive en JavaScript y NO es seguridad real para un sitio público.
+```js
+mode: "supabase"
+```
+
+La Publishable Key de Supabase puede estar en el frontend. La seguridad debe depender de RLS y de funciones server-side. Nunca agregar al repositorio una Secret Key, `service_role`, contraseña de base de datos, credencial SMTP ni Google Client Secret.
+
+## Datos centralizados en Supabase
+
+Actualmente se sincronizan:
+- catálogo y stock;
+- imágenes/videos y colores;
+- insumos, categorías y recetas/BOM;
+- pedidos y detalle de pedidos;
+- presupuestos;
+- perfiles de usuarios;
+- analítica;
+- orden personalizado de productos e insumos.
+
+## Autenticación
+
+- Clientes: Google OAuth mediante Supabase Auth.
+- Administrador: email/contraseña de Supabase.
+- Los clientes solamente pueden leer sus propios pedidos mediante RLS.
+- Pedidos anteriores como invitado pueden vincularse al usuario si coinciden con su email autenticado.
+
+## JavaScript
+
+`script.js` conserva el núcleo y varias funciones históricas.
+
+Como primera etapa de modularización:
+- `js/inventory-ui.js`: interfaz/lógica de insumos.
+- `js/analytics-ui.js`: cálculos y render del panel de análisis.
+- `supabase-bridge.js`: auth, catálogo y Storage.
+- `supabase-inventory.js`: persistencia de insumos/recetas.
+- `supabase-sales.js`: pedidos, ventas y presupuestos.
+- `supabase-analytics.js`: registro/carga de eventos.
+
+Ver `js/README.md` para el orden de carga y dependencias.
+
+## Esquema Supabase
+
+El esquema consolidado de referencia está en:
+
+`supabase_schema_current_v1.sql`
+
+Los SQL incrementales históricos se conservan en el repositorio. No hace falta volver a ejecutarlos si ya fueron aplicados.
+
+## Slicer
+
+El visor STL/3MF funciona en el navegador con Three.js.
+
+El slicing real con OrcaSlicer no puede ejecutarse en GitHub Pages. `slicer.js` conserva la interfaz preparada para un backend futuro (VPS/Raspberry/worker separado).
+
+## Snapshot estable
+
+Antes de la modularización se creó la rama:
+
+`stable-v0.5-pre-community-2026-10-09`
+
+Su commit base es:
+
+`e9e5119720f9bff525a65e6821432afcdb544718`
+
+Esa rama sirve como punto de rollback del estado funcional anterior a esta refactorización.
