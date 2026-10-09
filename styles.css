@@ -529,7 +529,7 @@ body.sidebar-open{overflow:hidden}
 }
 
 
-/* Cuentas de clientes con Google */
+/* Autenticación de cuentas */
 .google-login-btn{width:100%;min-height:48px;border:1px solid rgba(255,255,255,.16);border-radius:13px;background:#fff;color:#232323;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:11px;font:inherit;font-weight:750;cursor:pointer;transition:.16s transform,.16s box-shadow,.16s opacity}
 .google-login-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .google-login-btn:disabled{opacity:.65;cursor:wait}
@@ -556,4 +556,24 @@ body.sidebar-open{overflow:hidden}
   .customer-profile-card{grid-template-columns:1fr;padding:18px}
   .customer-profile-avatar{width:88px;height:88px}
   .customer-profile-data{grid-template-columns:1fr}
+}
+
+
+/* Auth por email + Google */
+.auth-view h2{margin:0 0 8px}
+.auth-view>.muted{margin:0 0 18px;line-height:1.6}
+.auth-form{margin-top:14px!important}
+.auth-form label{display:grid;margin-bottom:12px}
+.auth-form .btn{margin-top:3px}
+.auth-secondary-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
+.auth-text-btn{border:0;background:transparent;color:#e9e9f4;padding:5px 0;font:inherit;font-size:12px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.auth-text-btn:hover{color:#fff}
+.auth-back-login{margin-top:12px}
+.auth-help{margin:14px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+.auth-feedback{margin-top:16px;padding:12px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.045);font-size:12px;line-height:1.55}
+.auth-feedback[data-type="success"]{border-color:rgba(101,211,145,.35);background:rgba(101,211,145,.09);color:#c8f5d8}
+.auth-feedback[data-type="error"]{border-color:rgba(239,107,120,.38);background:rgba(239,107,120,.09);color:#ffd2d7}
+.auth-feedback[data-type="info"]{color:#e8e8f2}
+@media(max-width:520px){
+  .auth-secondary-actions{align-items:flex-start;flex-direction:column}
 }
