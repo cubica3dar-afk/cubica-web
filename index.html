@@ -73,7 +73,7 @@
       <nav id="account-sidebar-nav" class="account-sidebar-nav">
         <button type="button" data-sidebar-section="store"><span>⌂</span><span>Tienda</span></button>
         <button type="button" data-sidebar-section="orders" class="session-only"><span>▤</span><span id="sidebar-orders-label">Mis pedidos</span></button>
-        <button type="button" data-sidebar-section="profile" class="session-only customer-only"><span>◉</span><span>Mi perfil</span></button>
+        <button type="button" data-sidebar-section="profile" class="session-only"><span>◉</span><span>Mi perfil</span></button>
         <button type="button" data-sidebar-section="stock-finished" class="admin-only"><span>▣</span><span>Terminados</span></button>
         <button type="button" data-sidebar-section="stock-supplies" class="admin-only"><span>◫</span><span>Insumos</span></button>
         <button type="button" data-sidebar-section="budget" class="admin-only"><span>⌁</span><span>Presupuestos</span></button>
@@ -183,12 +183,12 @@
         <div id="orders-list"></div>
       </section>
 
-      <section id="section-profile" class="page-section hidden customer-only">
+      <section id="section-profile" class="page-section hidden">
         <div class="section-head">
           <div>
             <p class="eyebrow">CUENTA</p>
             <h2>Mi perfil</h2>
-            <p class="muted">Tu cuenta está protegida por Google. Cúbica no guarda tu contraseña de Google.</p>
+            <p id="profile-page-subtitle" class="muted">Información de tu cuenta Cúbica.</p>
           </div>
         </div>
         <div class="customer-profile-card card">
@@ -200,7 +200,7 @@
             <div><span>Nombre</span><strong id="profile-page-name">—</strong></div>
             <div><span>Email</span><strong id="profile-page-email">—</strong></div>
             <div><span>Método de acceso</span><strong id="profile-page-provider">Google</strong></div>
-            <div><span>Cuenta</span><strong>Cliente Cúbica</strong></div>
+            <div><span>Cuenta</span><strong id="profile-page-account-type">—</strong></div>
           </div>
         </div>
       </section>
@@ -700,14 +700,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=20261009-refactor2"></script>
-  <script src="js/ui-shell.js?v=20261009-refactor2"></script>
+  <script src="js/ui-shell.js?v=20261009-admin-profile-fix"></script>
   <script src="js/store-ui.js?v=20261009-refactor2"></script>
   <script src="js/products-ui.js?v=20261009-recipe-step-fix"></script>
   <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
   <script src="js/orders-ui.js?v=20261009-refactor2"></script>
   <script src="js/analytics-ui.js?v=20261009-refactor2"></script>
-  <script src="js/app-init.js?v=20261009-refactor2"></script>
+  <script src="js/app-init.js?v=20261009-admin-profile-fix"></script>
 
   <script src="supabase-bridge.js?v=20261008-google-auth2"></script>
   <script src="supabase-inventory.js?v=20261008-supplies-sort2"></script>
