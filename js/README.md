@@ -34,7 +34,8 @@ El frontend continúa usando JavaScript nativo y scripts clásicos para mantener
 - **budget-ui.js**: calculadora y representación de presupuestos.
 - **orders-ui.js**: historial de pedidos y planificación de insumos para fabricación.
 - **analytics-ui.js**: KPIs, tablas, gráficos y métricas.
-- **app-init.js**: listeners DOM y ensamblado de la interfaz.
+- **app-init.js**: listeners DOM y ensamblado general de la interfaz.
+- **auth-ui.js**: login Google/email, registro, confirmación, recuperación y cambio de contraseña.
 
 Los archivos `supabase-*.js` son adaptadores de persistencia/autenticación y están separados por dominio.
 
