@@ -209,7 +209,7 @@
     if(!HAS_SLICER_BACKEND){setMessage('GitHub Pages no puede ejecutar OrcaSlicer. La vista 3D funciona, pero el cálculo real necesita un backend externo o un motor WASM en el navegador.',true);return;}
     if(!selectedFile) return;
     els.analyze.disabled=true; els.analyze.textContent='Procesando…';
-    setMessage('Ejecutando slicing real. En Raspberry Pi 3 puede tardar bastante más que en una PC.');
+    setMessage('Ejecutando slicing real. En un servidor de baja potencia puede tardar bastante más que en una PC.');
     els.result.classList.add('hidden');
     const form=new FormData();
     form.append('file',selectedFile); form.append('profile',els.profile.value);
