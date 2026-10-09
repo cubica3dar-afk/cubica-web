@@ -78,8 +78,8 @@ function showSection(id){
     toast("Esta sección es exclusiva del administrador.");
     id="login";
   }
-  if(id==="profile" && session?.role!=="customer"){
-    id=session?"store":"login";
+  if(id==="profile" && !session){
+    id="login";
   }
   document.querySelectorAll(".page-section").forEach(sec=>sec.classList.add("hidden"));
   $("section-"+id).classList.remove("hidden");
@@ -87,7 +87,7 @@ function showSection(id){
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.classList.toggle("active",b.dataset.sidebarSection===id));
   closeAccountSidebar();
   if(id==="store") renderProducts(); if(id==="cart") renderCart(); if(id==="orders") renderOrders();
-  if(id==="profile") renderCustomerProfile();
+  if(id==="profile") renderProfile();
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();
   if(requested==="store" && typeof window.cubicaTrackEvent==="function") window.cubicaTrackEvent("page_view",null,{section:"store"});
@@ -102,12 +102,33 @@ function renderWelcome(){
     message.textContent=WELCOME_MESSAGES[index];
   }
 }
-function renderCustomerProfile(){
-  if(session?.role!=="customer")return;
-  const name=$("profile-page-name"),email=$("profile-page-email"),provider=$("profile-page-provider");
-  if(name)name.textContent=session.username||"Cliente";
+function renderProfile(){
+  if(!session)return;
+
+  const isAdmin=session.role==="admin";
+  const name=$("profile-page-name");
+  const email=$("profile-page-email");
+  const provider=$("profile-page-provider");
+  const subtitle=$("profile-page-subtitle");
+  const accountType=$("profile-page-account-type");
+
+  if(name)name.textContent=session.username||(isAdmin?"Administrador":"Cliente");
   if(email)email.textContent=session.email||"";
-  if(provider)provider.textContent=session.authProvider==="google"?"Google":"Cuenta Cúbica";
+
+  if(provider){
+    if(session.authProvider==="google")provider.textContent="Google";
+    else if(session.authProvider==="email")provider.textContent="Email y contraseña";
+    else provider.textContent=isAdmin?"Email y contraseña":"Cuenta Cúbica";
+  }
+
+  if(subtitle){
+    subtitle.textContent=isAdmin
+      ?"Administrá los datos visibles de tu cuenta de administrador."
+      :"Tu cuenta está protegida por tu proveedor de acceso. Cúbica no almacena contraseñas de terceros.";
+  }
+
+  if(accountType)accountType.textContent=isAdmin?"Administrador Cúbica":"Cliente Cúbica";
+
   const img=$("profile-page-avatar"),fallback=$("profile-page-avatar-fallback");
   if(img&&fallback){
     if(session.avatarUrl){
@@ -151,7 +172,7 @@ function renderApp(){
   });
 
   renderAccountSidebar();
-  renderCustomerProfile();
+  renderProfile();
   setupNav();
   renderProducts();
   renderCart();
