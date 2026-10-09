@@ -3,6 +3,11 @@
    Mantiene la lógica visual/cálculos de analytics separada del núcleo de la app.
 */
 
+
+/* Estado local del módulo de análisis. */
+let analyticsRange="30d";
+let analyticsView="summary";
+
 function svgEscape(s){return escapeHtml(String(s));}
 function analyticsRangeBounds(range=analyticsRange, anchor=new Date()){
   const now=new Date(anchor), end=new Date(anchor);
