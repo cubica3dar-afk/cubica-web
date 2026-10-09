@@ -18,11 +18,12 @@ El frontend continúa usando JavaScript nativo y scripts clásicos para mantener
 10. `js/analytics-ui.js`
 11. `js/app-init.js`
 12. `supabase-bridge.js`
-13. `supabase-inventory.js`
-14. `supabase-sales.js`
-15. `supabase-analytics.js`
-16. `viewer.js`
-17. `slicer.js`
+13. `js/auth-ui.js`
+14. `supabase-inventory.js`
+15. `supabase-sales.js`
+16. `supabase-analytics.js`
+17. `viewer.js`
+18. `slicer.js`
 
 ## Responsabilidades
 
