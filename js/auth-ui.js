@@ -33,6 +33,8 @@
     if(/Email not confirmed/i.test(msg))return "Primero confirmá tu email desde el correo que te enviamos.";
     if(/Password should be at least|password.*characters/i.test(msg))return "La contraseña no cumple con la longitud mínima.";
     if(/rate limit|too many requests|over_email_send_rate_limit/i.test(msg))return "Se enviaron demasiadas solicitudes. Esperá unos minutos e intentá nuevamente.";
+    if(/Email address not authorized|email.*not authorized/i.test(msg))return "Supabase no puede enviar el correo a esa dirección con su servicio de email predeterminado. Configurá SMTP propio o probá temporalmente con un email autorizado del equipo.";
+    if(/Error sending confirmation email|error sending.*email|smtp/i.test(msg))return "No se pudo enviar el correo de confirmación. Revisá la configuración SMTP de Supabase.";
     if(/signup.*disabled|Signups not allowed/i.test(msg))return "El registro por email todavía no está habilitado en Supabase.";
     if(/email.*invalid/i.test(msg))return "Revisá que el email sea válido.";
     return fallback;
