@@ -50,7 +50,13 @@
 
     const profile = await profileFor(sbSession.user);
     const metadata=sbSession.user.user_metadata||{};
-    const provider=sbSession.user.app_metadata?.provider||metadata.provider||"";
+    const rawProviders=Array.isArray(sbSession.user.app_metadata?.providers)
+      ? sbSession.user.app_metadata.providers
+      : [sbSession.user.app_metadata?.provider||metadata.provider||""];
+    const authProviders=[...new Set(rawProviders.filter(Boolean))];
+    const provider=authProviders.includes("google") && authProviders.includes("email")
+      ? "google+email"
+      : (authProviders[0]||"");
     session = {
       username: profile?.display_name || metadata.full_name || metadata.name || sbSession.user.email || "usuario",
       email: sbSession.user.email || profile?.email || "",
@@ -58,7 +64,8 @@
       supabaseUserId: sbSession.user.id,
       avatarUrl: metadata.avatar_url || metadata.picture || "",
       avatarPath: metadata.avatar_path || "",
-      authProvider: provider
+      authProvider: provider,
+      authProviders
     };
     writeLocal(STORAGE.session, session);
     renderApp();
@@ -443,80 +450,79 @@
     },500);
   };
 
+  function authRedirectUrl(){
+    return window.location.origin+window.location.pathname;
+  }
+
   async function signInWithGoogle(){
-    const redirectTo=window.location.origin+window.location.pathname;
     const {data,error}=await client.auth.signInWithOAuth({
       provider:"google",
       options:{
-        redirectTo,
+        redirectTo:authRedirectUrl(),
         queryParams:{prompt:"select_account"}
       }
     });
     if(error) throw error;
     return data;
   }
+
+  async function signInWithEmail(email,password){
+    const {data,error}=await client.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    await applySupabaseSession(data.session,true);
+    if(session?.role==="customer") await claimCustomerGuestOrders();
+    if(!catalogLoadedFromSupabase) await loadCatalogFromSupabase();
+    return data;
+  }
+
+  async function signUpWithEmail(name,email,password){
+    const {data,error}=await client.auth.signUp({
+      email,
+      password,
+      options:{
+        emailRedirectTo:authRedirectUrl(),
+        data:{full_name:name,name}
+      }
+    });
+    if(error) throw error;
+    if(data.session){
+      await applySupabaseSession(data.session,true);
+      if(session?.role==="customer") await claimCustomerGuestOrders();
+    }
+    return data;
+  }
+
+  async function sendPasswordReset(email){
+    const {data,error}=await client.auth.resetPasswordForEmail(email,{
+      redirectTo:authRedirectUrl()
+    });
+    if(error) throw error;
+    return data;
+  }
+
+  async function updatePassword(password){
+    const {data,error}=await client.auth.updateUser({password});
+    if(error) throw error;
+    return data;
+  }
+
+  async function signOutCubica(){
+    const {error}=await client.auth.signOut();
+    if(error) throw error;
+    session=null;
+    localStorage.removeItem(STORAGE.session);
+    renderApp();
+    window.dispatchEvent(new CustomEvent("cubica:auth-ready",{detail:{role:null}}));
+  }
+
   window.cubicaSignInWithGoogle=signInWithGoogle;
+  window.cubicaSignInWithEmail=signInWithEmail;
+  window.cubicaSignUpWithEmail=signUpWithEmail;
+  window.cubicaSendPasswordReset=sendPasswordReset;
+  window.cubicaUpdatePassword=updatePassword;
+  window.cubicaSignOut=signOutCubica;
 
   document.addEventListener("DOMContentLoaded", async () => {
-    const googleBtn=$("google-login-btn");
-    if(googleBtn){
-      googleBtn.onclick=async()=>{
-        const old=googleBtn.innerHTML;
-        googleBtn.disabled=true;
-        googleBtn.classList.add("loading");
-        try{
-          googleBtn.querySelector("span").textContent="Abriendo Google…";
-          await signInWithGoogle();
-        }catch(err){
-          console.error(err);
-          googleBtn.innerHTML=old;
-          googleBtn.disabled=false;
-          googleBtn.classList.remove("loading");
-          const msg=String(err?.message||"");
-          toast(/provider.*enabled|Unsupported provider/i.test(msg)
-            ?"Todavía falta habilitar Google en Supabase."
-            :"No se pudo iniciar sesión con Google.");
-        }
-      };
-    }
-
-    const form = $("login-form");
-    if(form){
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const email = $("login-user").value.trim();
-        const password = $("login-password").value;
-        const btn = e.submitter || form.querySelector('button[type="submit"]');
-        const old = btn?.textContent || "Iniciar sesión";
-        if(btn){ btn.disabled=true; btn.textContent="Ingresando…"; }
-
-        try{
-          const {data,error}=await client.auth.signInWithPassword({email,password});
-          if(error) throw error;
-          await applySupabaseSession(data.session,true);
-          await loadCatalogFromSupabase();
-          showSection("store");
-        }catch(err){
-          console.error(err);
-          toast(err?.message==="Invalid login credentials"?"Email o contraseña incorrectos.":"No se pudo iniciar sesión.");
-        }finally{
-          if(btn){btn.disabled=false;btn.textContent=old;}
-        }
-      };
-    }
-
-    const logout=$("logout-btn");
-    if(logout){
-      logout.onclick=async()=>{
-        await client.auth.signOut();
-        session=null;
-        localStorage.removeItem(STORAGE.session);
-        renderApp();
-        showSection("store");
-        toast("Sesión cerrada");
-      };
-    }
-
     const {data}=await client.auth.getSession();
     await applySupabaseSession(data.session,false);
     if(session?.role==="customer") await claimCustomerGuestOrders();
@@ -524,11 +530,19 @@
 
     client.auth.onAuthStateChange(async(event,newSession)=>{
       await applySupabaseSession(newSession,false);
+
+      if(event==="PASSWORD_RECOVERY"){
+        window.dispatchEvent(new CustomEvent("cubica:password-recovery"));
+        return;
+      }
+
       if(newSession?.user && session?.role==="customer"){
         const claimed=await claimCustomerGuestOrders();
-        if(event==="SIGNED_IN" && claimed>0)toast(`Vinculamos ${claimed} pedido${claimed===1?"":"s"} anterior${claimed===1?"":"es"} a tu cuenta.`);
+        if(event==="SIGNED_IN" && claimed>0){
+          toast(`Vinculamos ${claimed} pedido${claimed===1?"":"s"} anterior${claimed===1?"":"es"} a tu cuenta.`);
+        }
       }
-      // Al recuperar la sesión al volver a una pestaña no se cambia la sección activa.
+
       if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
       if(event==="SIGNED_IN" && session?.role==="customer") showSection("store");
     });
