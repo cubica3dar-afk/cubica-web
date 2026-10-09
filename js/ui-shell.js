@@ -116,7 +116,8 @@ function renderProfile(){
   if(email)email.textContent=session.email||"";
 
   if(provider){
-    if(session.authProvider==="google")provider.textContent="Google";
+    if(session.authProvider==="google+email")provider.textContent="Google + email y contraseña";
+    else if(session.authProvider==="google")provider.textContent="Google";
     else if(session.authProvider==="email")provider.textContent="Email y contraseña";
     else provider.textContent=isAdmin?"Email y contraseña":"Cuenta Cúbica";
   }
