@@ -38,8 +38,9 @@ Actualmente se sincronizan:
 
 ## Autenticación
 
-- Clientes: Google OAuth mediante Supabase Auth.
-- Administrador: email/contraseña de Supabase.
+- Clientes: Google OAuth o email/contraseña mediante Supabase Auth.
+- El registro por email soporta confirmación de correo y recuperación/cambio de contraseña.
+- Administrador: email/contraseña de Supabase; el rol se resuelve desde `profiles`.
 - Los clientes solamente pueden leer sus propios pedidos mediante RLS.
 - Pedidos anteriores como invitado pueden vincularse al usuario si coinciden con su email autenticado.
 
@@ -55,6 +56,7 @@ La aplicación se divide en:
 - `js/orders-ui.js`
 - `js/analytics-ui.js`
 - `js/app-init.js`
+- `js/auth-ui.js`
 
 Los adaptadores Supabase permanecen separados:
 - `supabase-bridge.js`
