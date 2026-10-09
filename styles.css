@@ -214,7 +214,7 @@ td input,td select{padding:8px;border-radius:8px;min-width:80px}
 @media(max-width:650px){.slicer-plate-panel,.slicer-plate-breakdown-head{flex-direction:column;align-items:stretch}.slicer-plate-select-wrap{display:block}.slicer-plate-select-wrap select{width:100%;min-width:0;margin-top:5px}}
 
 
-/* Estado de almacenamiento central en Raspberry Pi */
+/* Estado de sincronización de datos */
 .sync-badge{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#dfe7ff;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 .sync-badge[data-mode="ok"]{color:#c7f7d4;border-color:rgba(56,189,108,.35);background:rgba(56,189,108,.10)}
 .sync-badge[data-mode="pending"]{color:#e7e7ff}
