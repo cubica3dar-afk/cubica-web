@@ -12,6 +12,22 @@
     return;
   }
 
+  // Capturar el tipo antes de que Supabase consuma y limpie el hash.
+  const recoveryFromUrl = new URLSearchParams(window.location.hash.slice(1)).get("type")==="recovery";
+  const recoveryStorageKey = "cubica_password_recovery_user";
+  let recoveryActive = false;
+  window.cubicaPasswordRecoveryActive = false;
+  const domReady = new Promise(resolve=>{
+    if(document.readyState!=="loading") resolve();
+    else document.addEventListener("DOMContentLoaded",resolve,{once:true});
+  });
+
+  function clearPasswordRecovery(){
+    recoveryActive=false;
+    window.cubicaPasswordRecoveryActive=false;
+    sessionStorage.removeItem(recoveryStorageKey);
+  }
+
   const client = window.supabase.createClient(url, key);
   window.cubicaSupabase = client;
 
@@ -509,6 +525,7 @@
   async function signOutCubica(){
     const {error}=await client.auth.signOut();
     if(error) throw error;
+    clearPasswordRecovery();
     session=null;
     localStorage.removeItem(STORAGE.session);
     renderApp();
@@ -522,29 +539,40 @@
   window.cubicaUpdatePassword=updatePassword;
   window.cubicaSignOut=signOutCubica;
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    const {data}=await client.auth.getSession();
-    await applySupabaseSession(data.session,false);
-    if(session?.role==="customer") await claimCustomerGuestOrders();
-    await loadCatalogFromSupabase();
-
-    client.auth.onAuthStateChange(async(event,newSession)=>{
-      await applySupabaseSession(newSession,false);
-
-      if(event==="PASSWORD_RECOVERY"){
-        window.dispatchEvent(new CustomEvent("cubica:password-recovery"));
-        return;
-      }
-
-      if(newSession?.user && session?.role==="customer"){
-        const claimed=await claimCustomerGuestOrders();
-        if(event==="SIGNED_IN" && claimed>0){
-          toast(`Vinculamos ${claimed} pedido${claimed===1?"":"s"} anterior${claimed===1?"":"es"} a tu cuenta.`);
+  // Suscribirse antes de getSession o consultas: PASSWORD_RECOVERY no se repite.
+  // Diferir el trabajo para liberar el bloqueo interno de Auth antes de usar su API.
+  let authQueue=Promise.resolve();
+  client.auth.onAuthStateChange((event,newSession)=>{
+    const userId=newSession?.user?.id;
+    if(event==="SIGNED_OUT" || !userId){
+      clearPasswordRecovery();
+    }else if(event==="PASSWORD_RECOVERY" ||
+      (event==="INITIAL_SESSION" && (recoveryFromUrl || sessionStorage.getItem(recoveryStorageKey)===userId))){
+      recoveryActive=true;
+      window.cubicaPasswordRecoveryActive=true;
+      sessionStorage.setItem(recoveryStorageKey,userId);
+    }
+    setTimeout(()=>{
+      authQueue=authQueue.then(async()=>{
+        await domReady;
+        await applySupabaseSession(newSession,false);
+        if(recoveryActive && newSession?.user){
+          window.dispatchEvent(new CustomEvent("cubica:password-recovery"));
+          return;
         }
-      }
+        if(newSession?.user && session?.role==="customer"){
+          const claimed=await claimCustomerGuestOrders();
+          if(event==="SIGNED_IN" && claimed>0){
+            toast(`Vinculamos ${claimed} pedido${claimed===1?"":"s"} anterior${claimed===1?"":"es"} a tu cuenta.`);
+          }
+        }
+        if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
+        if(event==="SIGNED_IN" && session?.role==="customer" && !recoveryActive) showSection("store");
+      }).catch(err=>console.error("No se pudo sincronizar la sesión",err));
+    },0);
+  });
 
-      if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
-      if(event==="SIGNED_IN" && session?.role==="customer") showSection("store");
-    });
+  document.addEventListener("DOMContentLoaded",()=>{
+    loadCatalogFromSupabase();
   });
 })();

@@ -52,6 +52,7 @@
   }
 
   window.addEventListener("cubica:password-recovery",()=>{
+    $("welcome-view")?.classList.add("hidden");
     showSection("login");
     showAuthView("reset");
     setFeedback("Enlace validado. Ahora elegí tu nueva contraseña.","success");
@@ -173,6 +174,7 @@
 
     $("reset-password-form")?.addEventListener("submit",async e=>{
       e.preventDefault();
+      const form=e.currentTarget;
       const password=$("reset-password").value;
       const repeat=$("reset-password-repeat").value;
       const btn=e.submitter||e.currentTarget.querySelector('button[type="submit"]');
@@ -186,7 +188,7 @@
         if(typeof window.cubicaUpdatePassword!=="function")throw new Error("Cambio de contraseña no disponible");
         await window.cubicaUpdatePassword(password);
         if(typeof window.cubicaSignOut==="function")await window.cubicaSignOut();
-        e.currentTarget.reset();
+        form.reset();
         showSection("login");
         showAuthView("login");
         setFeedback("Contraseña actualizada. Ya podés iniciar sesión con tu email y la nueva contraseña.","success");
