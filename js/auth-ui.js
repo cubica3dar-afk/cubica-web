@@ -118,11 +118,13 @@
 
     $("signup-form")?.addEventListener("submit",async e=>{
       e.preventDefault();
+      // currentTarget se limpia al terminar el despacho del evento, antes del await.
+      const form=e.currentTarget;
       const name=$("signup-name").value.trim();
       const email=$("signup-email").value.trim();
       const password=$("signup-password").value;
       const repeat=$("signup-password-repeat").value;
-      const btn=e.submitter||e.currentTarget.querySelector('button[type="submit"]');
+      const btn=e.submitter||form.querySelector('button[type="submit"]');
 
       if(name.length<2)return setFeedback("Escribí un nombre válido.","error");
       if(password.length<8)return setFeedback("La contraseña debe tener al menos 8 caracteres.","error");
@@ -134,11 +136,11 @@
         if(typeof window.cubicaSignUpWithEmail!=="function")throw new Error("Registro no disponible");
         const data=await window.cubicaSignUpWithEmail(name,email,password);
         if(data?.session){
-          e.currentTarget.reset();
+          form.reset();
           showSection("store");
           toast("Cuenta creada correctamente.");
         }else{
-          e.currentTarget.reset();
+          form.reset();
           showAuthView("login");
           if($("login-user"))$("login-user").value=email;
           setFeedback("Cuenta registrada. Revisá tu email y abrí el enlace de verificación. Si ese correo ya tenía una cuenta, usá “Crear / recuperar contraseña”.","success");
