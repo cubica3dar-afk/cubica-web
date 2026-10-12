@@ -1,0 +1,3 @@
+# Autenticación propia entre Cron y el worker. Nunca invocar desde el navegador.
+[functions.order-emails]
+verify_jwt = false
