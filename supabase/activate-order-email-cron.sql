@@ -1,4 +1,5 @@
--- Activar DESPUÉS de desplegar order-emails y configurar sus secretos.
+-- Activar después de desplegar order-emails. Si faltan secretos del proveedor,
+-- el runtime no reclama entregas y las conserva pendientes sin consumir reintentos.
 -- El secreto existe en Vault con nombre cubica_order_email_worker_secret.
 -- Lo crea la migración de la cola y el worker lo valida en backend.
 begin;
