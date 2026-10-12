@@ -52,4 +52,11 @@ Fuentes: [programación de Edge Functions](https://supabase.com/docs/guides/func
 
 Se inspeccionó directamente el catálogo del proyecto: columnas/tipos de las tablas utilizadas, definición de `create_public_order`, triggers, RLS y permisos. Las cuatro migraciones se aplicaron con el historial de Supabase. La prueba transaccional `tests/database-rollback.sql` pasó para invitados y autenticados, guardado con precios del servidor, snapshot, bloqueo de entregas, payload estable, flags independientes y reintentos. Los datos de prueba se revirtieron; siguen existiendo los siete pedidos originales y ninguna entrega histórica se encoló.
 
-Las herramientas administrativas de Supabase no permiten configurar secretos de Edge Functions en esta conexión; `RESEND_API_KEY` y `ORDER_EMAIL_FROM` deben guardarse en su pantalla de Secrets. Cron está activado con el trabajo `cubica-order-emails` cada minuto, y la Edge Function está desplegada. La llamada sin secreto respondió 401 y la llamada autenticada respondió 503 (`missing_server_configuration`) antes de configurar Resend. El worker no reclama entregas ni consume reintentos mientras falte configuración. Después de guardar ambos secretos, los pedidos nuevos podrán enviarse automáticamente. Falta comprobar una compra acordada y la entrega real en las bandejas.
+Los secretos del proveedor ya fueron configurados por el usuario. La función autenticada respondió 200 y el usuario confirmó la recepción correcta de los dos correos. Cron sigue activo cada minuto.
+
+## Diseño elegido
+
+- Cliente: versión colorida de Cúbica, con encabezado azul profundo, acento violeta, logo, productos, total destacado y botón de acceso a sus pedidos.
+- Interno: versión minimalista y elegante, con datos del cliente ordenados y resumen de producción que conserva disponibilidad, faltantes y recetas ausentes.
+
+Las plantillas usan tablas de presentación e inline styles, con ajuste para pantallas pequeñas y versión de texto plano. Se revisaron en escritorio y a 360 px, y pasaron las 18 pruebas de regresión. El cálculo de materiales, el guardado y la cola no se modificaron. Un reintento de un correo ya preparado conserva su payload anterior para respetar la idempotencia de Resend; los nuevos correos usan los diseños elegidos.
