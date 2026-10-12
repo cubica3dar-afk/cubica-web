@@ -45,6 +45,8 @@ El primer Preparado inserta una sola entrada ready en order_email_outbox. No hay
 - Pruebas de recuperación: evento temprano, PASSWORD_RECOVERY, recarga, otra cuenta, logout y formulario asíncrono.
 - Revisión visual con fixtures en 390×844 y 1280×900: materiales/faltantes, confirmación, cancelación explícita y seis estados proyectados para el cliente, sin controles internos ni desbordamiento horizontal.
 - Se comprobó que la definición de create_public_order es idéntica a la anterior y que las políticas RLS existentes no cambiaron.
+- tests/order-analytics.test.cjs verifica el renderizado de KPI: las cuatro etapas abiertas cuentan como pendientes, Entregado conserva su facturación y Cancelado continúa excluido como antes.
+- Se verificó el worker desplegado con autenticación interna y cola vacía: HTTP 200, cero reintentos y cero fallos; sin envíos a clientes.
 
 Las verificaciones de Auth y correos se hicieron con pruebas y la infraestructura existente; no se generaron cuentas ni se enviaron avisos reales a clientes durante QA. El envío a un inbox real se producirá cuando un pedido real llegue por primera vez a Preparado.
 

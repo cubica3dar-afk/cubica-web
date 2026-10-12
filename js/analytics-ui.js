@@ -197,7 +197,7 @@ function renderAnalytics(){
   const revenue=mine.reduce((a,o)=>a+(Number(o.total)||0),0);
   const units=mine.reduce((a,o)=>a+(o.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
   const ticket=mine.length?revenue/mine.length:0;
-  const pending=mine.filter(o=>["pendiente","preparado"].includes(String(o.status||"").toLowerCase())).length;
+  const pending=mine.filter(o=>["pendiente","confirmado","en producción","preparado"].includes(String(o.status||"").toLowerCase())).length;
   const prevRevenue=previous.reduce((a,o)=>a+(Number(o.total)||0),0);
   const prevOrders=previous.length;
   const prevUnits=previous.reduce((a,o)=>a+(o.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
