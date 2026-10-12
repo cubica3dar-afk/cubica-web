@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   renderWelcome();
   renderApp();
   showSection("store");
+  window.cubicaOpenOrdersLink?.();
 
   $("enter-store-btn").onclick=()=>{
     $("welcome-view").classList.add("hidden");

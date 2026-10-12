@@ -1,5 +1,28 @@
 /* CÚBICA 3D — shell de interfaz: navegación, cuenta, secciones y paginación. */
 
+// El email y los retornos de Auth pueden solicitar una sección concreta.
+let ordersLinkActive = new URLSearchParams(window.location.search).get("view")==="orders"
+  || sessionStorage.getItem("cubica_auth_destination")==="orders";
+let ordersLinkOpened = false;
+if(ordersLinkActive) sessionStorage.setItem("cubica_auth_destination","orders");
+
+window.cubicaAuthRedirectUrl = function(){
+  const redirect=new URL(window.location.pathname,window.location.origin);
+  if(ordersLinkActive) redirect.searchParams.set("view","orders");
+  return redirect.href;
+};
+window.cubicaOpenOrdersLink = function(){
+  if(!ordersLinkActive || window.cubicaPasswordRecoveryActive ||
+    new URLSearchParams(window.location.hash.slice(1)).get("type")==="recovery") return false;
+  $("welcome-view")?.classList.add("hidden");
+  ordersLinkOpened=true;
+  showSection(session?"orders":"login");
+  return true;
+};
+window.cubicaNavigateAfterSignIn = function(){
+  if(!window.cubicaOpenOrdersLink()) showSection("store");
+};
+
 const WELCOME_MESSAGES = [
   "Hay cosas que comprás porque las necesitás. Y hay otras que elegís porque simplemente querés tenerlas. Bienvenido a Cúbica.",
   "Que una impresión salga de una máquina no significa que sea una más. En Cúbica, cada objeto empieza con una idea y termina en tus manos.",
@@ -67,6 +90,17 @@ function renderAccountSidebar(){
   if(editBadge)editBadge.classList.toggle("hidden",session?.role!=="admin");
 }
 function showSection(id){
+  // Al navegar voluntariamente a otra sección, dejar de forzar el destino del email.
+  if(ordersLinkOpened && !["orders","login"].includes(id)){
+    ordersLinkActive=false;
+    ordersLinkOpened=false;
+    sessionStorage.removeItem("cubica_auth_destination");
+    const current=new URL(window.location.href);
+    if(current.searchParams.get("view")==="orders"){
+      current.searchParams.delete("view");
+      window.history.replaceState(null,"",current.href);
+    }
+  }
   const requested=id;
   const section=$("section-"+id);
   if(!section)return;

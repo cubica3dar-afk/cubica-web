@@ -467,7 +467,7 @@
   };
 
   function authRedirectUrl(){
-    return window.location.origin+window.location.pathname;
+    return window.cubicaAuthRedirectUrl?.() || window.location.origin+window.location.pathname;
   }
 
   async function signInWithGoogle(){
@@ -567,7 +567,10 @@
           }
         }
         if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
-        if(event==="SIGNED_IN" && session?.role==="customer" && !recoveryActive) showSection("store");
+        if(!recoveryActive && ["INITIAL_SESSION","SIGNED_IN"].includes(event)){
+          const opened=window.cubicaOpenOrdersLink?.();
+          if(!opened && event==="SIGNED_IN" && session?.role==="customer") showSection("store");
+        }
       }).catch(err=>console.error("No se pudo sincronizar la sesión",err));
     },0);
   });

@@ -108,7 +108,7 @@
       try{
         if(typeof window.cubicaSignInWithEmail!=="function")throw new Error("Auth no disponible");
         await window.cubicaSignInWithEmail(email,password);
-        showSection("store");
+        window.cubicaNavigateAfterSignIn();
       }catch(err){
         console.error(err);
         setFeedback(errorMessage(err,"No se pudo iniciar sesión."),"error");
@@ -138,7 +138,7 @@
         const data=await window.cubicaSignUpWithEmail(name,email,password);
         if(data?.session){
           form.reset();
-          showSection("store");
+          window.cubicaNavigateAfterSignIn();
           toast("Cuenta creada correctamente.");
         }else{
           form.reset();
@@ -208,7 +208,7 @@
           localStorage.removeItem(STORAGE.session);
           renderApp();
         }
-        showSection("store");
+        window.cubicaNavigateAfterSignIn();
         showAuthView("login");
         toast("Sesión cerrada");
       }catch(err){
