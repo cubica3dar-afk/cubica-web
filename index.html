@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261012-lifecycle1">
+  <link rel="stylesheet" href="styles.css?v=20261012-community1">
 
   <script type="importmap">
   {
@@ -78,6 +78,7 @@
         <button type="button" data-sidebar-section="stock-supplies" class="admin-only"><span>◫</span><span>Insumos</span></button>
         <button type="button" data-sidebar-section="budget" class="admin-only"><span>⌁</span><span>Presupuestos</span></button>
         <button type="button" data-sidebar-section="analytics" class="admin-only"><span>⌗</span><span>Análisis</span></button>
+        <button type="button" data-sidebar-section="community" class="admin-only"><span>☏</span><span>Comunidad</span></button>
       </nav>
 
       <div class="account-sidebar-footer">
@@ -311,7 +312,14 @@
 
         <div id="analytics-panel-products" class="analytics-panel hidden">
           <div class="analytics-section-card">
-            <div class="analytics-card-head"><div><h3>Rendimiento por producto</h3><p class="muted">Unidades, facturación, costo de receta y margen estimado.</p></div></div>
+            <h3>Rendimiento por producto</h3>
+            <div class="community-actions"><label>Período<select id="product-performance-period"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option><option value="all">Todo</option></select></label><label>Ordenar por<select id="product-performance-sort"><option value="views">Vistas</option><option value="orders">Pedidos</option><option value="revenue">Facturación</option><option value="carts">Carritos</option><option value="likes">Likes</option><option value="dislikes">Dislikes internos</option><option value="comments">Comentarios</option><option value="view_to_order">Vista → pedido</option><option value="name">Nombre</option></select></label></div>
+            <p class="muted">Vistas y carritos del período; pedidos y facturación excluyen Cancelado. Sesiones de navegador, no personas únicas. Reacciones y comentarios muestran el estado actual.</p>
+            <p id="product-performance-status" role="status"></p><div id="product-performance-table" class="table-wrap"></div>
+            <details><summary>Cómo se calculan las métricas</summary><p class="muted">Vista → carrito = eventos de agregar al carrito / vistas × 100. Vista → pedido = pedidos distintos que incluyen el producto / vistas × 100. Positivas = likes / (likes + dislikes) × 100. Sin denominador se muestra —. Son razones de actividad; no atribución individual y pueden superar 100 %. Unidades y facturación suman las líneas del pedido, incluidos colores/variantes. Los dislikes y la proporción positiva son internos.</p></details>
+          </div>
+          <div class="analytics-section-card">
+            <div class="analytics-card-head"><div><h3>Ventas y margen por producto</h3><p class="muted">Unidades, facturación, costo de receta y margen estimado.</p></div></div>
             <div id="analytics-products-table" class="table-wrap analytics-table-wrap"></div>
           </div>
         </div>
@@ -349,6 +357,11 @@
         <p id="finished-sort-hint" class="finished-sort-hint muted">En “Orden personalizado” podés mover cada producto con las flechas ↑ y ↓.</p>
         <div id="finished-stock-table" class="table-wrap"></div>
         <div id="finished-pagination" class="pagination hidden" aria-label="Paginación de productos terminados"></div>
+      </section>
+
+      <section id="section-community" class="page-section hidden admin-only">
+        <div class="section-head"><div><p class="eyebrow">COMUNIDAD</p><h2>Moderación</h2><p class="muted">Ocultá o restaurá la visibilidad. Las opiniones se publican automáticamente.</p></div></div>
+        <div id="community-moderation-list"></div><button id="community-moderation-more" class="btn ghost hidden">Ver más comentarios</button>
       </section>
 
       <section id="section-stock-supplies" class="page-section hidden admin-only">
@@ -675,6 +688,7 @@
     <div class="modal-card product-detail-modal">
       <button class="modal-close" data-close-modal="product-detail-modal">×</button>
       <div id="product-detail-content"></div>
+      <section id="product-community" class="product-community" aria-label="Comunidad del producto"></section>
     </div>
   </div>
 
@@ -760,9 +774,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=20261009-refactor2"></script>
-  <script src="js/ui-shell.js?v=20261011-orders-email-link"></script>
+  <script src="js/ui-shell.js?v=20261012-community1"></script>
   <script src="js/store-ui.js?v=20261009-refactor2"></script>
-  <script src="js/products-ui.js?v=20261009-recipe-step-fix"></script>
+  <script src="js/products-ui.js?v=20261012-community1"></script>
+  <script src="js/community-ui.js?v=20261012-community1"></script>
   <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
@@ -783,10 +798,10 @@
     </div>
   </div>
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
-  <script src="js/app-init.js?v=20261011-orders-email-link"></script>
+  <script src="js/app-init.js?v=20261012-community1"></script>
 
-  <script src="supabase-bridge.js?v=20261012-lifecycle1"></script>
-  <script src="js/auth-ui.js?v=20261011-orders-email-link"></script>
+  <script src="supabase-bridge.js?v=20261012-community1"></script>
+  <script src="js/auth-ui.js?v=20261012-community1"></script>
   <script src="supabase-inventory.js?v=20261012-lifecycle1"></script>
   <script src="supabase-sales.js?v=20261012-lifecycle1"></script>
   <script src="supabase-analytics.js?v=20261006-1"></script>

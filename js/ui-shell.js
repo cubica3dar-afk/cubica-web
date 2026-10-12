@@ -108,7 +108,7 @@ function showSection(id){
     toast("Iniciá sesión para consultar tus pedidos.");
     id="login";
   }
-  if(["stock-finished","stock-supplies","budget","analytics"].includes(id) && session?.role!=="admin"){
+  if(["stock-finished","stock-supplies","budget","analytics","community"].includes(id) && session?.role!=="admin"){
     toast("Esta sección es exclusiva del administrador.");
     id="login";
   }
@@ -124,6 +124,8 @@ function showSection(id){
   if(id==="profile") renderProfile();
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();
+  if(id==="community")window.loadCommunityModeration?.(false);
+  if(id==="analytics")window.loadProductPerformance?.();
   if(requested==="store" && typeof window.cubicaTrackEvent==="function") window.cubicaTrackEvent("page_view",null,{section:"store"});
 }
 function renderWelcome(){

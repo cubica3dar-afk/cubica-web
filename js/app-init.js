@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   renderApp();
   showSection("store");
   window.cubicaOpenOrdersLink?.();
+  window.cubicaOpenProductLink?.();
 
   $("enter-store-btn").onclick=()=>{
     $("welcome-view").classList.add("hidden");

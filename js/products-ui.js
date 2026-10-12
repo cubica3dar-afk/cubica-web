@@ -348,6 +348,7 @@ function openProductDetail(id){
   const p=products.find(x=>x.id===id);if(!p)return;
   normalizeProduct(p);detailProductId=id;detailMediaIndex=0;detailSelectedColor=p.colors?.[0]?.name||'';detailSelectedColors=p.colors?.length?[p.colors[0].name]:[];
   renderProductDetail();openModal('product-detail-modal');
+  window.dispatchEvent(new CustomEvent("cubica:product-open",{detail:{productId:id}}));
   if(typeof window.cubicaTrackEvent==="function")window.cubicaTrackEvent("product_view",id,{name:p.name,category:p.category});
 }
 function renderProductDetail(){

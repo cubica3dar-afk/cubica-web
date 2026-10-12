@@ -219,6 +219,7 @@
       catalogLoadedFromSupabase = true;
       setDataBadge("Datos: Supabase","ok");
       renderProducts();
+      window.cubicaOpenProductLink?.();
       if(session?.role==="admin") renderFinishedStock();
     }catch(err){
       console.error("Catálogo Supabase",err);
@@ -576,7 +577,7 @@
         }
         if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
         if(!recoveryActive && ["INITIAL_SESSION","SIGNED_IN"].includes(event)){
-          const opened=window.cubicaOpenOrdersLink?.();
+          const opened=window.cubicaOpenOrdersLink?.()||window.cubicaOpenProductLink?.();
           if(!opened && event==="SIGNED_IN" && session?.role==="customer") showSection("store");
         }
       }).catch(err=>console.error("No se pudo sincronizar la sesión",err));

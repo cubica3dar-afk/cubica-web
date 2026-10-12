@@ -57,6 +57,9 @@
     showAuthView("reset");
     setFeedback("Enlace validado. Ahora elegí tu nueva contraseña.","success");
   });
+  window.addEventListener("cubica:auth-request",()=>{
+    if(!window.cubicaPasswordRecoveryActive)showAuthView("login");
+  });
 
   document.addEventListener("DOMContentLoaded",()=>{
     $("auth-open-signup")?.addEventListener("click",()=>{
