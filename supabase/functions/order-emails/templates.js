@@ -47,6 +47,20 @@ export function customerEmail(order, items, from) {
   };
 }
 
+export function readyEmail(order, items, from) {
+  const heading = "Tu pedido está listo";
+  const message = `Tu pedido ${title(order)} ya está preparado. Nos pondremos en contacto para coordinar la entrega o retiro.`;
+  const header = `<div class="email-inset" style="padding:28px 34px;background:${COLORS.navy};border-bottom:6px solid ${COLORS.accent};color:#fff;">${logo}<p style="letter-spacing:4px;font-weight:bold;">CÚBICA</p><h1 class="email-heading" style="font-size:34px;line-height:1.2;">${heading}</h1></div>`;
+  return {
+    from, to:[order.customer_email], reply_to:"contacto@cubica3d.ar",
+    subject:`Cúbica · Tu pedido ${title(order)} está listo`,
+    html:frame({colored:true,heading,header,body:
+      `${paragraph(`Hola ${escapeHtml(order.customer_name)}.`)}${paragraph(escapeHtml(message))}${itemTable(items,true)}<p style="margin:26px 0;"><a href="${ORDERS_URL}" style="display:block;padding:15px 20px;background:${COLORS.accent};color:#fff;text-decoration:none;border-radius:10px;text-align:center;font-weight:bold;">Ver mi pedido →</a></p>${paragraph("Ingresá con el email de tu compra para consultar el pedido.")}`,
+      footer:`<strong>Gracias por elegir Cúbica.</strong><br>cubica3d.ar · contacto@cubica3d.ar`}),
+    text:`${heading}\n\nHola ${order.customer_name}. ${message}\n\n${itemText(items)}\n\nVer mi pedido: ${ORDERS_URL}\nIngresá con el email de tu compra para consultar el pedido.`,
+  };
+}
+
 export function internalEmail(order, items, plan, from) {
   const statuses = { available: "Disponible para el pedido completo", insufficient: "Insumos insuficientes para el pedido completo", unknown: "Inventario incompleto: requiere revisión" };
   const productsHtml = plan.products.map(product => `<li><strong>${escapeHtml(product.name)} × ${quantity(product.ordered)}</strong><br>${product.recipeStatus === "missing" ? escapeHtml(MISSING_RECIPE) : escapeHtml(statuses[product.availability])}</li>`).join("");

@@ -1,5 +1,5 @@
 import { calculateProductionPlan } from "./plan.js";
-import { customerEmail, internalEmail } from "./templates.js";
+import { customerEmail, internalEmail, readyEmail } from "./templates.js";
 
 // El worker solo necesita RPC. REST nativo evita dependencias externas en runtime.
 export function createRpcClient(url, serviceKey, _options, fetchImpl = fetch) {
@@ -67,6 +67,8 @@ export async function processDelivery(client, job, options) {
       }
       if (job.kind === "customer") {
         payload = customerEmail(snapshot.order, snapshot.items, options.from);
+      } else if (job.kind === "ready") {
+        payload = readyEmail(snapshot.order, snapshot.items, options.from);
       } else if (job.kind === "internal") {
         const plan = calculateProductionPlan(snapshot.items, snapshot.recipes, snapshot.supplies);
         payload = internalEmail(snapshot.order, snapshot.items, plan, options.from);

@@ -8,6 +8,7 @@
   let inventorySyncing=false;
   let inventoryTimer=null;
   let inventoryLoaded=false;
+  const supplyStockBaseline=new Map();
 
   function setBadge(text,mode="ok"){
     if(typeof updateServerBadge==="function") updateServerBadge(text,mode);
@@ -52,6 +53,8 @@
       if(recErr) throw recErr;
 
       supplyCategories = (cats||[]).map(x=>x.name);
+      supplyStockBaseline.clear();
+      for(const row of sup||[])supplyStockBaseline.set(String(row.id),Number(row.qty));
       supplies = (sup||[]).map((x,i)=>normalizeSupply({
         id:x.id,
         name:x.name,
@@ -137,21 +140,13 @@
     }
 
     if(rows.length){
-      let {error}=await client.from("supplies").upsert(rows,{onConflict:"id"});
-
-      if(error && /brand|sort_order|column .* does not exist/i.test(String(error.message||""))){
-        const v1Rows=rows.map(({brand,sort_order,...rest})=>rest);
-        const retryV1=await client.from("supplies").upsert(v1Rows,{onConflict:"id"});
-        error=retryV1.error;
+      for(const row of rows){
+        const expected=supplyStockBaseline.get(row.id);
+        const changeStock=expected===undefined||row.qty!==expected;
+        const {error}=await client.rpc("save_admin_inventory_row",{p_table:"supplies",p_row:row,p_expected:expected??null,p_change_stock:changeStock});
+        if(error)throw error;
+        if(changeStock)supplyStockBaseline.set(row.id,row.qty);
       }
-
-      if(error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(error.message||""))){
-        const legacyRows=rows.map(({material_type,brand,color_name,color_hex,sort_order,...rest})=>rest);
-        const retryLegacy=await client.from("supplies").upsert(legacyRows,{onConflict:"id"});
-        error=retryLegacy.error;
-      }
-
-      if(error) throw error;
     }
   }
 
@@ -195,6 +190,11 @@
     }
   }
   window.migrateCubicaInventoryToSupabase=migrateInventoryToSupabase;
+  window.loadCubicaInventoryFromSupabase=loadInventoryFromSupabase;
+  window.flushCubicaInventory=async()=>{
+    if(inventorySyncing)throw new Error("Esperá a que termine de guardar el inventario.");
+    if(inventoryTimer){clearTimeout(inventoryTimer);inventoryTimer=null;await syncInventoryNow();}
+  };
 
   async function syncInventoryNow(){
     if(session?.role!=="admin" || inventorySyncing) return;
@@ -217,6 +217,7 @@
     if(![STORAGE.supplies,STORAGE.supplyCategories,STORAGE.products].includes(key)) return;
     clearTimeout(inventoryTimer);
     inventoryTimer=setTimeout(async()=>{
+      inventoryTimer=null;
       try{
         await syncInventoryNow();
       }catch(err){

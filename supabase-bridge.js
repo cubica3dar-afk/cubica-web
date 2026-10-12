@@ -35,6 +35,7 @@
   let catalogSyncTimer = null;
   let catalogSyncing = false;
   let catalogLoadInProgress = false;
+  const productStockBaseline=new Map();
 
   function setDataBadge(text, mode="ok"){
     if(typeof updateServerBadge === "function") updateServerBadge(text, mode);
@@ -175,6 +176,8 @@
       }
 
       const ids = rows.map(r=>r.id);
+      productStockBaseline.clear();
+      for(const row of rows)productStockBaseline.set(String(row.id),Number(row.stock));
       const previousById = new Map((products||[]).map(p=>[p.id,p]));
 
       const [{data:colors,error:colorError},{data:media,error:mediaError}] = await Promise.all([
@@ -340,13 +343,13 @@
 
       const rows=productRows(list);
       if(rows.length){
-        let {error}=await client.from("products").upsert(rows,{onConflict:"id"});
-        if(error && /sort_order|column .* does not exist/i.test(String(error.message||""))){
-          const legacyRows=rows.map(({sort_order,...rest})=>rest);
-          const retry=await client.from("products").upsert(legacyRows,{onConflict:"id"});
-          error=retry.error;
+        for(const row of rows){
+          const expected=productStockBaseline.get(row.id);
+          const changeStock=expected===undefined||row.stock!==expected;
+          const {error}=await client.rpc("save_admin_inventory_row",{p_table:"products",p_row:row,p_expected:expected??null,p_change_stock:changeStock});
+          if(error)throw error;
+          if(changeStock)productStockBaseline.set(row.id,row.stock);
         }
-        if(error) throw error;
       }
       await syncProductChildren(list);
       catalogLoadedFromSupabase=true;
@@ -357,6 +360,10 @@
   }
 
   window.loadCubicaCatalogFromSupabase=loadCatalogFromSupabase;
+  window.flushCubicaCatalog=async()=>{
+    if(catalogSyncing)throw new Error("Esperá a que termine de guardar el catálogo.");
+    if(catalogSyncTimer){clearTimeout(catalogSyncTimer);catalogSyncTimer=null;await saveProductsToSupabase(products,{removeMissing:true});}
+  };
 
   async function uploadProductMedia(file,type){
     if(session?.role!=="admin") throw new Error("Solo el administrador puede subir archivos.");
@@ -456,6 +463,7 @@
     if(key!==STORAGE.products || session?.role!=="admin") return;
     clearTimeout(catalogSyncTimer);
     catalogSyncTimer=setTimeout(async()=>{
+      catalogSyncTimer=null;
       try{
         await saveProductsToSupabase(value,{removeMissing:true});
       }catch(err){

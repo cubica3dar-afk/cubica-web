@@ -26,6 +26,8 @@
       notes:row.notes||"",
       total:Number(row.total)||0,
       status:row.status||"Pendiente",
+      lifecycleVersion:Number(row.lifecycle_version)||0,
+      productionStartedAt:row.production_started_at||null,
       username:row.username||"guest",
       supplyPlan:row.supply_plan||{products:[],supplies:[]},
       internalEmailSent:!!row.internal_email_sent,
@@ -33,6 +35,7 @@
       emailErrors:row.email_errors||[],
       serverSaved:true,
       items:(row.order_items||[]).map(i=>({
+        itemId:i.id,
         productId:i.product_id||"",
         name:i.name,
         color:i.color||"",
@@ -54,9 +57,7 @@
 
   async function fetchRemoteSales(){
     const [{data:orderRows,error:orderErr},{data:quoteRows,error:quoteErr}]=await Promise.all([
-      client.from("orders")
-        .select("id,order_number,client_order_id,user_id,created_at,customer_name,customer_email,phone,payment,notes,total,status,username,supply_plan,internal_email_sent,customer_email_sent,email_errors,order_items(id,product_id,name,color,qty,unit_price,line_total)")
-        .order("created_at",{ascending:false}),
+      client.rpc("get_admin_orders"),
       client.from("quotes")
         .select("id,created_at,title,data,summary,created_by")
         .order("created_at",{ascending:false})
@@ -69,9 +70,11 @@
   async function migrateLocalOrders(localOrders,remoteRows){
     if(!Array.isArray(localOrders)||!localOrders.length) return 0;
     const remoteClientIds=new Set((remoteRows||[]).map(r=>String(r.client_order_id||"")).filter(Boolean));
+    const remoteOrderIds=new Set((remoteRows||[]).map(r=>String(r.id)));
     let migrated=0;
 
     for(const o of localOrders){
+      if(o.serverSaved||remoteOrderIds.has(String(o.id)))continue;
       const clientId=String(o.clientOrderId||o.id||"");
       if(clientId && remoteClientIds.has(clientId)) continue;
       if(!Array.isArray(o.items)||!o.items.length) continue;
@@ -179,10 +182,7 @@
     if(session?.role!=="customer" || salesLoading) return;
     salesLoading=true;
     try{
-      const {data,error}=await client
-        .from("orders")
-        .select("id,order_number,client_order_id,user_id,created_at,customer_name,customer_email,phone,payment,notes,total,status,username,supply_plan,order_items(id,product_id,name,color,qty,unit_price,line_total)")
-        .order("created_at",{ascending:false});
+      const {data,error}=await client.rpc("get_customer_orders");
       if(error) throw error;
 
       orders=(data||[]).map(remoteOrderToLocal);
@@ -240,19 +240,7 @@
   async function markOrderSupabase(id){
     const o=orders.find(x=>String(x.id)===String(id));
     if(!o || session?.role!=="admin") return;
-    const next=o.status==="Preparado"?"Pendiente":"Preparado";
-    try{
-      const {error}=await client.from("orders").update({status:next}).eq("id",o.id);
-      if(error) throw error;
-      o.status=next;
-      writeLocal(STORAGE.orders,orders);
-      renderOrders();
-      renderAnalytics();
-      toast(`Pedido ${o.orderNumber||""}: ${next}.`);
-    }catch(err){
-      console.error(err);
-      toast("No se pudo actualizar el pedido.");
-    }
+    await window.openOrderManagement(o.id);
   }
   window.markOrder=markOrderSupabase;
 

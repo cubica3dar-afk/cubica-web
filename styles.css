@@ -577,3 +577,22 @@ body.sidebar-open{overflow:hidden}
 @media(max-width:520px){
   .auth-secondary-actions{align-items:flex-start;flex-direction:column}
 }
+.order-management-card{width:min(820px,100%)}
+.order-management-summary,.order-state-controls,.order-confirm-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.order-management-summary{justify-content:space-between;margin:16px 0}
+.order-status{padding:8px 12px;background:rgba(147,106,255,.15);border:1px solid var(--line);border-radius:10px}
+.order-consumption,.order-warning{padding:14px;border:1px solid var(--line);border-radius:12px;line-height:1.6;margin:16px 0}
+.order-consumption.recorded{background:rgba(64,170,110,.12)}
+.order-warning{background:rgba(239,173,68,.12)}
+.order-shortage{color:#ffc475;font-weight:600}
+.table-wrap .order-material-table{width:100%;min-width:0;border-collapse:collapse;font-size:13px}
+.order-material-table th,.order-material-table td{padding:12px 8px;border-bottom:1px solid var(--line);text-align:left}
+.order-material-table small{display:block;color:var(--muted)}
+.order-notes{white-space:pre-wrap;overflow-wrap:anywhere}
+.order-cancel-item{display:grid;grid-template-columns:1fr 120px;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
+.order-cancel-item strong{grid-column:1/-1}.order-cancel-item label{display:grid;gap:6px;font-size:12px}
+.order-management-card details{margin-top:20px;padding-top:12px;border-top:1px solid var(--line)}
+.order-management-card summary{cursor:pointer;font-weight:600}
+#order-production-confirm{padding:14px;border:1px solid #ffc475;border-radius:12px;margin-top:20px}
+#order-management-message{white-space:pre-wrap;overflow-wrap:anywhere;color:#ffc475}
+@media(max-width:600px){.order-state-controls>*{width:100%}.order-cancel-item{grid-template-columns:1fr}.order-confirm-actions .btn{width:100%}.order-material-table th,.order-material-table td{padding:9px 5px;font-size:12px}}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261009-email-auth1">
+  <link rel="stylesheet" href="styles.css?v=20261012-lifecycle1">
 
   <script type="importmap">
   {
@@ -331,7 +331,7 @@
       <section id="section-stock-finished" class="page-section hidden admin-only">
         <div class="section-head">
           <div><p class="eyebrow">INVENTARIO</p><h2>Productos terminados</h2><p class="muted">Figuras, veladores, accesorios y otros productos listos para vender.</p></div>
-          <button class="btn primary" data-open-modal="finished-modal">+ Producto</button>
+          <div class="inventory-actions"><button class="btn ghost" onclick="openInventoryHistory('products')">Movimientos</button><button class="btn primary" data-open-modal="finished-modal">+ Producto</button></div>
         </div>
         <div class="inventory-toolbar finished-toolbar">
           <div class="inventory-search"><span>⌕</span><input id="finished-search" placeholder="Buscar producto por nombre, categoría o descripción..."></div>
@@ -355,6 +355,7 @@
         <div class="section-head">
           <div><p class="eyebrow">INVENTARIO</p><h2>Insumos y depósito</h2><p class="muted">Organizá filamentos, electrónica, cajas, electricidad y cualquier otro material.</p></div>
           <div class="inventory-actions">
+            <button class="btn ghost" onclick="openInventoryHistory('supplies')">Movimientos</button>
             <button id="add-supply-category" class="btn secondary">+ Categoría</button>
             <button class="btn primary" data-open-modal="supply-modal">+ Insumo</button>
           </div>
@@ -764,14 +765,30 @@
   <script src="js/products-ui.js?v=20261009-recipe-step-fix"></script>
   <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
-  <script src="js/orders-ui.js?v=20261009-refactor2"></script>
+  <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
+    <div class="modal-card order-management-card">
+      <button class="modal-close" data-close-modal="order-management-modal" aria-label="Cerrar">×</button>
+      <p class="eyebrow">GESTIÓN INTERNA</p>
+      <h2 id="order-management-title">Pedido</h2>
+      <div id="order-management-content"></div>
+    </div>
+  </div>
+  <script src="js/orders-ui.js?v=20261012-lifecycle1"></script>
+  <script src="js/order-management.js?v=20261012-lifecycle1"></script>
+  <div id="inventory-history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-history-title">
+    <div class="modal-card order-management-card">
+      <button class="modal-close" data-close-modal="inventory-history-modal" aria-label="Cerrar">×</button>
+      <p class="eyebrow">INVENTARIO</p><h2 id="inventory-history-title">Movimientos</h2>
+      <div id="inventory-history-content"></div>
+    </div>
+  </div>
   <script src="js/analytics-ui.js?v=20261009-refactor2"></script>
   <script src="js/app-init.js?v=20261011-orders-email-link"></script>
 
-  <script src="supabase-bridge.js?v=20261011-orders-email-link"></script>
+  <script src="supabase-bridge.js?v=20261012-lifecycle1"></script>
   <script src="js/auth-ui.js?v=20261011-orders-email-link"></script>
-  <script src="supabase-inventory.js?v=20261008-supplies-sort2"></script>
-  <script src="supabase-sales.js?v=20261008-google-auth2"></script>
+  <script src="supabase-inventory.js?v=20261012-lifecycle1"></script>
+  <script src="supabase-sales.js?v=20261012-lifecycle1"></script>
   <script src="supabase-analytics.js?v=20261006-1"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
   <script src="slicer.js?v=20261009-refactor2"></script>

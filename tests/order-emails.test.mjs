@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateProductionPlan } from "../supabase/functions/order-emails/plan.js";
-import { customerEmail, internalEmail, MISSING_RECIPE } from "../supabase/functions/order-emails/templates.js";
+import { customerEmail, internalEmail, readyEmail, MISSING_RECIPE } from "../supabase/functions/order-emails/templates.js";
 import { createHandler, createRpcClient, DeliveryError, processDelivery, runWorker, sendWithResend } from "../supabase/functions/order-emails/worker.js";
 
 const order = {
@@ -23,6 +23,31 @@ const supplies = [{ id: "s1", name: "PRIVATE_SUPPLY_SENTINEL", qty: 500, unit: "
 const snapshot = () => structuredClone({ order, items, recipes, supplies });
 const from = "Cúbica <contacto@cubica3d.ar>";
 const job = kind => ({ order_id: order.id, kind, lock_token: "lease", attempts: 1, payload: null });
+
+test("ready notification has commercial fields, safe HTML, and the orders deep link",()=>{
+  const payload=readyEmail({...order,status:"En producción",production_started_at:"PRIVATE_PRODUCTION"},items,from);
+  assert.match(payload.subject,/está listo/);
+  assert.match(payload.html,/Tu pedido está listo/);
+  assert.match(payload.text,/coordinar la entrega o retiro/);
+  assert.match(payload.html,/https:\/\/cubica3d.ar\/\?view=orders/);
+  assert.match(payload.html,/Ver mi pedido/);
+  assert.doesNotMatch(payload.html+payload.text,/PRIVATE_|En producción|frontend_forged_stock/);
+  assert.doesNotMatch(payload.html,/<script>/);
+});
+
+test("ready delivery reuses persisted payload and an independent stable idempotency key",async()=>{
+  const calls=[];
+  const client={rpc:async(name,args)=>{
+    calls.push({name,args});
+    return {data:name==="get_order_email_snapshot"?snapshot():name==="prepare_order_email_delivery"?args.p_payload:null,error:null};
+  }};
+  let sent;
+  assert.equal(await processDelivery(client,job("ready"),{from,send:async(payload,key)=>{sent={payload,key};return "ready-message";}}),"sent");
+  assert.equal(sent.key,`cubica-order/${order.id}/ready/v1`);
+  assert.match(sent.payload.subject,/está listo/);
+  assert.equal(calls[1].name,"prepare_order_email_delivery");
+  assert.equal(calls[2].args.p_kind,"ready");
+});
 
 test("shared supply shortage uses the entire order and marks both products", () => {
   const plan = calculateProductionPlan(items, recipes, supplies);
