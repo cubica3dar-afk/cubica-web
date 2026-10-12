@@ -30,7 +30,7 @@ API con wrappers invoker: `list_my_delivery_addresses`, `save_my_delivery_addres
 
 Precio final = tarifa válida del proveedor + margen porcentual redondeado a centavos + caja + protección. SQL selecciona el menor precio final, no la menor tarifa base. Nunca acepta importes/márgenes/pesos/dimensiones enviados por el navegador.
 
-Embalaje: ordenar las tres dimensiones de cada producto; usar el máximo de las dos mayores y apilar únicamente la menor según cantidad. Elegir una caja configurada que contenga toda la columna y soporte peso de todos los productos + caja. No sumar las tres dimensiones ni usar volumen como prueba de cabida. Las dimensiones configuradas deben representar la envolvente protegida que realmente se embala; verificar capacidad útil y medidas exteriores de las cajas antes de habilitar tarifas reales. La estimación conservadora puede exigir una caja más grande que un acomodo manual optimizado; si no cabe una caja conocida, no cotiza.
+Embalaje: ordenar las tres dimensiones de cada producto; usar el máximo de las dos mayores y apilar únicamente la menor según cantidad. Elegir una caja configurada que contenga toda la columna y soporte peso de todos los productos + caja. No sumar las tres dimensiones ni usar volumen como prueba de cabida. Las dimensiones configuradas deben representar la envolvente protegida que realmente se embala; verificar capacidad útil y medidas exteriores de las cajas antes de habilitar tarifas reales. La capacidad interna decide si cabe el pedido; la API del transportista recibe únicamente dimensiones exteriores, validadas como iguales o mayores que las internas. La estimación conservadora puede exigir una caja más grande que un acomodo manual optimizado; si no cabe una caja conocida, no cotiza.
 
 Las cajas/protección son configuración de costos, no una copia de stock comercial. Cotizar no consume ningún insumo. El consumo BOM sigue ocurriendo exclusivamente al iniciar producción, una sola vez. Si un insumo de embalaje ya forma parte de una receta, conserva su movimiento existente y no se descuenta otra vez por cotizar.
 
@@ -45,6 +45,7 @@ Diego autorizó explícitamente limpiar cotizaciones abandonadas. A las 03:15 de
 - `20261012065637_delivery_addresses_quotes_and_logistics.sql`
 - `20261012070346_delivery_variant_and_contact_validation.sql`
 - `20261012070621_delivery_abandoned_quote_retention.sql`
+- `20261012085223_delivery_package_exterior_dimensions.sql`
 - Edge `shipping-quotes` v1; `order-emails` v15. Ambas validan su autorización dentro del handler; verify_jwt=false para admitir invitados/worker con secreto existente.
 
 ## Validación
