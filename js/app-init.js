@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   updateDataBadge("Datos: conectando…","pending");
   renderWelcome();
   renderApp();
+  if(window.cubicaAuthCallbackBlocked)$("welcome-view")?.classList.add("hidden");
   showSection("store");
   window.cubicaOpenOrdersLink?.();
   window.cubicaOpenProductLink?.();

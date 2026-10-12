@@ -14,6 +14,10 @@
 
   // Capturar el tipo antes de que Supabase consuma y limpie el hash.
   const recoveryFromUrl = new URLSearchParams(window.location.hash.slice(1)).get("type")==="recovery";
+  const callbackParams = new URLSearchParams(window.location.hash.slice(1));
+  let callbackFailed = callbackParams.has("error");
+  let recoveryPending = recoveryFromUrl || new URLSearchParams(window.location.search||"").get("view")==="reset";
+  window.cubicaAuthCallbackBlocked = callbackFailed || recoveryPending;
   const recoveryStorageKey = "cubica_password_recovery_user";
   let recoveryActive = false;
   window.cubicaPasswordRecoveryActive = false;
@@ -26,7 +30,18 @@
     recoveryActive=false;
     window.cubicaPasswordRecoveryActive=false;
     sessionStorage.removeItem(recoveryStorageKey);
+    recoveryPending=false;
+    callbackFailed=false;
+    window.cubicaAuthCallbackBlocked=false;
+    if(window.history?.replaceState){
+      const destination=new URL(window.location.href);
+      if(destination.searchParams.get("view")==="reset")destination.searchParams.delete("view");
+      if(new URLSearchParams(destination.hash.slice(1)).has("error"))destination.hash="";
+      window.history.replaceState(null,"",destination.href);
+    }
   }
+
+  window.cubicaDismissAuthCallback=clearPasswordRecovery;
 
   const client = window.supabase.createClient(url, key);
   window.cubicaSupabase = client;
@@ -519,15 +534,17 @@
 
   async function sendPasswordReset(email){
     const {data,error}=await client.auth.resetPasswordForEmail(email,{
-      redirectTo:authRedirectUrl()
+      redirectTo:window.location.origin+window.location.pathname+"?view=reset"
     });
     if(error) throw error;
     return data;
   }
 
   async function updatePassword(password){
+    if(!recoveryActive || callbackFailed)throw new Error("Recovery session required");
     const {data,error}=await client.auth.updateUser({password});
     if(error) throw error;
+    clearPasswordRecovery();
     return data;
   }
 
@@ -553,17 +570,25 @@
   let authQueue=Promise.resolve();
   client.auth.onAuthStateChange((event,newSession)=>{
     const userId=newSession?.user?.id;
-    if(event==="SIGNED_OUT" || !userId){
+    if(event==="SIGNED_OUT"){
       clearPasswordRecovery();
-    }else if(event==="PASSWORD_RECOVERY" ||
-      (event==="INITIAL_SESSION" && (recoveryFromUrl || sessionStorage.getItem(recoveryStorageKey)===userId))){
+    }else if(!callbackFailed && userId && (event==="PASSWORD_RECOVERY" ||
+      (event==="INITIAL_SESSION" && (recoveryFromUrl || sessionStorage.getItem(recoveryStorageKey)===userId)))){
       recoveryActive=true;
       window.cubicaPasswordRecoveryActive=true;
+      recoveryPending=false;
+      window.cubicaAuthCallbackBlocked=true;
       sessionStorage.setItem(recoveryStorageKey,userId);
+    }else if(recoveryActive && sessionStorage.getItem(recoveryStorageKey)!==userId){
+      clearPasswordRecovery();
     }
     setTimeout(()=>{
       authQueue=authQueue.then(async()=>{
         await domReady;
+        if(callbackFailed || (recoveryPending && !recoveryActive)){
+          window.dispatchEvent(new CustomEvent("cubica:recovery-invalid"));
+          return;
+        }
         await applySupabaseSession(newSession,false);
         if(recoveryActive && newSession?.user){
           window.dispatchEvent(new CustomEvent("cubica:password-recovery"));

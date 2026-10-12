@@ -57,8 +57,14 @@
     showAuthView("reset");
     setFeedback("Enlace validado. Ahora elegí tu nueva contraseña.","success");
   });
+  window.addEventListener("cubica:recovery-invalid",()=>{
+    $("welcome-view")?.classList.add("hidden");
+    showSection("login");
+    showAuthView("forgot");
+    setFeedback("El enlace no es válido, venció o ya fue utilizado. Solicitá un correo nuevo y abrí el enlace más reciente.","error");
+  });
   window.addEventListener("cubica:auth-request",()=>{
-    if(!window.cubicaPasswordRecoveryActive)showAuthView("login");
+    if(!window.cubicaAuthCallbackBlocked && !window.cubicaPasswordRecoveryActive)showAuthView("login");
   });
 
   document.addEventListener("DOMContentLoaded",()=>{
@@ -74,7 +80,10 @@
       if(email && $("forgot-email"))$("forgot-email").value=email;
     });
 
-    document.querySelectorAll(".auth-back-login").forEach(btn=>btn.addEventListener("click",()=>showAuthView("login")));
+    document.querySelectorAll(".auth-back-login").forEach(btn=>btn.addEventListener("click",()=>{
+      window.cubicaDismissAuthCallback?.();
+      showAuthView("login");
+    }));
 
     const googleBtn=$("google-login-btn");
     if(googleBtn){

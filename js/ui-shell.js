@@ -12,7 +12,7 @@ window.cubicaAuthRedirectUrl = function(){
   return redirect.href;
 };
 window.cubicaOpenOrdersLink = function(){
-  if(!ordersLinkActive || window.cubicaPasswordRecoveryActive ||
+  if(!ordersLinkActive || window.cubicaAuthCallbackBlocked || window.cubicaPasswordRecoveryActive ||
     new URLSearchParams(window.location.hash.slice(1)).get("type")==="recovery") return false;
   $("welcome-view")?.classList.add("hidden");
   ordersLinkOpened=true;
@@ -90,6 +90,7 @@ function renderAccountSidebar(){
   if(editBadge)editBadge.classList.toggle("hidden",session?.role!=="admin");
 }
 function showSection(id){
+  if(window.cubicaAuthCallbackBlocked && id!=="login")id="login";
   // Al navegar voluntariamente a otra sección, dejar de forzar el destino del email.
   if(ordersLinkOpened && !["orders","login"].includes(id)){
     ordersLinkActive=false;
