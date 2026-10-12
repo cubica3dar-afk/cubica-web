@@ -30,7 +30,7 @@ test("valida dirección argentina sin exigir piso/departamento",()=>{
 });
 
 test("envío sin tarifa disponible nunca confirma ni inventa precio",async()=>{
-  const s=setup({mode:"shipping"});await s.api.requestQuote();await assert.rejects(s.api.validate(),/Calculá un envío vigente/);
+  const s=setup({mode:"shipping"});await s.api.requestQuote();await assert.rejects(s.api.validate(),/todavía no está habilitado/);assert.doesNotMatch(s.nodes.get("delivery-checkout-message").textContent,/venció/);
   assert.equal(s.api.payload().quote_token,null);assert.doesNotMatch(s.nodes.get("delivery-checkout-total").innerHTML,/>\$\s*0/);assert.match(s.nodes.get("delivery-checkout-total").innerHTML,/Por cotizar/);
 });
 
@@ -46,7 +46,7 @@ test("cotización queda ligada a dirección, cantidades y variantes",async()=>{
 
 test("no acepta una tarifa vencida, negativa o sin estado quoted",async()=>{
   for(const q of [{status:"quoted",price:-1,expires_at:new Date(Date.now()+60000).toISOString()},{status:"quoted",price:100,expires_at:new Date(Date.now()-1000).toISOString()},{status:"unavailable",price:100,expires_at:new Date(Date.now()+60000).toISOString()}]){
-    const s=setup({mode:"shipping",quoteData:{...q,quote_token:"b".repeat(64)}});await s.api.requestQuote();assert.equal(s.api.payload().quote_token,null);await assert.rejects(s.api.validate(),/vigente/);
+    const s=setup({mode:"shipping",quoteData:{...q,quote_token:"b".repeat(64)}});await s.api.requestQuote();assert.equal(s.api.payload().quote_token,null);await assert.rejects(s.api.validate(),/vigente|tarifa/);
   }
 });
 

@@ -93,7 +93,7 @@ function renderAccountSidebar(){
 function showSection(id){
   if(window.cubicaAuthCallbackBlocked && id!=="login")id="login";
   // Al navegar voluntariamente a otra sección, dejar de forzar el destino del email.
-  if(ordersLinkOpened && !["orders","login"].includes(id)){
+  if((ordersLinkOpened||["checkout","cart"].includes(id)) && !["orders","login"].includes(id)){
     ordersLinkActive=false;
     ordersLinkOpened=false;
     sessionStorage.removeItem("cubica_auth_destination");
@@ -117,6 +117,7 @@ function showSection(id){
   if(id==="profile" && !session){
     id="login";
   }
+  window.cubicaCheckoutNavigation?.(id);
   window.cubicaProductNavigation?.(id);
   document.querySelectorAll(".page-section").forEach(sec=>sec.classList.add("hidden"));
   $("section-"+id).classList.remove("hidden");
@@ -124,7 +125,7 @@ function showSection(id){
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.classList.toggle("active",b.dataset.sidebarSection===id));
   closeAccountSidebar();
   if(id==="store") renderProducts(); if(id==="cart") renderCart(); if(id==="orders") renderOrders();
-  if(id==="profile") {renderProfile();window.cubicaDelivery?.renderProfile();}
+  if(id==="profile") {renderProfile();window.cubicaDelivery?.renderProfile();window.cubicaBuyerProfile?.renderProfile();}
   if(id==="delivery")window.cubicaDelivery?.loadAdmin();
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();

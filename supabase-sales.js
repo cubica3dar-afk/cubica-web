@@ -267,13 +267,14 @@
     const form=e.target;
     const submitBtn=e.submitter||e.target.querySelector('button[type="submit"]');
     const originalText=submitBtn?.textContent||"Confirmar pedido";
-    if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Enviando pedido…";}
+    if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Enviando pedido…";if(submitBtn.dataset)submitBtn.dataset.submitting="true";}
 
     try{
       if(!window.cubicaDelivery)throw new Error("No se pudo cargar la selección de entrega. Recargá la página.");
+      window.cubicaValidateCheckout?.();
       await window.cubicaDelivery.validate();
       const delivery=window.cubicaDelivery.payload();
-      const name=$("customer-name").value.trim();
+      const name=window.cubicaCheckoutBuyerName?.()||$("customer-name").value.trim();
       const email=$("customer-email").value.trim();
       const phone=$("customer-phone").value.trim();
       if(!name||!email) throw new Error("Completá nombre y email.");
@@ -332,7 +333,7 @@
       orders.push(order);
       writeLocal(STORAGE.orders,orders);
       cart=[];writeLocal(STORAGE.cart,cart);
-      closeModal("checkout-modal");
+      
       renderCart();
 
       if(typeof window.loadCubicaCatalogFromSupabase==="function"){
@@ -353,12 +354,14 @@
       toast(`${order.orderNumber||"Pedido registrado"}: pedido guardado en Cúbica.`);
       await window.cubicaDelivery?.afterOrderSaved();
       form.reset();
+      window.cubicaCheckoutComplete?.(order);
     }catch(err){
       console.error("Pedido Supabase",err);
       toast(err.message||"No se pudo registrar el pedido.");
     }finally{
       orderSubmitting=false;
-      if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=originalText;}
+      if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=originalText;if(submitBtn.dataset)delete submitBtn.dataset.submitting;}
+      window.cubicaCheckout?.renderSummary?.();
     }
   }
 

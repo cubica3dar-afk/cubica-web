@@ -10,8 +10,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   renderApp();
   if(window.cubicaAuthCallbackBlocked)$("welcome-view")?.classList.add("hidden");
   showSection("store");
-  window.cubicaOpenOrdersLink?.();
-  window.cubicaOpenProductLink?.();
+  window.cubicaOpenCheckoutLink?.()||window.cubicaOpenOrdersLink?.()||window.cubicaOpenProductLink?.();
 
   $("enter-store-btn").onclick=()=>{
     $("welcome-view").classList.add("hidden");
@@ -120,29 +119,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   };
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
 
-  $("checkout-btn").onclick=()=>{
-    if(!cart.length)return toast("El carrito está vacío.");
-    if(session?.role==="customer"){
-      const name=$("customer-name"),email=$("customer-email");
-      if(name && !name.value)name.value=session.username||"";
-      if(email){
-        email.value=session.email||email.value;
-        email.readOnly=true;
-        email.title="El pedido quedará asociado a tu cuenta.";
-      }
-    }else{
-      const email=$("customer-email");
-      if(email){
-        email.readOnly=false;
-        email.removeAttribute("title");
-      }
-    }
-    if(typeof window.cubicaTrackEvent==="function"){
-      window.cubicaTrackEvent("checkout_started",null,{items:cart.reduce((a,x)=>a+(Number(x.qty)||0),0)});
-    }
-    window.cubicaDelivery?.refreshCheckout?.();
-    openModal("checkout-modal");
-  };
+  $("checkout-btn").onclick=()=>window.cubicaStartCheckout?.();
 
   document.querySelectorAll("[data-close-modal]").forEach(b=>b.onclick=()=>closeModal(b.dataset.closeModal));
   document.querySelectorAll("[data-open-modal]").forEach(b=>b.onclick=()=>{

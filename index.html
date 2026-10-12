@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="styles.css?v=20261012-community1">
   <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
   <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
+  <link rel="stylesheet" href="styles-checkout.css?v=checkout1">
 
   <script type="importmap">
   {
@@ -196,6 +197,29 @@
 
       <section id="section-product" class="page-section hidden" aria-label="Producto"><nav class="product-page-nav" aria-label="Navegación del producto"><button type="button" class="btn ghost" onclick="backToProductCatalog()">← Volver al catálogo</button></nav><div id="product-detail-content"></div><section id="product-community" class="product-community" aria-label="Opiniones"></section></section>
       <section id="section-delivery" class="page-section hidden"><div class="section-title"><h1>Entregas</h1><p>Origen, embalaje, transportistas y cotizaciones.</p></div><div id="delivery-admin-content"></div></section>
+      <section id="section-checkout" class="page-section hidden" aria-labelledby="checkout-page-title">
+        <header class="checkout-page-header"><button id="checkout-back-cart" type="button" class="btn ghost checkout-back">← Volver al carrito</button><p class="checkout-eyebrow">COMPRA</p><h1 id="checkout-page-title" tabindex="-1">Finalizar compra</h1><p class="muted">Revisá tus datos, elegí cómo recibir tu pedido y confirmá el total.</p></header>
+        <div id="checkout-layout">
+          <div class="checkout-main">
+            <form id="checkout-form" class="form-grid">
+              <h2 class="checkout-heading full-span">Datos del comprador</h2>
+              <label for="customer-name">Nombre<input id="customer-name" autocomplete="given-name" maxlength="60" required></label>
+              <label for="customer-last-name">Apellido<input id="customer-last-name" autocomplete="family-name" maxlength="60" required></label>
+              <label for="customer-email">Email<input id="customer-email" type="email" autocomplete="email" maxlength="180" required></label>
+              <label for="customer-phone">Teléfono / WhatsApp<input id="customer-phone" type="tel" autocomplete="tel" maxlength="40" placeholder="+54 9 11 1234 5678"></label>
+              <label class="full-span" for="payment-method">Forma de pago<select id="payment-method" required><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option></select></label>
+              <label class="full-span" for="customer-notes">Observaciones<textarea id="customer-notes" rows="3" maxlength="1500" placeholder="Personalización o información importante para este pedido"></textarea></label>
+              <div class="checkout-note full-span">Antes de confirmar, revisá los productos, la modalidad de entrega y el total. Recibirás la confirmación por email. Confirmar un pedido no acredita el pago.</div>
+            </form>
+          </div>
+          <aside class="checkout-summary" aria-labelledby="checkout-summary-title">
+            <h2 id="checkout-summary-title">Tu pedido</h2><div id="checkout-summary-items"></div><div id="checkout-delivery-total-host"></div>
+            <p id="checkout-summary-message" role="status" aria-live="polite"></p>
+            <button id="checkout-confirm-btn" class="btn primary full" type="submit" form="checkout-form">Confirmar pedido</button>
+            <button id="checkout-summary-cart" class="btn ghost full" type="button">Revisar carrito</button>
+          </aside>
+        </div>
+      </section>
       <section id="section-store" class="page-section">
         <div class="hero">
           <div>
@@ -562,37 +586,6 @@
     </main>
   </div>
 
-  <div id="checkout-modal" class="modal hidden">
-    <div class="modal-card">
-      <button class="modal-close" data-close-modal="checkout-modal">×</button>
-      <h2>Datos del pedido</h2>
-      <form id="checkout-form" class="form-grid">
-        <label>Nombre
-          <input id="customer-name" required>
-        </label>
-        <label>Email
-          <input id="customer-email" type="email" required>
-        </label>
-        <label>Teléfono / WhatsApp
-          <input id="customer-phone" placeholder="+54 9 ...">
-        </label>
-        <label>Forma de pago
-          <select id="payment-method" required>
-            <option value="Efectivo">Efectivo</option>
-            <option value="Transferencia">Transferencia</option>
-          </select>
-        </label>
-        <label class="full-span">Observaciones
-          <textarea id="customer-notes" rows="3" placeholder="Color, retiro, personalización, etc."></textarea>
-        </label>
-        <div class="checkout-note full-span">
-          Antes de confirmar, revisá los productos, la modalidad de entrega y el total. Recibirás la confirmación por email. Confirmar un pedido no acredita el pago.
-        </div>
-        <button class="btn primary full" type="submit">Confirmar pedido</button>
-      </form>
-    </div>
-  </div>
-
   <div id="finished-modal" class="modal hidden">
     <div class="modal-card finished-product-modal">
       <button class="modal-close" data-close-modal="finished-modal">×</button>
@@ -771,10 +764,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=20261009-refactor2"></script>
-  <script src="js/ui-shell.js?v=delivery1"></script>
+  <script src="js/ui-shell.js?v=checkout1"></script>
   <script src="js/store-ui.js?v=delivery1"></script>
-  <script src="js/products-ui.js?v=delivery2"></script>
-  <script src="js/community-ui.js?v=delivery1"></script>
+  <script src="js/products-ui.js?v=checkout1"></script>
+  <script src="js/community-ui.js?v=checkout1"></script>
   <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
@@ -795,13 +788,17 @@
     </div>
   </div>
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
-  <script src="js/app-init.js?v=delivery1"></script>
 
-  <script src="supabase-bridge.js?v=delivery1"></script>
+
+  <script src="js/app-init.js?v=checkout1"></script>
+  <script src="supabase-bridge.js?v=checkout1"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=20261012-lifecycle1"></script>
-  <script src="supabase-sales.js?v=delivery1"></script>
-  <script src="js/delivery-ui.js?v=delivery3"></script>
+  <script src="supabase-sales.js?v=checkout1"></script>
+  <script src="js/delivery-ui.js?v=checkout1"></script>
+  <script src="js/checkout-profile.js?v=checkout1"></script>
+  <script src="js/checkout-ui.js?v=checkout1"></script>
+
   <script src="supabase-analytics.js?v=20261006-1"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
   <script src="slicer.js?v=20261009-refactor2"></script>

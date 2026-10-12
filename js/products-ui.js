@@ -455,10 +455,11 @@ window.cubicaProductNavigation=section=>{
 window.cubicaProductPageActive=()=>detailPageActive;
 window.addEventListener('popstate',event=>{
   if(recoveryOwnsNavigation())return;
-  closeModal('checkout-modal');
+
   const params=new URLSearchParams(location.search),id=params.get('product');
   detailHistoryNavigation=true;
   try{
+    if(['checkout','cart'].includes(params.get('view'))){detailPageActive=false;window.cubicaOpenCheckoutLink?.();return;}
     if(params.get('view')==='orders'){detailPageActive=false;window.cubicaOpenOrdersLink?.();return;}
     if(id){detailPageActive=false;openProductDetail(id,{history:'none'});}
     else if(event?.state?.cubicaView&&['store','cart','orders','profile','delivery','budget','analytics','community','stock-finished','stock-supplies','login'].includes(event.state.cubicaView)){showSection(event.state.cubicaView);}

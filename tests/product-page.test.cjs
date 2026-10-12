@@ -1,21 +1,21 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const base=path.join(__dirname,'../js');
 const escape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-function setup(url='https://cubica3d.ar/',withCommunity=false,withShell=false){
- let currentUrl=new URL(url),activeSection='store',checkoutCount=0;
- const nodes=new Map(),listeners=new Map(),storage=new Map(),timers=[],events=[],metrics=[],rpcCalls=[],history=[currentUrl.href],messages=[];
+function setup(url='https://cubica3d.ar/',withCommunity=false,withShell=false,initialStorage=[]){
+ let currentUrl=new URL(url),activeSection='store';
+ const nodes=new Map(),listeners=new Map(),storage=new Map(initialStorage),timers=[],events=[],metrics=[],rpcCalls=[],history=[currentUrl.href],messages=[];
  function node(id){
   if(nodes.has(id))return nodes.get(id);
-  const classes=new Set(),element={id,value:'',disabled:false,dataset:{},textContent:'',classList:{add:cls=>classes.add(cls),remove:cls=>classes.delete(cls),contains:cls=>classes.has(cls),toggle(cls,state){state??=!classes.has(cls);if(state)classes.add(cls);else classes.delete(cls);}},focus(){},scrollIntoView(){},querySelector(selector){if(selector==='h1')return {focus(){}};if(selector==='.product-detail-grid')return this.innerHTML.includes('product-detail-grid')?{}:null;return null;},querySelectorAll(){return [];},click(){if(id==='checkout-btn')checkoutCount++;},setAttribute(){}};
+  const classes=new Set(id.startsWith('section-')&&id!=='section-store'?['hidden']:[]),element={id,value:'',disabled:false,dataset:{},textContent:'',classList:{add:cls=>classes.add(cls),remove:cls=>classes.delete(cls),contains:cls=>classes.has(cls),toggle(cls,state){state??=!classes.has(cls);if(state)classes.add(cls);else classes.delete(cls);}},focus(){},scrollIntoView(){},querySelector(selector){if(selector==='h1')return {focus(){}};if(selector==='.product-detail-grid')return this.innerHTML.includes('product-detail-grid')?{}:null;return null;},querySelectorAll(){return [];},click(){if(id==='checkout-btn')window.cubicaStartCheckout?.();},setAttribute(){}};
   let html='';Object.defineProperty(element,'innerHTML',{get:()=>html,set:value=>{html=value;const quantity=String(value).match(/id="detail-qty"[^>]*value="([^"]*)"/);if(quantity)node('detail-qty').value=quantity[1];}});
   nodes.set(id,element);return element;
  }
  const products=[{id:'product-1',name:'Velador búho',category:'Veladores',price:12000,stock:0,description:'Diseño para tu casa.',colors:[{name:'Blanco',hex:'#fff'},{name:"Azul 'marino'",hex:'#123456'}],colorMode:'single',media:[{type:'image',src:'https://example.test/buho.jpg'},{type:'video',src:'https://example.test/buho.mp4'}],recipe:[{supplyId:'private-material',qty:240}]},{id:'product-2',name:'Figura',category:'Figuras',price:5000,stock:2,colors:[],media:[]}];
- const window={get location(){return currentUrl;},history:{pushState(_state,_unused,target){currentUrl=new URL(target,currentUrl);history.push(currentUrl.href);},replaceState(_state,_unused,target){currentUrl=new URL(target,currentUrl);history[history.length-1]=currentUrl.href;}},cubicaCatalogState:'ready',addEventListener(type,handler){const list=listeners.get(type)||[];list.push(handler);listeners.set(type,list);},dispatchEvent(event){events.push(event);for(const handler of listeners.get(event.type)||[])handler(event);},cubicaTrackEvent:(...args)=>metrics.push(args),cubicaAuthRedirectUrl:()=>currentUrl.origin+currentUrl.pathname,cubicaNavigateAfterSignIn(){},cubicaOpenOrdersLink:()=>false,cubicaSupabase:{async rpc(name,args){rpcCalls.push([name,args]);return {data:{product_likes:4,my_reaction:null,comments:[],has_more:false},error:null};}}};
- const ctx={window,URL,URLSearchParams,Intl,console,products,cart:[{productId:'product-2',qty:2,color:''}],session:null,supplies:[{id:'private-material',cost:500,qty:10000}],DEFAULT_FINISHED_CATEGORIES:[],STORAGE:{cart:'cart',products:'products'},localStorage:{getItem:()=>null,setItem(){}},sessionStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},document:{body:node('body'),addEventListener(){},querySelectorAll:selector=>selector==='.page-section'?['store','login','product','orders','cart'].map(id=>node('section-'+id)):[]},CustomEvent:function(type,options={}){this.type=type;this.detail=options.detail;},$:node,escapeHtml:escape,money:value=>`$${value}`,write(){},toast:message=>messages.push(message),renderPagination(){},renderOrders(){},formatDate:String,setTimeout:callback=>timers.push(callback),showSection(id){window.cubicaProductNavigation?.(id);activeSection=id;if(id==='cart')ctx.renderCart();},closeModal(id){node(id).classList.add('hidden');},openModal(){throw new Error('Product page must not open a modal');}};
+ const window={get location(){return currentUrl;},history:{pushState(_state,_unused,target){currentUrl=new URL(target,currentUrl);history.push(currentUrl.href);},replaceState(_state,_unused,target){currentUrl=new URL(target,currentUrl);history[history.length-1]=currentUrl.href;}},scrollTo(){},cubicaCatalogState:'ready',addEventListener(type,handler){const list=listeners.get(type)||[];list.push(handler);listeners.set(type,list);},dispatchEvent(event){events.push(event);for(const handler of listeners.get(event.type)||[])handler(event);},cubicaTrackEvent:(...args)=>metrics.push(args),cubicaAuthRedirectUrl:()=>currentUrl.origin+currentUrl.pathname,cubicaNavigateAfterSignIn(){},cubicaOpenOrdersLink:()=>false,cubicaSupabase:{async rpc(name,args){rpcCalls.push([name,args]);return {data:{product_likes:4,my_reaction:null,comments:[],has_more:false},error:null};}}};
+ const ctx={window,history:window.history,URL,URLSearchParams,Intl,console,products,cart:[{productId:'product-2',qty:2,color:''}],session:null,supplies:[{id:'private-material',cost:500,qty:10000}],DEFAULT_FINISHED_CATEGORIES:[],STORAGE:{cart:'cart',products:'products'},localStorage:{getItem:()=>null,setItem(){}},sessionStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},document:{querySelector:()=>null,body:node('body'),getElementById:node,addEventListener(){},querySelectorAll:selector=>selector==='.page-section'?['store','login','product','orders','cart','checkout'].map(id=>node('section-'+id)):[]},CustomEvent:function(type,options={}){this.type=type;this.detail=options.detail;},$:node,escapeHtml:escape,money:value=>`$${value}`,write(){},toast:message=>messages.push(message),renderPagination(){},renderOrders(){},formatDate:String,setTimeout:callback=>timers.push(callback),showSection(id){window.cubicaCheckoutNavigation?.(id);window.cubicaProductNavigation?.(id);activeSection=id;for(const section of ['store','login','product','orders','cart','checkout'])node('section-'+section).classList.toggle('hidden',section!==id);if(id==='cart')ctx.renderCart();},closeModal(id){node(id).classList.add('hidden');},openModal(){throw new Error('Product page must not open a modal');}};
  Object.defineProperty(ctx,'location',{get:()=>currentUrl});vm.createContext(ctx);
- for(const file of ['store-ui.js','products-ui.js',...(withShell?['ui-shell.js']:[]),...(withCommunity?['community-ui.js']:[])])vm.runInContext(fs.readFileSync(path.join(base,file),'utf8'),ctx,{filename:file});
- return {ctx,node,window,history,storage,events,metrics,rpcCalls,messages,timers,get section(){return activeSection;},get checkoutCount(){return checkoutCount;},pop(url,state){currentUrl=new URL(url);window.dispatchEvent({type:'popstate',state});},flush(){while(timers.length)timers.shift()();}};
+ for(const file of ['store-ui.js','products-ui.js',...(withShell?['ui-shell.js']:[]),...(withCommunity?['community-ui.js']:[]),'checkout-ui.js'])vm.runInContext(fs.readFileSync(path.join(base,file),'utf8'),ctx,{filename:file});
+ return {ctx,node,window,history,storage,events,metrics,rpcCalls,messages,timers,get section(){return activeSection;},get checkoutCount(){return metrics.filter(event=>event[0]==='checkout_started').length;},pop(url,state){currentUrl=new URL(url);window.dispatchEvent({type:'popstate',state});},flush(){while(timers.length)timers.shift()();}};
 }
 test('full product page creates shareable URL and browser back/forward without duplicate opens',()=>{
  const f=setup();f.ctx.openProductDetail('product-1');
@@ -36,6 +36,15 @@ test('direct URL preserves old links and opens existing Community below details'
  f.window.cubicaOpenProductLink();assert.equal(f.metrics.filter(e=>e[0]==='product_view').length,1);
  assert.doesNotMatch(f.node('product-detail-content').innerHTML,/private-material|10000|Receta|cost/);
 });
+
+test('explicit checkout cancels a previous orders Auth destination in the actual shell',()=>{
+ const f=setup('https://cubica3d.ar/?view=checkout',true,true,[['cubica_auth_destination','orders']]);
+ f.ctx.showSection('store');assert.equal(f.window.cubicaOpenCheckoutLink(),true);
+ assert.equal(f.storage.has('cubica_auth_destination'),false);
+ assert.equal(f.window.cubicaOpenOrdersLink(),false);
+ assert.equal(f.node('section-checkout').classList.contains('hidden'),false);
+ assert.equal(f.window.location.search,'?view=checkout');
+});
 test('pending, failed and unavailable server catalog are distinct route states',()=>{
  const f=setup('https://cubica3d.ar/?product=missing');f.window.cubicaCatalogState='loading';
  f.ctx.openProductDetail('missing',{history:'none'});assert.match(f.node('product-detail-content').innerHTML,/Cargando producto/);
@@ -52,10 +61,10 @@ test('Buy now merges selected variant and quantity, retains other items, opens c
  const f=setup();f.ctx.openProductDetail('product-1');f.ctx.setProductQuantity('3');f.node('detail-qty').value='3';f.ctx.selectProductColor("Azul 'marino'");
  assert.equal(f.node('detail-qty').value,'3','changing variant preserves quantity');
  assert.equal(f.ctx.buyProductNow(),true);assert.equal(f.ctx.buyProductNow(),false);assert.equal(f.ctx.addDetailToCart(),false);
- assert.equal(f.section,'cart');assert.equal(f.checkoutCount,1);assert.equal(f.ctx.cart.length,2);
+ assert.equal(f.section,'checkout');assert.equal(f.checkoutCount,1);assert.equal(f.ctx.cart.length,2);
  assert.equal(f.ctx.cart[0].productId,'product-2');assert.equal(f.ctx.cart[1].qty,3);assert.equal(f.ctx.cart[1].color,"Azul 'marino'");
  assert.equal(f.metrics.filter(e=>e[0]==='add_to_cart').length,1);assert.equal(f.node('cart-badge').textContent,'5');
- assert.equal(f.history.at(-1),'https://cubica3d.ar/');
+ assert.equal(f.history.at(-1),'https://cubica3d.ar/?view=checkout');
 });
 test('secondary action stays on page, gives live feedback, merges cart on a later intentional action',()=>{
  const f=setup();f.ctx.openProductDetail('product-1');assert(f.ctx.addDetailToCart());assert.equal(f.section,'product');assert.equal(f.checkoutCount,0);
@@ -127,13 +136,15 @@ test('index embeds one dedicated page and one community host with styles after b
  assert.doesNotMatch(source,/id="product-detail-modal"/);assert(source.indexOf('styles-product-page.css')>source.indexOf('styles.css'));
 });
 
-test('back from checkout closes its overlay and forward restores the cart',()=>{
- const f=setup();f.ctx.openProductDetail('product-1');f.ctx.buyProductNow();
- f.node('checkout-modal').classList.remove('hidden');
+test('back from checkout preserves the product route and forward restores checkout and cart',()=>{
+ const f=setup('https://cubica3d.ar/',true,true);f.ctx.openProductDetail('product-1');f.ctx.buyProductNow();
+ assert.equal(f.node('section-checkout').classList.contains('hidden'),false);assert.equal(f.history.at(-1),'https://cubica3d.ar/?view=checkout');
+ const entries=f.history.length;f.node('customer-name').value='Comprador';f.window.cubicaCheckout.saveDraft();
  f.pop('https://cubica3d.ar/?product=product-1');
- assert.equal(f.section,'product');assert(f.node('checkout-modal').classList.contains('hidden'));
- f.pop('https://cubica3d.ar/',{cubicaView:'cart'});
- assert.equal(f.section,'cart');assert(f.node('checkout-modal').classList.contains('hidden'));
+ assert.equal(f.node('section-product').classList.contains('hidden'),false);assert.equal(f.window.location.href,'https://cubica3d.ar/?product=product-1');
+ assert.equal(f.history.length,entries,'back navigation must not push a replacement history entry');
+ f.pop('https://cubica3d.ar/?view=checkout',{cubicaView:'checkout'});
+ assert.equal(f.node('section-checkout').classList.contains('hidden'),false);assert.equal(f.history.length,entries);assert.equal(f.node('customer-name').value,'Comprador');
  assert.equal(f.ctx.cart.find(i=>i.productId==='product-1').qty,1);
 });
 

@@ -16,6 +16,7 @@
   };
   window.cubicaOpenProductLink=()=>{
     const destination=linkProduct||new URLSearchParams(location.search).get("product");
+    if(new URLSearchParams(location.search).get("view")==="checkout"||new URLSearchParams(location.search).get("view")==="cart")return false;
     if(!destination||window.cubicaAuthCallbackBlocked||window.cubicaPasswordRecoveryActive||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).get("view")==="orders"||sessionStorage.getItem("cubica_auth_destination")==="orders")return false;
     if(sessionStorage.getItem(pendingKey)&&!session)return false;
     $("welcome-view")?.classList.add("hidden");

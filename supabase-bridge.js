@@ -611,7 +611,7 @@
         }
         if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
         if(!recoveryActive && ["INITIAL_SESSION","SIGNED_IN"].includes(event)){
-          const opened=window.cubicaOpenOrdersLink?.()||window.cubicaOpenProductLink?.();
+          const opened=window.cubicaOpenCheckoutLink?.()||window.cubicaOpenOrdersLink?.()||window.cubicaOpenProductLink?.();
           if(!opened && event==="SIGNED_IN" && session?.role==="customer") showSection("store");
         }
       }).catch(err=>console.error("No se pudo sincronizar la sesión",err));
