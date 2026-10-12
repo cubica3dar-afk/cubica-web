@@ -208,7 +208,7 @@
           localStorage.removeItem(STORAGE.session);
           renderApp();
         }
-        window.cubicaNavigateAfterSignIn();
+        showSection("store");
         showAuthView("login");
         toast("Sesión cerrada");
       }catch(err){
