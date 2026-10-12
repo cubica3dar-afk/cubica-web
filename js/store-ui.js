@@ -30,13 +30,13 @@ function renderProducts(){
   $("product-grid").innerHTML=pageItems.map(p=>{
     const firstImage=p.media.find(m=>m.type==="image");
     const cover=firstImage?`<img class="product-cover" src="${firstImage.src}" alt="${escapeHtml(p.name)}" loading="lazy" decoding="async">`:`<div class="product-icon">${iconFor(p.category)}</div>`;
-    return `<article class="product-card product-card-clickable" onclick="openProductDetail('${p.id}')">
+    return `<a class="product-card product-card-clickable" href="?product=${encodeURIComponent(p.id)}" onclick="if(!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&event.button===0){event.preventDefault();openProductDetail(${escapeHtml(JSON.stringify(p.id))})}">
       <div class="product-cover-wrap">${cover}${p.media.some(m=>m.type==="video"||m.type==="social")?'<span class="media-badge">▶ Video</span>':''}</div>
       <div class="product-meta">${escapeHtml(p.category)} · ${p.stock>0?`${p.stock} disponibles`:"Se fabrica a pedido"}</div>
       <h3>${escapeHtml(p.name)}</h3>
       <div class="price">${money(p.price)}</div>
       <div class="product-card-hint">Ver producto · fotos · colores · cantidad →</div>
-    </article>`;
+    </a>`;
   }).join("") || '<div class="card" style="padding:25px">No hay productos que coincidan.</div>';
 
   renderPagination("product-pagination",{
@@ -49,14 +49,19 @@ function renderProducts(){
 }
 function iconFor(cat){return cat==="Veladores"?"◉":cat==="Figuras"?"♟":cat==="Decoración"?"◇":"▣"}
 function addToCart(id, qtyOverride=null, colorOverride=null){
-  const p=products.find(x=>x.id===id); if(!p)return;
-  const input=$("qty-"+id); const q=Math.max(1,Number(qtyOverride ?? input?.value)||1);
+  const p=products.find(x=>x.id===id); if(!p||p.active===false)return false;
+  const input=$("qty-"+id); const q=Number(qtyOverride ?? input?.value ?? 1);
+  if(!Number.isSafeInteger(q)||q<1||q>100){toast("Elegí una cantidad entera entre 1 y 100.");return false;}
   const color=colorOverride ?? (p.colors?.[0]?.name||"");
-  const existing=cart.find(x=>x.productId===id && (x.color||"")===color); const next=(existing?.qty||0)+q;
+  const existing=cart.find(x=>x.productId===id && (x.color||"")===color); const next=(Number(existing?.qty)||0)+q;
+  if(!Number.isSafeInteger(next)||next>100){toast("El máximo es 100 unidades por variante en el carrito.");return false;}
   if(existing)existing.qty=next;else cart.push({productId:id,qty:q,color});
-  write(STORAGE.cart,cart);
-  if(typeof window.cubicaTrackEvent==="function")window.cubicaTrackEvent("add_to_cart",id,{qty:q,color,price:Number(p.price)||0});
+  write(STORAGE.cart,cart);window.cubicaDelivery?.invalidate("Los productos cambiaron. Calculá nuevamente el envío.");
+  if(typeof window.cubicaTrackEvent==="function"){
+    try{window.cubicaTrackEvent("add_to_cart",id,{qty:q,color,price:Number(p.price)||0});}catch(error){console.warn("No se pudo registrar la acción del carrito",error);}
+  }
   toast("Producto agregado al carrito");renderCart();updateCartBadge();
+  return true;
 }
 function updateCartBadge(){
   const badge=$("cart-badge");
@@ -72,16 +77,18 @@ function renderCart(){
   box.innerHTML=cart.map(item=>{
     const p=products.find(x=>x.id===item.productId);if(!p)return "";
     total+=p.price*item.qty;count+=item.qty;
+    const idArg=escapeHtml(JSON.stringify(p.id)),colorArg=escapeHtml(JSON.stringify(item.color||""));
     return `<div class="cart-row"><div><strong>${escapeHtml(p.name)}</strong><div class="muted">${item.color?`Color: ${escapeHtml(item.color)} · `:""}${money(p.price)} c/u</div></div>
-      <input type="number" min="1" value="${item.qty}" onchange="changeCart('${p.id}',this.value,'${escapeHtml(item.color||"")}')">
-      <strong>${money(p.price*item.qty)}</strong><button class="btn ghost" onclick="removeCart('${p.id}','${escapeHtml(item.color||"")}')">×</button></div>`;
+      <input type="number" min="1" max="100" step="1" aria-label="Cantidad de ${escapeHtml(p.name)}" value="${item.qty}" onchange="changeCart(${idArg},this.value,${colorArg})">
+      <strong>${money(p.price*item.qty)}</strong><button class="btn ghost" aria-label="Quitar ${escapeHtml(p.name)} del carrito" onclick="removeCart(${idArg},${colorArg})">×</button></div>`;
   }).join("");
   $("cart-count").textContent=count;$("cart-total").textContent=money(total);updateCartBadge();
 }
-function changeCart(id,q,color=""){const item=cart.find(x=>x.productId===id && (x.color||"")===color),p=products.find(x=>x.id===id);q=Math.max(1,Number(q)||1);if(item)item.qty=q;write(STORAGE.cart,cart);renderCart();updateCartBadge()}
-function removeCart(id,color=""){cart=cart.filter(x=>!(x.productId===id && (x.color||"")===color));write(STORAGE.cart,cart);renderCart();updateCartBadge()}
+function changeCart(id,q,color=""){const item=cart.find(x=>x.productId===id && (x.color||"")===color);q=Number(q);if(!Number.isSafeInteger(q)||q<1||q>100){toast("Elegí una cantidad entera entre 1 y 100.");renderCart();return;}if(item)item.qty=q;write(STORAGE.cart,cart);window.cubicaDelivery?.invalidate("Los productos cambiaron. Calculá nuevamente el envío.");renderCart();updateCartBadge()}
+function removeCart(id,color=""){cart=cart.filter(x=>!(x.productId===id && (x.color||"")===color));write(STORAGE.cart,cart);window.cubicaDelivery?.invalidate("Los productos cambiaron. Calculá nuevamente el envío.");renderCart();updateCartBadge()}
 
 window.addToCart=addToCart;
 window.changeCart=changeCart;
 window.removeCart=removeCart;
 window.setProductPage=setProductPage;
+

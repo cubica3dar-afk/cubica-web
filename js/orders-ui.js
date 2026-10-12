@@ -33,7 +33,7 @@ function renderOrders(){
 
   $("orders-list").innerHTML=Object.keys(groups).sort().reverse().map(k=>`<div><h3>${escapeHtml(k)}</h3>${groups[k].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`
     <article class="order-card"><div class="order-head"><div><strong>${escapeHtml(String(o.orderNumber||o.id).startsWith("CUB-")?(o.orderNumber||o.id):`#${String(o.id).slice(-8).toUpperCase()}`)}</strong><div class="muted">${formatDate(o.date)}</div></div><strong>${money(o.total)}</strong></div>
-    <div class="order-body"><div class="order-items">${(o.items||[]).map(i=>`${escapeHtml(i.name)}${i.color?` · ${escapeHtml(i.color)}`:''} × ${i.qty} — ${money(i.price*i.qty)}`).join("<br>")} </div>
+    <div class="order-body">${window.cubicaDelivery?.customerHtml(o.delivery)||""}<div class="order-items">${(o.items||[]).map(i=>`${escapeHtml(i.name)}${i.color?` · ${escapeHtml(i.color)}`:''} × ${i.qty} — ${money(i.price*i.qty)}`).join("<br>")} </div>
     <p class="muted">${isAdmin?`Cliente: ${escapeHtml(o.customerName)} · `:""}Pago: ${escapeHtml(o.payment)} · Estado: <strong>${escapeHtml(isAdmin?o.status:customerOrderStatus(o.status))}</strong></p>
     ${isAdmin?`<p class="muted">${o.productionStartedAt?"Consumo de materiales registrado":"Materiales sin consumir"}</p><button class="btn ghost" onclick="openOrderManagement('${escapeHtml(o.id)}')">Gestionar pedido</button>`:""}</div></article>`).join("")}</div>`).join("") || '<div class="card" style="padding:20px">Todavía no hay pedidos asociados a esta cuenta.</div>';
 }
@@ -69,3 +69,4 @@ function calculateOrderSupplyPlan(items){
 }
 
 window.markOrder=markOrder;
+

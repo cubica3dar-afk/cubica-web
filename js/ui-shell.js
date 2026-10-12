@@ -12,6 +12,7 @@ window.cubicaAuthRedirectUrl = function(){
   return redirect.href;
 };
 window.cubicaOpenOrdersLink = function(){
+  if(new URLSearchParams(window.location.search).get("view")==="orders")ordersLinkActive=true;
   if(!ordersLinkActive || window.cubicaAuthCallbackBlocked || window.cubicaPasswordRecoveryActive ||
     new URLSearchParams(window.location.hash.slice(1)).get("type")==="recovery") return false;
   $("welcome-view")?.classList.add("hidden");
@@ -109,20 +110,22 @@ function showSection(id){
     toast("Iniciá sesión para consultar tus pedidos.");
     id="login";
   }
-  if(["stock-finished","stock-supplies","budget","analytics","community"].includes(id) && session?.role!=="admin"){
+  if(["stock-finished","stock-supplies","budget","analytics","community","delivery"].includes(id) && session?.role!=="admin"){
     toast("Esta sección es exclusiva del administrador.");
     id="login";
   }
   if(id==="profile" && !session){
     id="login";
   }
+  window.cubicaProductNavigation?.(id);
   document.querySelectorAll(".page-section").forEach(sec=>sec.classList.add("hidden"));
   $("section-"+id).classList.remove("hidden");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.classList.toggle("active",b.dataset.sidebarSection===id));
   closeAccountSidebar();
   if(id==="store") renderProducts(); if(id==="cart") renderCart(); if(id==="orders") renderOrders();
-  if(id==="profile") renderProfile();
+  if(id==="profile") {renderProfile();window.cubicaDelivery?.renderProfile();}
+  if(id==="delivery")window.cubicaDelivery?.loadAdmin();
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();
   if(id==="community")window.loadCommunityModeration?.(false);
@@ -256,3 +259,4 @@ function openModal(id){
 function closeModal(id){
   $(id)?.classList.add("hidden");
 }
+

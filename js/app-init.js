@@ -140,6 +140,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     if(typeof window.cubicaTrackEvent==="function"){
       window.cubicaTrackEvent("checkout_started",null,{items:cart.reduce((a,x)=>a+(Number(x.qty)||0),0)});
     }
+    window.cubicaDelivery?.refreshCheckout?.();
     openModal("checkout-modal");
   };
 
@@ -202,3 +203,4 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   initBudgetDefaults();
 });
+

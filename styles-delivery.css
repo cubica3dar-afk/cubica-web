@@ -1,0 +1,29 @@
+/* Formularios y seguimiento de entregas, privados cuando corresponden. */
+.delivery-checkout{min-width:0;border-top:1px solid var(--line);padding-top:20px;margin-top:8px}
+.delivery-mode{border:0;padding:0;margin:0 0 16px;min-width:0}
+.delivery-mode legend{font-size:16px;font-weight:800;margin-bottom:12px}
+.delivery-mode label{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);border-radius:14px;padding:14px;background:rgba(255,255,255,.03);cursor:pointer;margin-bottom:10px}
+.delivery-mode input,.delivery-checkbox input{width:20px;height:20px;flex:0 0 20px;padding:0;margin:0;accent-color:#fff}
+.delivery-mode span{display:grid;gap:5px;min-width:0}.delivery-mode small{line-height:1.45}.delivery-mode label:has(input:checked){border-color:#fff;background:rgba(255,255,255,.08)}
+.delivery-note{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:14px;line-height:1.6;font-size:13px}
+.delivery-address-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 16px;min-width:0}
+.delivery-address-grid>*{min-width:0}.delivery-address-grid input,.delivery-address-grid select,.delivery-address-grid textarea{max-width:100%;min-width:0;min-height:44px}
+.delivery-checkbox{display:flex;align-items:center;gap:10px;line-height:1.5;margin:14px 0}.delivery-small{font-size:12px;line-height:1.5}
+.delivery-checkout-total{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px;margin-top:16px;font-size:13px}
+.delivery-checkout-total>div{display:flex;justify-content:space-between;align-items:center;gap:14px}.delivery-checkout-total strong{text-align:right}
+.delivery-checkout-total .delivery-total{font-size:16px;border-top:1px solid var(--line);padding-top:12px}.delivery-error{color:var(--danger);line-height:1.5}
+#delivery-checkout-message:empty,#delivery-address-profile-message:empty,#delivery-admin-message:empty{display:none}
+.delivery-profile-card{padding:24px;margin-top:22px;min-width:0}.delivery-profile-card h3{margin-top:0}.delivery-panel-heading{display:flex;gap:16px;justify-content:space-between;align-items:flex-start}
+.delivery-panel-heading>div,.delivery-panel-heading>label{min-width:0;flex:1}.delivery-panel-heading .btn{flex-shrink:0}.delivery-action-row{display:flex;flex-wrap:wrap;gap:8px}
+.delivery-action-row .btn{min-height:44px}.delivery-address-card{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;min-width:0}.delivery-address-card p{color:var(--muted);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.delivery-badge{font-size:10px;border:1px solid var(--line);border-radius:999px;padding:4px 6px;margin-left:5px;font-weight:500;display:inline-block}
+#delivery-profile-form{border-top:1px solid var(--line);padding-top:12px;margin-top:18px}.delivery-provider-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.delivery-settings-item{border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px;min-width:0}.delivery-settings-item h4{margin-top:0}.delivery-settings-item p{font-size:12px;line-height:1.5}.delivery-settings-item summary{font-weight:700;cursor:pointer;padding:6px 0}.delivery-settings-item[open] summary{margin-bottom:18px}
+#delivery-admin-content{min-width:0}#delivery-admin-content h3{margin-top:28px}#delivery-admin-content>form>h3:first-child{margin-top:0}
+.delivery-quotes-table table{min-width:760px}.delivery-cost-list{border:1px solid var(--line);border-radius:12px;padding:12px}.delivery-cost-list>div{display:flex;justify-content:space-between;gap:14px;padding:8px 0;font-size:13px}.delivery-cost-list dt{color:var(--muted)}.delivery-cost-list dd{margin:0;text-align:right;overflow-wrap:anywhere}
+#order-delivery-panel{border-top:1px solid var(--line);padding-top:10px;margin-top:22px}#order-delivery-panel p{line-height:1.6;overflow-wrap:anywhere}
+.delivery-customer-summary{border-top:1px solid var(--line);padding-top:14px;margin-top:16px;font-size:13px}.delivery-customer-summary p{color:var(--muted);line-height:1.5}.delivery-customer-summary a{display:inline-block;min-height:44px}
+.delivery-mode input:focus-visible,.delivery-checkbox input:focus-visible{outline:3px solid #b7b6e9;outline-offset:4px}.delivery-mode label:focus-within{box-shadow:0 0 0 3px rgba(183,182,233,.2)}
+@media(max-width:900px){.delivery-provider-grid{grid-template-columns:1fr}.delivery-profile-card{padding:20px}}
+@media(max-width:600px){.delivery-address-grid{grid-template-columns:1fr}.delivery-address-grid .full-span{grid-column:1/-1}.delivery-panel-heading{flex-direction:column}.delivery-panel-heading>.btn{width:100%}.delivery-profile-card{padding:16px}.delivery-action-row>.btn{flex:1 1 120px}.delivery-checkout-total>div{align-items:flex-start}.delivery-cost-list>div{font-size:12px}.delivery-settings-item{padding:14px}}
+

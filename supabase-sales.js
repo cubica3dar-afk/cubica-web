@@ -5,6 +5,7 @@
   const client=window.cubicaSupabase;
   if(!client) return;
 
+  let orderSubmitting=false;
   let salesLoading=false;
   let salesReady=false;
 
@@ -33,6 +34,7 @@
       internalEmailSent:!!row.internal_email_sent,
       customerEmailSent:!!row.customer_email_sent,
       emailErrors:row.email_errors||[],
+      delivery:row.delivery||null,
       serverSaved:true,
       items:(row.order_items||[]).map(i=>({
         itemId:i.id,
@@ -258,13 +260,19 @@
 
   async function submitOrderSupabase(e){
     e.preventDefault();
+    if(orderSubmitting)return;
     if(!cart.length) return toast("El carrito está vacío.");
 
+    orderSubmitting=true;
+    const form=e.target;
     const submitBtn=e.submitter||e.target.querySelector('button[type="submit"]');
     const originalText=submitBtn?.textContent||"Confirmar pedido";
     if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Enviando pedido…";}
 
     try{
+      if(!window.cubicaDelivery)throw new Error("No se pudo cargar la selección de entrega. Recargá la página.");
+      await window.cubicaDelivery.validate();
+      const delivery=window.cubicaDelivery.payload();
       const name=$("customer-name").value.trim();
       const email=$("customer-email").value.trim();
       const phone=$("customer-phone").value.trim();
@@ -283,7 +291,7 @@
       }
 
       const draftOrder={
-        id:uid("ord"),
+        id:delivery.request_id,
         date:new Date().toISOString(),
         customerName:name,
         customerEmail:email,
@@ -297,26 +305,18 @@
         supplyPlan:calculateOrderSupplyPlan(items)
       };
 
-      const {data,error}=await client.rpc("create_public_order",{
+      const {data,error}=await client.rpc("create_delivery_order",{
         p_client_order_id:draftOrder.id,
         p_customer_name:name,
         p_customer_email:email,
         p_phone:phone,
         p_payment:draftOrder.payment,
         p_notes:draftOrder.notes,
-        p_items:rpcItems
+        p_items:rpcItems,
+        p_delivery:delivery
       });
 
       if(error){
-        const missing=/create_public_order|Could not find the function|PGRST202/i.test(String(error.message||"")+" "+String(error.code||""));
-        if(missing){
-          localFallbackOrder(draftOrder,items);
-          cart=[];writeLocal(STORAGE.cart,cart);
-          closeModal("checkout-modal");renderProducts();renderCart();
-          toast("Pedido guardado localmente. Falta activar la función de pedidos online en Supabase.");
-          e.target.reset();
-          return;
-        }
         throw error;
       }
 
@@ -351,11 +351,13 @@
         });
       }
       toast(`${order.orderNumber||"Pedido registrado"}: pedido guardado en Cúbica.`);
-      e.target.reset();
+      await window.cubicaDelivery?.afterOrderSaved();
+      form.reset();
     }catch(err){
       console.error("Pedido Supabase",err);
       toast(err.message||"No se pudo registrar el pedido.");
     }finally{
+      orderSubmitting=false;
       if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=originalText;}
     }
   }
@@ -380,3 +382,4 @@
     if(save) save.onclick=saveBudgetSupabase;
   });
 })();
+

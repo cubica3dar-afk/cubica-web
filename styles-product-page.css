@@ -1,0 +1,45 @@
+/* Dedicated public product pages reuse Cúbica's gallery and Community components. */
+.product-card-clickable{text-decoration:none;color:inherit}
+.product-card-clickable:focus-visible,#section-product button:focus-visible{outline:3px solid #b8a0ff;outline-offset:4px}
+#section-product{scroll-margin-top:92px;min-width:0}
+.product-page-nav{display:flex;align-items:center;gap:12px;margin:0 0 24px}
+#section-product .product-detail-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:32px}
+#section-product .product-page-gallery,#section-product .product-detail-info{min-width:0}
+#section-product .detail-viewer{height:auto;aspect-ratio:1 / 1;min-height:0;max-height:650px}
+#section-product .product-detail-info h1{font-size:clamp(30px,3.4vw,48px);line-height:1.08;margin:6px 0 18px;overflow-wrap:anywhere}
+#section-product .detail-description{overflow-wrap:anywhere}
+#section-product .detail-colors button{min-height:44px;max-width:100%;overflow-wrap:anywhere;text-align:left}
+#section-product .detail-buy{display:grid;grid-template-columns:1fr;gap:12px;margin-top:24px;position:static;z-index:auto;background:none;padding:0}
+#section-product .detail-buy label{width:130px;font-size:13px;margin:0}
+#section-product .detail-buy input{min-height:48px;margin:0}
+.product-purchase-actions{display:grid;gap:10px}
+#section-product .product-purchase-actions .btn{width:100%;height:auto;min-height:52px;font-size:16px}
+#section-product .product-purchase-actions .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--dark)}
+#section-product .product-purchase-actions .btn.secondary{background:transparent;border-color:rgba(255,255,255,.26);font-size:14px}
+#section-product .product-purchase-actions .btn:disabled{opacity:.65;cursor:wait}
+#product-purchase-feedback{min-height:24px;color:var(--good);font-size:14px;overflow-wrap:anywhere}
+#section-product .product-community{margin-top:48px;padding-top:28px}
+#section-product .community-actions .btn{min-height:44px}
+#section-product .community-body,#section-product .community-author{overflow-wrap:anywhere;min-width:0}
+.product-page-state{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:32px;min-height:240px}
+.product-page-state h1{font-size:clamp(24px,4vw,36px);margin:0 0 14px}
+.product-page-state p{line-height:1.7}
+@media(max-width:900px){
+  #section-product .product-detail-grid{grid-template-columns:1fr;gap:24px}
+  #section-product .product-page-gallery{width:min(650px,100%);margin-inline:auto}
+  #section-product .product-detail-info{padding:0}
+}
+@media(max-width:600px){
+  #section-product .product-detail-grid{gap:20px}
+  #section-product .detail-viewer{border-radius:16px}
+  #section-product .detail-price{font-size:28px}
+  #section-product .detail-thumbs{gap:8px;max-width:100%;overscroll-behavior-x:contain}
+  #section-product .detail-thumb{flex-basis:64px;height:56px}
+  #section-product .detail-description{margin:18px 0;line-height:1.7}
+  #section-product .product-community{margin-top:32px;padding-top:20px}
+  #section-product .community-replies{padding-left:10px;margin-left:0}
+  #section-product .community-author strong{max-width:100%}
+  .product-page-state{padding:22px}
+}
+@media(prefers-reduced-motion:reduce){#section-product{scroll-behavior:auto}}
+

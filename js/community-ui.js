@@ -10,16 +10,17 @@
   const previousRedirect=window.cubicaAuthRedirectUrl;
   window.cubicaAuthRedirectUrl=()=>{
     const url=new URL(previousRedirect?previousRedirect():location.origin+location.pathname);
-    if(linkProduct&&url.searchParams.get("view")!=="orders")url.searchParams.set("product",linkProduct);
+    const destination=linkProduct||new URLSearchParams(location.search).get("product");
+    if(destination&&url.searchParams.get("view")!=="orders")url.searchParams.set("product",destination);
     return url.href;
   };
   window.cubicaOpenProductLink=()=>{
-    if(!linkProduct||window.cubicaAuthCallbackBlocked||window.cubicaPasswordRecoveryActive||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).get("view")==="orders"||sessionStorage.getItem("cubica_auth_destination")==="orders")return false;
-    if(!products.some(p=>p.id===linkProduct))return false;
+    const destination=linkProduct||new URLSearchParams(location.search).get("product");
+    if(!destination||window.cubicaAuthCallbackBlocked||window.cubicaPasswordRecoveryActive||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).get("view")==="orders"||sessionStorage.getItem("cubica_auth_destination")==="orders")return false;
     if(sessionStorage.getItem(pendingKey)&&!session)return false;
     $("welcome-view")?.classList.add("hidden");
-    const id=linkProduct;linkProduct=null;sessionStorage.removeItem(pendingKey);
-    showSection("store");openProductDetail(id);return true;
+    linkProduct=null;sessionStorage.removeItem(pendingKey);
+    openProductDetail(destination,{history:"none"});return true;
   };
   const previousNavigate=window.cubicaNavigateAfterSignIn;
   window.cubicaNavigateAfterSignIn=()=>{if(!window.cubicaOpenProductLink())previousNavigate();};
@@ -27,7 +28,7 @@
   function authenticated(){
     if(session?.supabaseUserId)return true;
     linkProduct=productId;sessionStorage.setItem(pendingKey,productId);
-    closeModal("product-detail-modal");$("welcome-view")?.classList.add("hidden");showSection("login");
+    $("welcome-view")?.classList.add("hidden");showSection("login");
     window.dispatchEvent(new CustomEvent("cubica:auth-request"));
     toast("Iniciá sesión para participar. Después volverás a este producto.");return false;
   }
@@ -115,7 +116,7 @@
   }
   window.addEventListener("cubica:product-open",event=>load(event.detail.productId));
   window.addEventListener("cubica:auth-ready",()=>{
-    if(productId&&!$("product-detail-modal").classList.contains("hidden"))load(productId);
+    if(productId&&window.cubicaProductPageActive?.())load(productId);
     if(session?.role!=="admin"){$("community-moderation-list").textContent="";$("product-performance-table").textContent="";performanceRows=[];moderationGeneration++;performanceGeneration++;}
   });
 
@@ -155,3 +156,4 @@
     $("product-performance-sort").onchange=renderPerformance;
   });
 })();
+

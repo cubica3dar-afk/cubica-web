@@ -164,6 +164,7 @@
   async function loadCatalogFromSupabase(){
     if(catalogLoadInProgress) return;
     catalogLoadInProgress = true;
+    window.cubicaCatalogState="loading";
     try{
       setDataBadge("Datos: Supabase…","pending");
 
@@ -174,6 +175,9 @@
       if(!rows?.length){
         catalogLoadedFromSupabase = false;
         setDataBadge("Supabase: catálogo pendiente","warn");
+        window.cubicaCatalogState="ready";
+        window.cubicaCatalogEmpty=true;
+        window.dispatchEvent(new CustomEvent("cubica:catalog-ready"));
 
         if(session?.role === "admin" && !sessionStorage.getItem("cubica_catalog_migration_prompted")){
           sessionStorage.setItem("cubica_catalog_migration_prompted","1");
@@ -232,12 +236,17 @@
       });
       writeLocal(STORAGE.products,products);
       catalogLoadedFromSupabase = true;
+      window.cubicaCatalogEmpty=false;
+      window.cubicaCatalogState="ready";
+      window.dispatchEvent(new CustomEvent("cubica:catalog-ready"));
       setDataBadge("Datos: Supabase","ok");
       renderProducts();
       window.cubicaOpenProductLink?.();
       if(session?.role==="admin") renderFinishedStock();
     }catch(err){
       console.error("Catálogo Supabase",err);
+      window.cubicaCatalogState="error";
+      window.dispatchEvent(new CustomEvent("cubica:catalog-error"));
       catalogLoadedFromSupabase = false;
       setDataBadge("Supabase: sin conexión","error");
     }finally{
@@ -613,3 +622,4 @@
     loadCatalogFromSupabase();
   });
 })();
+

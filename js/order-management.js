@@ -22,7 +22,7 @@
       <div class="order-management-summary"><strong class="order-status">${e(o.status)}</strong><strong>${money(o.total)}</strong></div>
       <p><strong>${e(o.customer_name)}</strong><br><span class="muted">${e(o.customer_email)} · ${e(o.phone||"Teléfono no informado")}<br>Pago: ${e(o.payment)}</span></p>
       <p class="order-notes">${e(o.notes||"Sin observaciones")}</p>
-      <h3>Productos</h3><ul>${items.map(i=>`<li>${e(i.name)}${i.color?` · ${e(i.color)}`:""} × ${number(i.qty)}</li>`).join("")}</ul>
+      <div id="order-delivery-panel"></div><h3>Productos</h3><ul>${items.map(i=>`<li>${e(i.name)}${i.color?` · ${e(i.color)}`:""} × ${number(i.qty)}</li>`).join("")}</ul>
       <div class="order-consumption ${consumption?"recorded":""}"><strong>${consumption?"Consumo registrado una sola vez":"Materiales sin consumir"}</strong><br>${consumption?`${e(formatDate(consumption.created_at))}. Los cambios de estado y la cancelación no devuelven ni vuelven a descontar insumos.`:"Los insumos se descuentan al iniciar producción."}</div>
       <h3>${consumption?"Receta registrada al iniciar producción":"Plan de materiales"}</h3>
       <p class="muted">${consumption?"Disponible indica el stock previo al consumo. Los faltantes autorizados quedan registrados; no representan materiales descontados." :"Calculado en Supabase para todas las unidades. Los insumos compartidos están sumados."}</p>
@@ -33,6 +33,7 @@
       <p id="order-management-message" role="status" aria-live="polite"></p>
       <details><summary>Historial de estados (${history.length})</summary>${history.map(h=>`<p>${e(h.from_status)} → <strong>${e(h.to_status)}</strong><br><span class="muted">${e(formatDate(h.created_at))}</span>${h.cancellation?`<br>${h.cancellation.map(c=>{const item=items.find(i=>String(i.id)===String(c.item_id));return `${e(item?.name||"Producto")}: ${c.disposition==="finished_standard"?"estándar al stock":c.disposition==="finished_personalized"?"personalizada sin stock":"sin pieza terminada"} (${number(c.qty)})`;}).join("<br>")}`:""}</p>`).join("")||'<p class="muted">Sin transiciones registradas. Los pedidos anteriores conservan su estado original.</p>'}</details>
       <details><summary>Movimientos del pedido (${movements.length})</summary>${movements.map(m=>`<p><strong>${e(m.name)}</strong>: ${m.delta>0?"+":""}${number(m.delta)} ${e(m.unit)}<br><span class="muted">${m.reason==="production"?"Inicio de producción":"Pieza cancelada terminada al stock"} · ${e(formatDate(m.created_at))}</span>${m.deficit>0?`<br><span class="order-shortage">Necesario ${number(m.required)} · Faltante autorizado ${number(m.deficit)} ${e(m.unit)}</span>`:""}</p>`).join("")||'<p class="muted">Sin movimientos de materiales o piezas canceladas.</p>'}</details>`;
+    window.cubicaDelivery?.renderAdminOrder(o.id,$("order-delivery-panel"));
     $("order-next-status")?.addEventListener("change",()=>{
       $("order-cancellation").classList.toggle("hidden",$("order-next-status").value!=="Cancelado");
       $("order-production-confirm").classList.add("hidden");
@@ -119,3 +120,4 @@
     }catch(error){toast(error.message||"No se pudo cargar el historial.");}
   };
 })();
+

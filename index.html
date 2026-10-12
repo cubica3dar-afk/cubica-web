@@ -6,6 +6,8 @@
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
   <link rel="stylesheet" href="styles.css?v=20261012-community1">
+  <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
+  <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
 
   <script type="importmap">
   {
@@ -78,6 +80,7 @@
         <button type="button" data-sidebar-section="stock-supplies" class="admin-only"><span>◫</span><span>Insumos</span></button>
         <button type="button" data-sidebar-section="budget" class="admin-only"><span>⌁</span><span>Presupuestos</span></button>
         <button type="button" data-sidebar-section="analytics" class="admin-only"><span>⌗</span><span>Análisis</span></button>
+        <button type="button" data-sidebar-section="delivery" class="admin-only"><span>↗</span><span>Entregas</span></button>
         <button type="button" data-sidebar-section="community" class="admin-only"><span>☏</span><span>Comunidad</span></button>
       </nav>
 
@@ -191,6 +194,8 @@
         </div>
       </section>
 
+      <section id="section-product" class="page-section hidden" aria-label="Producto"><nav class="product-page-nav" aria-label="Navegación del producto"><button type="button" class="btn ghost" onclick="backToProductCatalog()">← Volver al catálogo</button></nav><div id="product-detail-content"></div><section id="product-community" class="product-community" aria-label="Opiniones"></section></section>
+      <section id="section-delivery" class="page-section hidden"><div class="section-title"><h1>Entregas</h1><p>Origen, embalaje, transportistas y cotizaciones.</p></div><div id="delivery-admin-content"></div></section>
       <section id="section-store" class="page-section">
         <div class="hero">
           <div>
@@ -581,7 +586,7 @@
           <textarea id="customer-notes" rows="3" placeholder="Color, retiro, personalización, etc."></textarea>
         </label>
         <div class="checkout-note full-span">
-          Al confirmar, el pedido se guarda en Cúbica. El servidor envía el detalle interno a Cúbica y, si el correo está configurado, el cliente recibe una confirmación. El email del cliente nunca se usa como remitente.
+          Antes de confirmar, revisá los productos, la modalidad de entrega y el total. Recibirás la confirmación por email. Confirmar un pedido no acredita el pago.
         </div>
         <button class="btn primary full" type="submit">Confirmar pedido</button>
       </form>
@@ -684,14 +689,6 @@
     </div>
   </div>
 
-  <div id="product-detail-modal" class="modal hidden">
-    <div class="modal-card product-detail-modal">
-      <button class="modal-close" data-close-modal="product-detail-modal">×</button>
-      <div id="product-detail-content"></div>
-      <section id="product-community" class="product-community" aria-label="Comunidad del producto"></section>
-    </div>
-  </div>
-
   <div id="supply-modal" class="modal hidden">
     <div class="modal-card supply-modal-card">
       <button class="modal-close" data-close-modal="supply-modal">×</button>
@@ -774,10 +771,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=20261009-refactor2"></script>
-  <script src="js/ui-shell.js?v=recovery2"></script>
-  <script src="js/store-ui.js?v=20261009-refactor2"></script>
-  <script src="js/products-ui.js?v=20261012-community1"></script>
-  <script src="js/community-ui.js?v=recovery2"></script>
+  <script src="js/ui-shell.js?v=delivery1"></script>
+  <script src="js/store-ui.js?v=delivery1"></script>
+  <script src="js/products-ui.js?v=delivery1"></script>
+  <script src="js/community-ui.js?v=delivery1"></script>
   <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
@@ -788,8 +785,8 @@
       <div id="order-management-content"></div>
     </div>
   </div>
-  <script src="js/orders-ui.js?v=20261012-lifecycle1"></script>
-  <script src="js/order-management.js?v=20261012-lifecycle1"></script>
+  <script src="js/orders-ui.js?v=delivery1"></script>
+  <script src="js/order-management.js?v=delivery1"></script>
   <div id="inventory-history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-history-title">
     <div class="modal-card order-management-card">
       <button class="modal-close" data-close-modal="inventory-history-modal" aria-label="Cerrar">×</button>
@@ -798,14 +795,16 @@
     </div>
   </div>
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
-  <script src="js/app-init.js?v=recovery2"></script>
+  <script src="js/app-init.js?v=delivery1"></script>
 
-  <script src="supabase-bridge.js?v=recovery2"></script>
+  <script src="supabase-bridge.js?v=delivery1"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=20261012-lifecycle1"></script>
-  <script src="supabase-sales.js?v=20261012-lifecycle1"></script>
+  <script src="supabase-sales.js?v=delivery1"></script>
+  <script src="js/delivery-ui.js?v=delivery1"></script>
   <script src="supabase-analytics.js?v=20261006-1"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
+
