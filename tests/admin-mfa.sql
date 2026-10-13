@@ -1,5 +1,5 @@
--- Administrative MFA staging. Everything is rolled back, including the
--- temporary activation of the enforcement switch.
+-- Administrative MFA enforcement. Every fixture and temporary switch change
+-- is contained in this transaction and rolled back.
 begin;
 do $$
 declare
@@ -16,30 +16,44 @@ begin
   perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal1')::text,true);
   perform set_config('role','authenticated',true);
   status:=public.get_admin_mfa_status();
-  if status->>'is_admin'<>'true' or status->>'enforcement_enabled'<>'false'
-    or status->>'access_allowed'<>'true' or (status->>'verified_factor_count')::integer<>0 then
-    raise exception 'Staged administrator status is incorrect: %',status;
-  end if;
-  if not private.is_admin() then raise exception 'Staging blocked the existing administrator'; end if;
-  perform public.get_admin_orders();
-  perform set_config('role','none',true);
-
-  create or replace function private.admin_mfa_enforcement_enabled()
-  returns boolean language sql stable set search_path='' as $f$ select true; $f$;
-
-  perform set_config('role','authenticated',true);
-  status:=public.get_admin_mfa_status();
-  if status->>'enforcement_enabled'<>'true' or status->>'access_allowed'<>'false' then
-    raise exception 'AAL1 status did not close the administrative gate: %',status;
+  if status->>'is_admin'<>'true' or status->>'enforcement_enabled'<>'true'
+    or status->>'access_allowed'<>'false' or (status->>'verified_factor_count')::integer<>0 then
+    raise exception 'Enforced AAL1 administrator status is incorrect: %',status;
   end if;
   if private.is_admin() then raise exception 'AAL1 retained administrative authorization'; end if;
   begin
     perform public.get_admin_orders();
     raise exception 'AAL1 called a protected administrative RPC';
   exception when insufficient_privilege then null; end;
+  begin perform public.get_order_management(gen_random_uuid()); raise exception 'AAL1 read order management';
+  exception when insufficient_privilege then null; end;
+  begin perform public.change_order_status(gen_random_uuid(),'Confirmado',0,false,null,'{}'); raise exception 'AAL1 changed an order';
+  exception when insufficient_privilege then null; end;
+  begin perform public.save_admin_inventory_row('supplies','{}',0,false); raise exception 'AAL1 changed inventory';
+  exception when insufficient_privilege then null; end;
+  begin perform public.admin_delivery_settings(); raise exception 'AAL1 read delivery settings';
+  exception when insufficient_privilege then null; end;
+  begin perform public.admin_order_delivery(gen_random_uuid()); raise exception 'AAL1 read private delivery data';
+  exception when insufficient_privilege then null; end;
+  begin perform public.admin_update_order_delivery(gen_random_uuid(),'{}'); raise exception 'AAL1 changed delivery data';
+  exception when insufficient_privilege then null; end;
+  begin perform public.get_product_performance(7); raise exception 'AAL1 read administrative analytics';
+  exception when insufficient_privilege then null; end;
+  begin perform public.get_community_moderation(); raise exception 'AAL1 read moderation data';
+  exception when insufficient_privilege then null; end;
+  begin perform public.moderate_community_comment(-1,'hidden'); raise exception 'AAL1 moderated Community';
+  exception when insufficient_privilege then null; end;
   if exists(select 1 from public.inventory_movements limit 1) then
     raise exception 'AAL1 read protected inventory movements';
   end if;
+
+  if exists (
+    select 1
+    from pg_policies
+    where schemaname='public'
+      and policyname like '%admin%'
+      and coalesce(qual,'')||coalesce(with_check,'') not like '%private.is_admin()%'
+  ) then raise exception 'An administrative RLS policy bypasses private.is_admin()'; end if;
 
   perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2','amr',jsonb_build_array(jsonb_build_object('method','totp','timestamp',extract(epoch from now())::bigint)))::text,true);
   status:=public.get_admin_mfa_status();
@@ -60,6 +74,14 @@ begin
   exception when insufficient_privilege then null; end;
   perform set_config('role','none',true);
 
+  create or replace function private.admin_mfa_enforcement_enabled()
+  returns boolean language sql stable set search_path='' as $f$ select false; $f$;
+  perform set_config('request.jwt.claim.sub',admin_id::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal1')::text,true);
+  perform set_config('role','authenticated',true);
+  if not private.is_admin() then raise exception 'Emergency rollback did not restore role-only admin access'; end if;
+  perform set_config('role','none',true);
+
   if has_function_privilege('anon','public.get_admin_mfa_status()','EXECUTE')
     or not has_function_privilege('authenticated','public.get_admin_mfa_status()','EXECUTE') then
     raise exception 'MFA status RPC grants are incorrect';
@@ -69,6 +91,6 @@ begin
     raise exception 'Worker grants changed';
   end if;
 end $$;
-select 'Administrative MFA staging checks passed' as result;
+select 'Administrative MFA enforcement checks passed' as result;
 rollback;
 

@@ -36,6 +36,7 @@ begin
  perform set_config('request.jwt.claim.sub',a::text,true);
  begin perform public.edit_community_comment(root_id,'Contexto cambiado');raise exception 'Edit with replies accepted';exception when others then if sqlerrm='Edit with replies accepted' then raise;end if;end;
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2')::text,true);
  perform public.moderate_community_comment(root_id,'hidden');
  if jsonb_array_length(public.get_product_community(pid)->'comments')<>0 then raise exception 'Hidden root public';end if;
  begin perform public.get_product_community(pid,root_id);raise exception 'Hidden thread endpoint';exception when others then if sqlerrm='Hidden thread endpoint' then raise;end if;end;
@@ -56,6 +57,7 @@ begin
  out:=public.get_product_community(pid);
  if (out->'comments'->0->>'verified_purchase')::boolean then raise exception 'Prepared badge';end if;
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2')::text,true);
  perform public.change_order_status(oid,'Entregado',0);
  out:=public.get_product_community(pid);
  if not (out->'comments'->0->>'verified_purchase')::boolean then raise exception 'Missing delivered badge';end if;
@@ -77,6 +79,7 @@ begin
  begin perform public.get_product_performance(7);raise exception 'Customer analytics';exception when insufficient_privilege then null;end;
  begin perform public.get_community_moderation();raise exception 'Customer moderation';exception when insufficient_privilege then null;end;
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2')::text,true);
  stats:=public.get_product_performance(7);
  select value into out from jsonb_array_elements(stats->'products') where value->>'product_id'=pid;
  if (out->>'views')::int<>2 or (out->>'view_sessions')::int<>1 or (out->>'carts')::int<>1 or (out->>'orders')::int<>1
@@ -115,3 +118,4 @@ begin
 end;
 $$;
 rollback;
+

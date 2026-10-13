@@ -78,7 +78,7 @@ begin
  begin perform count(*) from private.buyer_details; raise exception 'Direct buyer table exposed'; exception when insufficient_privilege then null; end;
  begin perform count(*) from private.product_reactions; raise exception 'Private dislikes exposed'; exception when insufficient_privilege then null; end;
  perform set_config('request.jwt.claim.sub',adm::text,true);
- perform set_config('request.jwt.claims',jsonb_build_object('sub',adm,'role','authenticated')::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',adm,'role','authenticated','aal','aal2')::text,true);
  if not exists(select 1 from jsonb_array_elements(public.get_admin_orders()) x where x->>'id'=oid::text) then raise exception 'Admin orders broken'; end if;
  perform public.get_order_management(oid);
  perform public.admin_delivery_settings();
@@ -89,3 +89,4 @@ begin
 end $$;
 select 'Security rollback checks passed' as result;
 rollback;
+

@@ -182,7 +182,7 @@ begin
 
  -- Admin tracking and actual cost do not mutate agreed total or production status.
  perform set_config('request.jwt.claim.sub',adm::text,true);
- perform set_config('request.jwt.claims',jsonb_build_object('sub',adm,'role','authenticated')::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',adm,'role','authenticated','aal','aal2')::text,true);
  detail:=public.admin_update_order_delivery(oid,'{"logistics_status":"dispatched","actual_cost_ars":9500.55,"tracking_code":"QA-ROLLBACK","tracking_url":"https://example.invalid/track"}');
  if (detail->>'difference_ars')::numeric<>-250 then raise exception 'Cost difference calculation'; end if;
  if jsonb_array_length(detail->'history')<>1 then raise exception 'Tracking history missing'; end if;
@@ -211,3 +211,4 @@ begin
 end $$;
 select 'delivery backend rollback QA passed' as result;
 rollback;
+

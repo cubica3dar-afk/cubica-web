@@ -1,8 +1,8 @@
 # Administrative TOTP MFA
 
-This release prepares native Supabase TOTP MFA for Cúbica administrators. The
-mandatory backend gate is deliberately staged **off**. Customers keep their
-existing Google/email experience and never receive an administrative challenge.
+Native Supabase TOTP MFA is mandatory for Cúbica administrators. Customers keep
+their existing Google/email experience and never receive an administrative
+challenge.
 
 ## Authorization model
 
@@ -12,10 +12,10 @@ administrative RPCs, RLS policies and the `product-media` Storage policies.
 It now also requires the Supabase-issued JWT claim `aal = aal2` when
 `private.admin_mfa_enforcement_enabled()` returns true.
 
-The staged switch currently returns false. It must only be changed in a separate
-migration after the owner has enrolled and tested both a primary and backup TOTP
-factor and has explicitly approved activation. Browser flags cannot enable or
-bypass the backend rule.
+The enforcement switch returns true. It was enabled in a separate migration only
+after the owner enrolled and tested a primary and backup TOTP factor and gave
+explicit approval. Browser flags cannot enable, disable or bypass the backend
+rule.
 
 The status RPC is available at AAL1 only so the signed-in administrator can be
 sent to the challenge. It exposes the enforcement state, current AAL and a count
@@ -43,18 +43,23 @@ the server-only Admin Auth MFA API. That operation logs out active sessions. Nev
 put the service-role key or an administrative factor-deletion endpoint in the
 browser.
 
-## Activation checklist
+## Active access flow
 
-1. Enroll the primary factor and confirm the success state.
-2. Enroll and verify a backup factor.
-3. Sign out and test a fresh Google or email/password sign-in plus TOTP challenge.
-4. Confirm access to orders, inventory, Community, Analytics and delivery settings.
-5. Confirm the documented backup-factor recovery path.
-6. Obtain Diego's explicit approval.
-7. Apply a new migration that changes only
-   `private.admin_mfa_enforcement_enabled()` to `select true`.
-8. Run `tests/admin-mfa.sql`, the full regression suite and direct API denial tests.
+1. Email/password or Google establishes an AAL1 session.
+2. The app reads the filtered MFA gate status and routes the administrator to the
+   TOTP challenge.
+3. Either verified authenticator can be selected.
+4. Supabase verifies the code and issues an AAL2 session.
+5. Only then do the administrative RPCs, RLS and Storage policies authorize the
+   administrator.
 
-Do not edit the staging migration in place after deployment; activation must be a
-new, auditable migration.
+The activation migration is
+`20261013153000_admin_mfa_enforcement_on.sql`. The prepared emergency script is
+`supabase/rollback/admin_mfa_enforcement_off.sql`. It changes only the protected
+switch to false and preserves the enrolled factors. Run it only through protected
+project-owner database access after an access incident, and restore enforcement
+after the incident is resolved.
+
+Do not edit deployed migrations in place. Any future activation or rollback must
+remain a separate, auditable database change.
 

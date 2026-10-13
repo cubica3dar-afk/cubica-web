@@ -10,7 +10,7 @@ begin
  values(admin_id,'authenticated','authenticated',admin_id::text||'@example.invalid','{}');
  update public.profiles set role='admin' where id=admin_id;
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
- perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated')::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2')::text,true);
  p1:=prefix||'-p1';p2:=prefix||'-p2';p3:=prefix||'-p3';s1:=prefix||'-s1';s2:=prefix||'-s2';
  insert into public.products(id,name,price,stock) values(p1,'Fixture estándar',100,100),(p2,'Fixture personalizada',200,100),(p3,'Fixture sin receta',100,10);
  insert into public.supplies(id,name,qty,unit) values(s1,'Fixture PLA',100,'gramos'),(s2,'Fixture LED',5,'unidades');
@@ -127,6 +127,7 @@ begin
  exception when insufficient_privilege then null; end;
  if public.get_customer_orders()<>'[]'::jsonb then raise exception 'Anonymous order exposure'; end if;
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2')::text,true);
  -- Explicit stale writes cannot restore consumed stock; metadata edits preserve it.
  snapshot:=(select to_jsonb(s) from public.supplies s where id=s1);
  perform public.save_admin_inventory_row('supplies',snapshot||jsonb_build_object('qty',999,'name','Fixture renamed'),100,false);
@@ -147,3 +148,4 @@ begin
 end;
 $$;
 rollback;
+
