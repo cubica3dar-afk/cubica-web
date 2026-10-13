@@ -2,10 +2,13 @@ begin;
 do $$
 declare a uuid; b uuid; admin_id uuid; pid text:='community-qa-'||gen_random_uuid(); root_id bigint; reply_id bigint; extra_id bigint; out jsonb; stats jsonb; oid uuid; v integer; request uuid:=gen_random_uuid(); cursor_id bigint;
 begin
- select id into admin_id from public.profiles where role='admin' limit 1;
- select id into a from public.profiles where role='customer' order by id limit 1;
- select id into b from public.profiles where role='customer' and id<>a order by id limit 1;
- if a is null or b is null or admin_id is null then raise exception 'Need existing customer/customer/admin for rollback fixtures'; end if;
+ a:=gen_random_uuid(); b:=gen_random_uuid(); admin_id:=gen_random_uuid();
+ insert into auth.users(id,aud,role,email,raw_user_meta_data) values
+ (a,'authenticated','authenticated',a::text||'@example.invalid','{}'),
+ (b,'authenticated','authenticated',b::text||'@example.invalid','{}'),
+ (admin_id,'authenticated','authenticated',admin_id::text||'@example.invalid','{}');
+ update public.profiles set role='admin' where id=admin_id;
+ update auth.users set email_confirmed_at=now() where id in(a,b,admin_id);
  insert into public.products(id,name,price,stock) values(pid,'Community fixture',100,100),(pid||'-empty','Sin actividad fixture',100,1);
  perform set_config('request.jwt.claim.sub',a::text,true);
  perform set_config('role','authenticated',true);
@@ -108,7 +111,7 @@ begin
  perform set_config('role','none',true);
  if private.community_identity('user@example.invalid','javascript:alert(1)')<>jsonb_build_object('name','Cliente de Cúbica','avatar',null) then raise exception 'Email/avatar exposure';end if;
  begin update private.community_comments set user_id=b where id=extra_id;raise exception 'Changed author';exception when others then if sqlerrm='Changed author' then raise;end if;end;
- delete from public.products where id=pid;
+ -- ROLLBACK removes the product and every dependent fixture together.
 end;
 $$;
 rollback;

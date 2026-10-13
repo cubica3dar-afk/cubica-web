@@ -10,10 +10,12 @@ declare
  rid uuid:=gen_random_uuid(); rid2 uuid; qid uuid; oid uuid; pickup_id uuid; aid uuid; aid2 uuid; old_quote uuid; recent_quote uuid; referenced_quote uuid;
  token text:=repeat('a',64); v int; wanted_total numeric:=3501.75; old_total numeric;
 begin
- select id into a from public.profiles where role='customer' order by id limit 1;
- select id into b from public.profiles where role='customer' and id<>a order by id limit 1;
- select id into adm from public.profiles where role='admin' limit 1;
- if a is null or b is null or adm is null then raise exception 'Need existing customer/customer/admin for rollback QA'; end if;
+ a:=gen_random_uuid(); b:=gen_random_uuid(); adm:=gen_random_uuid();
+ insert into auth.users(id,aud,role,email,raw_user_meta_data) values
+ (a,'authenticated','authenticated',a::text||'@example.invalid','{}'),
+ (b,'authenticated','authenticated',b::text||'@example.invalid','{}'),
+ (adm,'authenticated','authenticated',adm::text||'@example.invalid','{}');
+ update public.profiles set role='admin' where id=adm;
  p1:=prefix||'-p1'; p2:=prefix||'-p2'; p3:=prefix||'-missing'; p4:=prefix||'-variants'; sid:=prefix||'-material';
  insert into public.products(id,name,price,stock) values(p1,'Fixture producto A',1000.25,100),(p2,'Fixture producto B',250.50,100),(p3,'Fixture sin dimensiones',500,100);
  insert into public.supplies(id,name,qty,unit) values(sid,'Fixture insumo no consumido',200,'unidades');
@@ -209,4 +211,3 @@ begin
 end $$;
 select 'delivery backend rollback QA passed' as result;
 rollback;
-

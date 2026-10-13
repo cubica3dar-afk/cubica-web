@@ -5,8 +5,10 @@ declare admin_id uuid; customer_id uuid; prefix text:='lifecycle-test-'||gen_ran
  p1 text; p2 text; p3 text; s1 text; s2 text; oid uuid; short_id uuid; missing_id uuid; cancelled_id uuid;
  result jsonb; snapshot jsonb; initial_customer_count integer; item1 bigint; item2 bigint; v integer;
 begin
- select id into admin_id from public.profiles where role='admin' limit 1;
- if admin_id is null then raise exception 'No existing admin for test'; end if;
+ admin_id:=gen_random_uuid();
+ insert into auth.users(id,aud,role,email,raw_user_meta_data)
+ values(admin_id,'authenticated','authenticated',admin_id::text||'@example.invalid','{}');
+ update public.profiles set role='admin' where id=admin_id;
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
  perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated')::text,true);
  p1:=prefix||'-p1';p2:=prefix||'-p2';p3:=prefix||'-p3';s1:=prefix||'-s1';s2:=prefix||'-s2';
@@ -107,7 +109,9 @@ begin
  perform public.get_admin_orders();
  perform set_config('role','none',true);
 
- select id into customer_id from public.profiles where role='customer' limit 1;
+ customer_id:=gen_random_uuid();
+ insert into auth.users(id,aud,role,email,raw_user_meta_data)
+ values(customer_id,'authenticated','authenticated',customer_id::text||'@example.invalid','{}');
  if customer_id is not null then
   perform set_config('request.jwt.claim.sub',customer_id::text,true);
   begin
@@ -135,7 +139,7 @@ begin
  perform set_config('request.jwt.claim.sub','',true);
  perform set_config('request.jwt.claims','{}',true);
  perform set_config('role','anon',true);
- result:=public.create_public_order(prefix||'-guest','Fixture guest','guest@example.invalid','','Efectivo','',jsonb_build_array(jsonb_build_object('product_id',p3,'qty',1)));
+ result:=public.create_delivery_order(prefix||'-guest','Fixture guest','guest@example.invalid','1122334455','Efectivo','',jsonb_build_array(jsonb_build_object('product_id',p3,'qty',1)),jsonb_build_object('mode','pickup','request_id',gen_random_uuid(),'quote_token',repeat('a',64)));
  perform set_config('role','none',true);
  if (select user_id from public.orders where id=(result->>'order_id')::uuid) is not null then raise exception 'Guest checkout identity'; end if;
  if (select qty from public.supplies where id=s1)<>45 then raise exception 'Guest checkout consumed supplies'; end if;
