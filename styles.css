@@ -27,6 +27,8 @@
 .mfa-secret code{overflow-wrap:anywhere;padding:10px 12px;border-radius:10px;background:#111827;color:#fff;letter-spacing:.08em}
 .mfa-code-form label{display:grid;gap:6px;min-width:220px}.mfa-code-form input{font-size:1.15rem;letter-spacing:.22em;font-variant-numeric:tabular-nums}
 .mfa-challenge-card{max-width:620px;margin:36px auto;padding:28px}.mfa-challenge-card h2{margin:4px 0 8px}
+body.mfa-pending #main-nav,body.mfa-pending .top-actions{display:none!important}
+body.mfa-pending #brand-home{cursor:default;pointer-events:none}
 @media (max-width:600px){
   .account-security-card,.mfa-challenge-card{padding:18px}.account-security-head{display:grid}.mfa-status{justify-self:start}
   .mfa-setup-grid{grid-template-columns:1fr}.mfa-qr-wrap{max-width:260px;width:100%;justify-self:center}
@@ -635,4 +637,3 @@ body.sidebar-open{overflow:hidden}
 #community-form{margin-top:22px;display:grid;gap:10px}#community-form label{font-weight:600}
 #community-message{color:#ffc475;overflow-wrap:anywhere}#product-performance-table table{min-width:1350px}
 @media(max-width:600px){.community-actions .btn{padding:8px 11px;font-size:12px}.community-replies{padding-left:12px}.community-author{gap:6px}.community-actions label{flex:1;min-width:130px}}
-

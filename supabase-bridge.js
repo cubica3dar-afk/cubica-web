@@ -76,12 +76,13 @@
     try{
       const {data,error}=await client.rpc("get_admin_mfa_status");
       if(error)throw error;
-      return data?.is_admin===true?data:{enforcement_enabled:false,current_level:"aal1",verified_factor_count:0,access_allowed:true};
+      if(data?.is_admin===true)return data;
+      throw new Error("Estado MFA administrativo inválido");
     }catch(error){
-      // The database remains the security boundary. During staged rollout, an
-      // unavailable status RPC must not lock the only administrator out.
+      // La base sigue siendo la barrera de seguridad. Con MFA obligatorio, la
+      // interfaz también falla de forma cerrada si no puede confirmar el estado.
       console.warn("No se pudo consultar el estado MFA administrativo.");
-      return {enforcement_enabled:false,current_level:"aal1",verified_factor_count:0,access_allowed:true,status_unavailable:true};
+      return {enforcement_enabled:true,current_level:"aal1",verified_factor_count:0,access_allowed:false,status_unavailable:true};
     }
   }
 
@@ -205,7 +206,7 @@
         window.cubicaCatalogEmpty=true;
         window.dispatchEvent(new CustomEvent("cubica:catalog-ready"));
 
-        if(session?.role === "admin" && !sessionStorage.getItem("cubica_catalog_migration_prompted")){
+        if(session?.role === "admin" && window.cubicaAdminMfaAccessAllowed?.()===true && !sessionStorage.getItem("cubica_catalog_migration_prompted")){
           sessionStorage.setItem("cubica_catalog_migration_prompted","1");
           setTimeout(async()=>{
             if(!confirm("La base de productos de Supabase está vacía. ¿Migrar ahora el catálogo actual de este navegador a Supabase?")) return;
@@ -268,7 +269,7 @@
       setDataBadge("Datos: Supabase","ok");
       renderProducts();
       window.cubicaOpenProductLink?.();
-      if(session?.role==="admin") renderFinishedStock();
+      if(session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true) renderFinishedStock();
     }catch(err){
       console.error("Catálogo Supabase",err);
       window.cubicaCatalogState="error";
@@ -367,7 +368,7 @@
   }
 
   async function saveProductsToSupabase(list,{removeMissing=true}={}){
-    if(session?.role!=="admin") return;
+    if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed?.()) return;
     if(catalogSyncing) return;
     catalogSyncing=true;
     try{
@@ -417,7 +418,7 @@
   };
 
   async function uploadProductMedia(file,type){
-    if(session?.role!=="admin") throw new Error("Solo el administrador puede subir archivos.");
+    if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed?.()) throw new Error("Verificá tu segundo factor para subir archivos.");
     if(!file) throw new Error("Archivo inválido.");
 
     const allowedImage=["image/jpeg","image/png","image/webp"];
@@ -454,7 +455,7 @@
   window.cubicaUploadProductMedia=uploadProductMedia;
 
   async function uploadProfileAvatar(file){
-    if(session?.role!=="admin") throw new Error("Solo el administrador puede cambiar la foto de perfil.");
+    if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed?.()) throw new Error("Verificá tu segundo factor para cambiar la foto de perfil.");
     if(!file) throw new Error("Archivo inválido.");
     const allowed=["image/jpeg","image/png","image/webp"];
     if(!allowed.includes(file.type)) throw new Error("Usá una imagen JPG, PNG o WEBP.");
@@ -500,7 +501,7 @@
   window.cubicaUploadProfileAvatar=uploadProfileAvatar;
 
   async function migrateProductsToSupabase(){
-    if(session?.role!=="admin") throw new Error("Solo el administrador puede migrar productos.");
+    if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed?.()) throw new Error("Verificá tu segundo factor para migrar productos.");
     if(!Array.isArray(products)||!products.length) throw new Error("No hay productos locales para migrar.");
     setDataBadge("Supabase: migrando…","pending");
     await saveProductsToSupabase(products,{removeMissing:false});
@@ -511,7 +512,7 @@
 
   // Cada cambio de productos hecho desde el panel admin se replica a Supabase.
   window.cubicaOnLocalWrite = function(key,value){
-    if(key!==STORAGE.products || session?.role!=="admin") return;
+    if(key!==STORAGE.products || session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed?.()) return;
     clearTimeout(catalogSyncTimer);
     catalogSyncTimer=setTimeout(async()=>{
       catalogSyncTimer=null;
@@ -654,4 +655,3 @@
     loadCatalogFromSupabase();
   });
 })();
-

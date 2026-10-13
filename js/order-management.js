@@ -4,6 +4,7 @@
   let current=null,busy=false,opening=0;
   const number=value=>new Intl.NumberFormat("es-AR",{maximumFractionDigits:4}).format(Number(value)||0);
   const e=escapeHtml;
+  const adminAccessAllowed=()=>session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
 
   function planHtml(plan){
     const missing=(plan.products||[]).filter(p=>p.recipe_missing);
@@ -12,7 +13,7 @@
   }
 
   function render(){
-    if(!current||session?.role!=="admin")return;
+    if(!current||!adminAccessAllowed())return;
     const {order:o,items,consumption,history,movements}=current;
     const closed=["Entregado","Cancelado"].includes(o.status);
     const index=states.indexOf(o.status);
@@ -47,20 +48,20 @@
   }
 
   window.openOrderManagement=async id=>{
-    if(session?.role!=="admin"||busy)return;
+    if(!adminAccessAllowed()||busy)return;
     const generation=++opening;
     try{
       await window.flushCubicaCatalog?.();
       await window.flushCubicaInventory?.();
       const {data,error}=await window.cubicaSupabase.rpc("get_order_management",{p_order_id:id});
       if(error)throw error;
-      if(generation!==opening||session?.role!=="admin")return;
+      if(generation!==opening||!adminAccessAllowed())return;
       current=data;render();openModal("order-management-modal");
     }catch(error){toast(error.message||"No se pudo cargar el pedido.");}
   };
 
   async function saveStatus(accept){
-    if(busy||!current||session?.role!=="admin")return;
+    if(busy||!current||!adminAccessAllowed())return;
     const next=$("order-next-status").value;
     const cancellation=next==="Cancelado"?current.items.map(i=>({item_id:i.id,
       disposition:document.querySelector(`[data-cancel-item="${i.id}"]`).value,
@@ -108,16 +109,15 @@
     }
   });
   window.openInventoryHistory=async type=>{
-    if(session?.role!=="admin")return;
+    if(!adminAccessAllowed())return;
     try{
       const {data,error}=await window.cubicaSupabase.from("inventory_movements").select("*")
         .not(type==="supplies"?"supply_id":"product_id","is",null).order("id",{ascending:false}).limit(200);
       if(error)throw error;
-      if(session?.role!=="admin")return;
+      if(!adminAccessAllowed())return;
       $("inventory-history-title").textContent=type==="supplies"?"Movimientos de insumos":"Movimientos de productos terminados";
       $("inventory-history-content").innerHTML=`<p class="muted">Últimos 200 movimientos. Historial registrado desde la activación de este bloque.</p>${(data||[]).map(m=>`<article class="order-consumption"><strong>${e(m.name)} · ${m.delta>0?"+":""}${number(m.delta)} ${e(m.unit)}</strong><br>${e(m.order_number||"Inventario")} · ${m.reason==="production"?"Inicio de producción":m.reason==="cancelled_finished"?"Pieza cancelada terminada al stock":m.reason==="manual_supply"?"Ajuste de insumos":"Venta o ajuste de productos terminados"}<br><span class="muted">${e(formatDate(m.created_at))} · ${number(m.quantity_before)} → ${number(m.quantity_after)}</span>${m.deficit>0?`<br><span class="order-shortage">Faltante autorizado: ${number(m.deficit)} ${e(m.unit)}</span>`:""}</article>`).join("")||"<p>Sin movimientos registrados.</p>"}`;
       openModal("inventory-history-modal");
     }catch(error){toast(error.message||"No se pudo cargar el historial.");}
   };
 })();
-

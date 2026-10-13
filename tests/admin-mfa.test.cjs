@@ -1,5 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
 const source=fs.readFileSync(path.join(__dirname,'../js/mfa-ui.js'),'utf8');
+const bridgeSource=fs.readFileSync(path.join(__dirname,'../supabase-bridge.js'),'utf8');
 const handlers={},windowHandlers={},nodes=new Map(),logs=[];
 function node(id){
  if(nodes.has(id))return nodes.get(id);
@@ -13,10 +14,11 @@ const client={auth:{mfa:{
  challengeAndVerify:async({code})=>code==='123456'?{data:{},error:null}:{data:null,error:{message:'invalid totp code'}},
  unenroll:async()=>({data:{},error:null})
 }}};
-const ctx={console:{log:x=>logs.push(x),error:x=>logs.push(x)},document:{getElementById:node,addEventListener:(type,fn)=>handlers[type]=fn},window:{session:{role:'admin',adminMfaEnforcement:false,adminMfaAal:'aal1'},cubicaSupabase:client,cubicaRefreshSupabaseSession:async()=>{},addEventListener:(type,fn)=>windowHandlers[type]=fn,confirm:()=>true},session:{role:'admin'},showSection:id=>ctx.lastSection=id,escapeHtml:String,setTimeout,CustomEvent:function(){}};
+const ctx={console:{log:x=>logs.push(x),error:x=>logs.push(x)},document:{getElementById:node,addEventListener:(type,fn)=>handlers[type]=fn},window:{session:{role:'admin',adminMfaEnforcement:false,adminMfaAal:'aal1'},cubicaSupabase:client,cubicaRefreshSupabaseSession:async()=>{},cubicaSignOut:async()=>{ctx.signedOut=true;ctx.session=null},addEventListener:(type,fn)=>windowHandlers[type]=fn,confirm:()=>true},session:{role:'admin'},showSection:id=>ctx.lastSection=id,escapeHtml:String,setTimeout,toast:()=>{},CustomEvent:function(){}};
 ctx.window.cubicaAdminMfaChallengeRequired=()=>ctx.session.role==='admin'&&ctx.session.adminMfaEnforcement===true&&ctx.session.adminMfaAccessAllowed!==true;
 vm.createContext(ctx);vm.runInContext(source,ctx);handlers.DOMContentLoaded();
 (async()=>{
+ assert.match(bridgeSource,/access_allowed:false,status_unavailable:true/,'unavailable MFA status must fail closed in the UI');
  await ctx.window.cubicaAdminMfa.refresh({route:false});
  assert.match(node('admin-mfa-status').textContent,/no configurado/i);
  await ctx.window.cubicaAdminMfa.beginEnrollment();
@@ -34,9 +36,12 @@ vm.createContext(ctx);vm.runInContext(source,ctx);handlers.DOMContentLoaded();
  node('mfa-challenge-code').value='123456';
  await ctx.window.cubicaAdminMfa.verifyChallenge({preventDefault(){}});
  assert.equal(ctx.lastSection,'profile');
+ assert(!handlers['mfa-challenge-back:click'],'profile escape must not exist during challenge');
+ await handlers['mfa-challenge-logout:click']();
+ assert(ctx.signedOut,'challenge must allow explicit sign out');
+ assert.equal(ctx.lastSection,'login');
  ctx.window.session={role:'customer'};ctx.session=ctx.window.session;
  windowHandlers['cubica:auth-ready']({detail:{role:'customer'}});
  assert(node('admin-mfa-card').classList.values.has('hidden'),'customer sees admin MFA card');
- console.log('PASS: admin enrollment, temporary secret handling, AAL1 challenge, invalid code, verified code, customer isolation');
+ console.log('PASS: admin enrollment, temporary secret handling, AAL1 challenge, invalid code, verified code, challenge logout, customer isolation');
 })().catch(e=>{console.error(e);process.exit(1)});
-

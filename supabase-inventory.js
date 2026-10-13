@@ -14,6 +14,21 @@
     if(typeof updateServerBadge==="function") updateServerBadge(text,mode);
   }
 
+  function adminAccessAllowed(){
+    return session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+  }
+
+  function inventoryErrorState(error){
+    const value=String(error?.message||"")+" "+String(error?.code||"")+" "+String(error?.status||"");
+    if(/401|403|42501|PGRST301|permission|unauthori|jwt/i.test(value)){
+      return {badge:"Supabase: acceso no autorizado",message:"No tenés autorización para consultar el inventario.",mode:"error"};
+    }
+    if(/failed to fetch|network|fetch failed|load failed|offline/i.test(value)){
+      return {badge:"Supabase: sin conexión",message:"No se pudo conectar con Supabase.",mode:"error"};
+    }
+    return {badge:"Supabase: error interno",message:"Supabase devolvió un error al consultar el inventario.",mode:"error"};
+  }
+
   async function fetchSuppliesCompat(){
     // v2: marca + orden personalizado.
     let result=await client.from("supplies")
@@ -41,8 +56,12 @@
   }
 
   async function loadInventoryFromSupabase(){
-    if(session?.role!=="admin") return;
+    if(!adminAccessAllowed()){
+      if(session?.role==="admin")setBadge("Supabase: MFA pendiente","warn");
+      return;
+    }
     try{
+      setBadge("Supabase: cargando inventario…","pending");
       const [{data:cats,error:catErr},{data:sup,error:supErr},{data:recipes,error:recErr}] = await Promise.all([
         client.from("supply_categories").select("name,sort_order,active").eq("active",true).order("sort_order"),
         fetchSuppliesCompat(),
@@ -96,7 +115,8 @@
       setBadge("Datos: Supabase","ok");
     }catch(err){
       console.error("Inventario Supabase",err);
-      setBadge("Supabase: inventario sin conexión","error");
+      const state=inventoryErrorState(err);
+      setBadge(state.badge,state.mode);
     }
   }
 
@@ -176,7 +196,7 @@
   }
 
   async function migrateInventoryToSupabase(){
-    if(session?.role!=="admin") throw new Error("Solo el administrador puede migrar el inventario.");
+    if(!adminAccessAllowed()) throw new Error("Verificá tu segundo factor para migrar el inventario.");
     inventorySyncing=true;
     try{
       setBadge("Supabase: migrando inventario…","pending");
@@ -197,7 +217,7 @@
   };
 
   async function syncInventoryNow(){
-    if(session?.role!=="admin" || inventorySyncing) return;
+    if(!adminAccessAllowed() || inventorySyncing) return;
     inventorySyncing=true;
     try{
       await saveSupplyCategoriesToSupabase(supplyCategories);
@@ -213,7 +233,7 @@
   const previousHook=window.cubicaOnLocalWrite;
   window.cubicaOnLocalWrite=function(key,value){
     if(typeof previousHook==="function") previousHook(key,value);
-    if(session?.role!=="admin") return;
+    if(!adminAccessAllowed()) return;
     if(![STORAGE.supplies,STORAGE.supplyCategories,STORAGE.products].includes(key)) return;
     clearTimeout(inventoryTimer);
     inventoryTimer=setTimeout(async()=>{
@@ -229,8 +249,12 @@
   };
 
   async function inspectInventoryAndOfferMigration({forcePrompt=false}={}){
-    if(session?.role!=="admin") return;
+    if(!adminAccessAllowed()){
+      if(session?.role==="admin")setBadge("Supabase: MFA pendiente","warn");
+      return;
+    }
     try{
+      setBadge("Supabase: consultando inventario…","pending");
       const {data,error}=await client.from("supplies").select("id").limit(1);
       if(error) throw error;
 
@@ -250,13 +274,18 @@
       }
     }catch(err){
       console.error("Revisión inventario Supabase",err);
-      setBadge("Supabase: inventario sin conexión","error");
-      toast("No se pudo revisar el inventario de Supabase.");
+      const state=inventoryErrorState(err);
+      setBadge(state.badge,state.mode);
+      toast(state.message);
     }
   }
 
   window.addEventListener("cubica:auth-ready", async(e)=>{
     if(e.detail?.role!=="admin") return;
+    if(e.detail?.mfa?.accessAllowed!==true){
+      setBadge("Supabase: MFA pendiente","warn");
+      return;
+    }
     // Espera un instante para que toda la app termine de inicializarse antes de preguntar.
     setTimeout(()=>inspectInventoryAndOfferMigration({forcePrompt:false}),500);
   });
@@ -267,6 +296,11 @@
       badge.onclick=async()=>{
         if(session?.role!=="admin"){
           toast("El estado de datos se gestiona desde Supabase.");
+          return;
+        }
+        if(!adminAccessAllowed()){
+          setBadge("Supabase: MFA pendiente","warn");
+          showSection("mfa");
           return;
         }
         await inspectInventoryAndOfferMigration({forcePrompt:true});

@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.addEventListener("click",()=>showSection(b.dataset.sidebarSection)));
 
   $("sidebar-avatar-button")?.addEventListener("click",()=>{
-    if(session?.role==="admin")$("profile-avatar-input")?.click();
+    if(session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true)$("profile-avatar-input")?.click();
   });
 
   $("profile-avatar-input")?.addEventListener("change",async e=>{
@@ -180,4 +180,3 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   initBudgetDefaults();
 });
-

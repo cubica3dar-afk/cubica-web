@@ -7,6 +7,10 @@
   let analyticsAvailable=true;
   let loadInProgress=false;
 
+  function adminAccessAllowed(){
+    return typeof session!=="undefined"&&session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+  }
+
   function analyticsSessionId(){
     let id=sessionStorage.getItem("cubica_analytics_session");
     if(!id){
@@ -41,7 +45,7 @@
   window.cubicaTrackEvent=trackEvent;
 
   async function loadAnalyticsEvents(){
-    if(loadInProgress || typeof session==="undefined" || session?.role!=="admin")return;
+    if(loadInProgress || !adminAccessAllowed())return;
     loadInProgress=true;
     try{
       const {data,error}=await client
@@ -68,7 +72,7 @@
   window.loadCubicaAnalytics=loadAnalyticsEvents;
 
   window.addEventListener("cubica:auth-ready",e=>{
-    if(e.detail?.role==="admin")loadAnalyticsEvents();
+    if(e.detail?.role==="admin"&&e.detail?.mfa?.accessAllowed===true)loadAnalyticsEvents();
   });
 
   document.addEventListener("DOMContentLoaded",()=>{

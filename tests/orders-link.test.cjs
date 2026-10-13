@@ -16,5 +16,8 @@ vm.runInContext('showSection("store")',ctx);assert.equal(ctx.window.location.sea
 ({ctx,nodes}=setup('https://cubica3d.ar/?view=orders#type=recovery',true));assert(!ctx.window.cubicaOpenOrdersLink(),'recovery takes priority');
 ({ctx,nodes}=setup('https://cubica3d.ar/',true));ctx.window.cubicaNavigateAfterSignIn();assert(!nodes.get('section-store').hidden,'ordinary login unchanged');
 ({ctx,nodes}=setup('https://cubica3d.ar/',true));ctx.session={role:'admin',adminMfaEnforcement:true,adminMfaAccessAllowed:false};ctx.window.cubicaNavigateAfterSignIn();assert(!nodes.get('section-mfa').hidden,'enforced admin AAL1 is routed to MFA');
-console.log('PASS: guest link, authenticated link, login race, OAuth fallback, manual navigation, recovery priority, ordinary login');
-
+for(const destination of ['store','profile','orders']){
+ vm.runInContext(`showSection("${destination}")`,ctx);
+ assert(!nodes.get('section-mfa').hidden,`AAL1 admin cannot navigate to ${destination}`);
+}
+console.log('PASS: guest link, authenticated link, login race, OAuth fallback, recovery priority, ordinary login, global MFA navigation lock');

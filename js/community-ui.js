@@ -118,14 +118,14 @@
   window.addEventListener("cubica:product-open",event=>load(event.detail.productId));
   window.addEventListener("cubica:auth-ready",()=>{
     if(productId&&window.cubicaProductPageActive?.())load(productId);
-    if(session?.role!=="admin"){$("community-moderation-list").textContent="";$("product-performance-table").textContent="";performanceRows=[];moderationGeneration++;performanceGeneration++;}
+    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true){$("community-moderation-list").textContent="";$("product-performance-table").textContent="";performanceRows=[];moderationGeneration++;performanceGeneration++;}
   });
 
   window.loadCommunityModeration=async more=>{
-    if(session?.role!=="admin")return;
+    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
     const version=++moderationGeneration;
     try{
-      const result=await rpc("get_community_moderation",{p_before_id:more?moderationCursor:null});if(version!==moderationGeneration||session?.role!=="admin")return;
+      const result=await rpc("get_community_moderation",{p_before_id:more?moderationCursor:null});if(version!==moderationGeneration||session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
       moderationCursor=result.next_cursor;
       const markup=result.comments.map(c=>`<article class="community-moderation-card"><strong>${html(c.product_name)} · ${html(c.author.name)}</strong><p class="muted">${html(formatDate(c.created_at))} · ${c.parent_id?"Respuesta":"Opinión"} · ${c.status==="hidden"?"Oculto":"Publicado"}${c.deleted_at?" · Eliminado":""}</p><p class="community-body">${html(c.body)}</p><button class="btn ghost" data-moderate-id="${c.id}" data-moderate-status="${c.status==="published"?"hidden":"published"}">${c.status==="published"?"Ocultar":"Restaurar visibilidad"}</button></article>`).join("");
       const host=$("community-moderation-list");if(more)host.insertAdjacentHTML("beforeend",markup);else host.innerHTML=markup||"<p>Sin comentarios.</p>";
@@ -133,16 +133,16 @@
     }catch(error){toast(error.message||"No se pudo cargar la moderación.");}
   };
   window.loadProductPerformance=async()=>{
-    if(session?.role!=="admin")return;
+    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
     const version=++performanceGeneration;$("product-performance-status").textContent="Cargando…";
     try{
       const days=$("product-performance-period").value;
-      const result=await rpc("get_product_performance",{p_days:days==="all"?null:Number(days)});if(version!==performanceGeneration||session?.role!=="admin")return;
+      const result=await rpc("get_product_performance",{p_days:days==="all"?null:Number(days)});if(version!==performanceGeneration||session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
       performanceRows=result.products;renderPerformance();$("product-performance-status").textContent="";
     }catch(error){if(version===performanceGeneration)$("product-performance-status").textContent=error.message||"No se pudo cargar el rendimiento.";}
   };
   function renderPerformance(){
-    if(session?.role!=="admin")return;
+    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
     const metric=$("product-performance-sort").value;
     const rows=[...performanceRows].sort((a,b)=>metric==="name"?a.name.localeCompare(b.name):(Number(b[metric])||0)-(Number(a[metric])||0));
     $("product-performance-table").innerHTML=`<table><thead><tr>${["Producto","Vistas","Sesiones","👍","👎 Interno","Comentarios","Carritos","Pedidos","Unidades","Facturación","Vista → carrito","Vista → pedido","Positivas"].map(s=>`<th>${s}</th>`).join("")}</tr></thead><tbody>${rows.map(p=>`<tr><td><strong>${html(p.name)}</strong>${p.active?"":'<small class="muted">Inactivo</small>'}</td>${[p.views,p.view_sessions,p.likes,p.dislikes,p.comments,p.carts,p.orders,p.units].map(n=>`<td>${count(n)}</td>`).join("")}<td>${money(p.revenue)}</td><td>${percent(p.view_to_cart)}</td><td>${percent(p.view_to_order)}</td><td>${percent(p.positive_ratio)}</td></tr>`).join("")||'<tr><td colspan="13">Sin productos.</td></tr>'}</tbody></table>`;
@@ -150,11 +150,10 @@
   document.addEventListener("DOMContentLoaded",()=>{
     $("community-moderation-more").onclick=()=>window.loadCommunityModeration(true);
     $("community-moderation-list").onclick=async event=>{
-      const button=event.target.closest("[data-moderate-id]");if(!button||session?.role!=="admin")return;
+      const button=event.target.closest("[data-moderate-id]");if(!button||session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
       button.disabled=true;try{await rpc("moderate_community_comment",{p_comment_id:Number(button.dataset.moderateId),p_status:button.dataset.moderateStatus});await window.loadCommunityModeration(false);}catch(error){toast(error.message);}finally{button.disabled=false;}
     };
     $("product-performance-period").onchange=window.loadProductPerformance;
     $("product-performance-sort").onchange=renderPerformance;
   });
 })();
-

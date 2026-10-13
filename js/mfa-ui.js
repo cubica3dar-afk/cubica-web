@@ -10,6 +10,7 @@
   const verified=()=>factors.filter(f=>f?.factor_type==="totp"&&f?.status==="verified");
   const pending=()=>factors.filter(f=>f?.factor_type==="totp"&&f?.status!=="verified");
   const isAdmin=()=>session?.role==="admin";
+  const hasAdminAccess=()=>isAdmin()&&window.cubicaAdminMfaAccessAllowed?.()===true;
   const state=()=>session||{};
 
   function message(target,text,type="info"){
@@ -82,6 +83,10 @@
 
   async function beginEnrollment(){
     if(busy||!isAdmin())return;
+    if(!hasAdminAccess()){
+      showSection("mfa");
+      return message("mfa-challenge-message","Verificá tu identidad antes de gestionar aplicaciones autenticadoras.","info");
+    }
     busy=true;message("admin-mfa-message","");renderProfile();
     try{
       await loadFactors();
@@ -146,6 +151,10 @@
 
   async function removeFactor(id,isPending=false){
     if(busy||!isAdmin()||!id)return;
+    if(!hasAdminAccess()){
+      showSection("mfa");
+      return message("mfa-challenge-message","Verificá tu identidad antes de gestionar aplicaciones autenticadoras.","info");
+    }
     const items=verified(),enforced=state().adminMfaEnforcement===true;
     if(!isPending&&state().adminMfaAal!=="aal2"){
       showSection("mfa");
@@ -172,7 +181,16 @@
     });
     el("admin-mfa-test")?.addEventListener("click",()=>{renderChallenge();showSection("mfa");});
     el("mfa-challenge-form")?.addEventListener("submit",verifyChallenge);
-    el("mfa-challenge-back")?.addEventListener("click",()=>showSection("profile"));
+    el("mfa-challenge-logout")?.addEventListener("click",async()=>{
+      const button=el("mfa-challenge-logout");if(button)button.disabled=true;
+      try{
+        await window.cubicaSignOut?.();
+        showSection("login");
+        toast("Sesión cerrada.");
+      }catch(error){
+        message("mfa-challenge-message",friendlyError(error,"No se pudo cerrar la sesión."),"error");
+      }finally{if(button)button.disabled=false;}
+    });
     el("admin-mfa-factor-list")?.addEventListener("click",event=>{
       const button=event.target.closest("[data-mfa-remove],[data-mfa-remove-pending]");if(!button)return;
       removeFactor(button.dataset.mfaRemove||button.dataset.mfaRemovePending,Boolean(button.dataset.mfaRemovePending));
@@ -185,4 +203,3 @@
   window.addEventListener("cubica:mfa-required",()=>refresh());
   window.cubicaAdminMfa={refresh,beginEnrollment,verifyChallenge,cleanCode};
 })();
-

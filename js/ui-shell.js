@@ -100,6 +100,9 @@ function renderAccountSidebar(){
 }
 function showSection(id){
   if(window.cubicaAuthCallbackBlocked && id!=="login")id="login";
+  // Un administrador con MFA obligatorio pendiente solo puede completar el
+  // desafío. El cierre de sesión se ofrece dentro de esa misma pantalla.
+  if(window.cubicaAdminMfaChallengeRequired?.() && id!=="mfa")id="mfa";
   // Al navegar voluntariamente a otra sección, dejar de forzar el destino del email.
   if((ordersLinkOpened||["checkout","cart"].includes(id)) && !["orders","login"].includes(id)){
     ordersLinkActive=false;
@@ -200,6 +203,13 @@ function renderProfile(){
 }
 function renderApp(){
   $("app").classList.remove("hidden");
+  const mfaPending=Boolean(window.cubicaAdminMfaChallengeRequired?.());
+  document.body.classList.toggle("mfa-pending",mfaPending);
+  const brandHome=$("brand-home");
+  if(brandHome){
+    brandHome.setAttribute("aria-disabled",mfaPending?"true":"false");
+    brandHome.tabIndex=mfaPending?-1:0;
+  }
   const logout=$("logout-btn"); if(logout)logout.classList.toggle("hidden",!session);
 
   const topImg=$("profile-avatar-top"), topFallback=$("profile-icon-fallback"), profileBtn=$("profile-btn");
@@ -274,4 +284,3 @@ function openModal(id){
 function closeModal(id){
   $(id)?.classList.add("hidden");
 }
-

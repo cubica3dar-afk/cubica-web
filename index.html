@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=20261012-community1">
+  <link rel="stylesheet" href="styles.css?v=mfa2">
   <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
   <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
   <link rel="stylesheet" href="styles-checkout.css?v=checkout1">
@@ -328,7 +328,7 @@
             <label>Aplicación autenticadora<select id="mfa-challenge-factor"></select></label>
             <label>Código<input id="mfa-challenge-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"></label>
             <button id="mfa-challenge-submit" class="btn primary" type="submit">Verificar identidad</button>
-            <button id="mfa-challenge-back" class="btn ghost" type="button">Volver a Mi perfil</button>
+            <button id="mfa-challenge-logout" class="btn ghost" type="button">Cerrar sesión</button>
           </form>
           <p id="mfa-challenge-empty" class="auth-feedback hidden" data-type="error">No hay un factor verificado disponible. La exigencia no debe activarse hasta completar la inscripción y el respaldo.</p>
           <p id="mfa-challenge-message" class="auth-feedback hidden" role="status" aria-live="polite"></p>
@@ -805,10 +805,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=20261009-refactor2"></script>
-  <script src="js/ui-shell.js?v=checkout1"></script>
+  <script src="js/ui-shell.js?v=mfa2"></script>
   <script src="js/store-ui.js?v=delivery1"></script>
   <script src="js/products-ui.js?v=checkout1"></script>
-  <script src="js/community-ui.js?v=checkout1"></script>
+  <script src="js/community-ui.js?v=mfa2"></script>
   <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
@@ -820,7 +820,7 @@
     </div>
   </div>
   <script src="js/orders-ui.js?v=delivery1"></script>
-  <script src="js/order-management.js?v=delivery1"></script>
+  <script src="js/order-management.js?v=mfa2"></script>
   <div id="inventory-history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-history-title">
     <div class="modal-card order-management-card">
       <button class="modal-close" data-close-modal="inventory-history-modal" aria-label="Cerrar">×</button>
@@ -831,19 +831,18 @@
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
 
 
-  <script src="js/app-init.js?v=checkout1"></script>
-  <script src="supabase-bridge.js?v=checkout1"></script>
-  <script src="js/mfa-ui.js?v=mfa1"></script>
+  <script src="js/app-init.js?v=mfa2"></script>
+  <script src="supabase-bridge.js?v=mfa2"></script>
+  <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
-  <script src="supabase-inventory.js?v=20261012-lifecycle1"></script>
-  <script src="supabase-sales.js?v=checkout1"></script>
+  <script src="supabase-inventory.js?v=mfa2"></script>
+  <script src="supabase-sales.js?v=mfa2"></script>
   <script src="js/delivery-ui.js?v=checkout1"></script>
   <script src="js/checkout-profile.js?v=checkout1"></script>
   <script src="js/checkout-ui.js?v=checkout1"></script>
 
-  <script src="supabase-analytics.js?v=20261006-1"></script>
+  <script src="supabase-analytics.js?v=mfa2"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
-

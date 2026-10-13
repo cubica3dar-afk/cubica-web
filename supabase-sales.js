@@ -13,6 +13,10 @@
     if(typeof updateServerBadge==="function") updateServerBadge(text,mode);
   }
 
+  function adminAccessAllowed(){
+    return session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+  }
+
   function remoteOrderToLocal(row){
     return {
       id:String(row.id),
@@ -140,7 +144,7 @@
   }
 
   async function loadSalesFromSupabase({migrateLocal=true}={}){
-    if(session?.role!=="admin" || salesLoading) return;
+    if(!adminAccessAllowed() || salesLoading) return;
     salesLoading=true;
     try{
       setBadge("Datos: Supabase…","pending");
@@ -206,8 +210,8 @@
   async function saveBudgetSupabase(){
     const b=window.lastBudget;
     if(!b) return;
-    if(session?.role!=="admin"){
-      toast("Iniciá sesión como administrador para guardar presupuestos.");
+    if(!adminAccessAllowed()){
+      toast(session?.role==="admin"?"Verificá tu segundo factor para guardar presupuestos.":"Iniciá sesión como administrador para guardar presupuestos.");
       return;
     }
 
@@ -241,7 +245,7 @@
 
   async function markOrderSupabase(id){
     const o=orders.find(x=>String(x.id)===String(id));
-    if(!o || session?.role!=="admin") return;
+    if(!o || !adminAccessAllowed()) return;
     await window.openOrderManagement(o.id);
   }
   window.markOrder=markOrderSupabase;
@@ -366,7 +370,7 @@
   }
 
   window.addEventListener("cubica:auth-ready",async(e)=>{
-    if(e.detail?.role==="admin") await loadSalesFromSupabase({migrateLocal:true});
+    if(e.detail?.role==="admin"&&e.detail?.mfa?.accessAllowed===true) await loadSalesFromSupabase({migrateLocal:true});
     if(e.detail?.role==="customer"){
       if(typeof window.cubicaClaimCustomerGuestOrders==="function")await window.cubicaClaimCustomerGuestOrders();
       await loadCustomerOrdersFromSupabase();
@@ -385,4 +389,3 @@
     if(save) save.onclick=saveBudgetSupabase;
   });
 })();
-

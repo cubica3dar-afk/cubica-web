@@ -48,10 +48,18 @@ browser.
 1. Email/password or Google establishes an AAL1 session.
 2. The app reads the filtered MFA gate status and routes the administrator to the
    TOTP challenge.
-3. Either verified authenticator can be selected.
-4. Supabase verifies the code and issues an AAL2 session.
-5. Only then do the administrative RPCs, RLS and Storage policies authorize the
+3. While AAL2 is pending, navigation is limited to the TOTP challenge or signing
+   out. Administrative inventory, sales and analytics requests are not started.
+4. Either verified authenticator can be selected.
+5. Supabase verifies the code and issues an AAL2 session. The app then loads the
+   administrative data automatically.
+6. Only then do the administrative RPCs, RLS and Storage policies authorize the
    administrator.
+
+If the status RPC is unavailable or returns an invalid response, the browser
+keeps the administrator at the challenge instead of assuming access. The data
+badge distinguishes this state and `MFA pendiente` from loading, connectivity,
+authorization and internal query errors.
 
 The activation migration is
 `20261013153000_admin_mfa_enforcement_on.sql`. The prepared emergency script is
@@ -62,4 +70,3 @@ after the incident is resolved.
 
 Do not edit deployed migrations in place. Any future activation or rollback must
 remain a separate, auditable database change.
-
