@@ -292,6 +292,47 @@
             <div><span>Cuenta</span><strong id="profile-page-account-type">—</strong></div>
           </div>
         </div>
+        <section id="admin-mfa-card" class="account-security-card card admin-only hidden" aria-labelledby="admin-mfa-title">
+          <div class="account-security-head">
+            <div><p class="eyebrow">SEGURIDAD DE LA CUENTA</p><h3 id="admin-mfa-title">Autenticación en dos pasos</h3></div>
+            <span id="admin-mfa-status" class="mfa-status" data-state="missing">Segundo factor no configurado</span>
+          </div>
+          <p id="admin-mfa-summary" class="muted"></p>
+          <ul id="admin-mfa-factor-list" class="mfa-factor-list"></ul>
+          <p id="admin-mfa-backup-note" class="mfa-backup-note hidden">Supabase no genera códigos de recuperación. Registrá un segundo autenticador en otro dispositivo o guardá su clave de forma separada y segura.</p>
+          <div class="mfa-actions">
+            <button id="admin-mfa-enroll" class="btn primary" type="button">Activar autenticación en dos pasos</button>
+            <button id="admin-mfa-test" class="btn secondary hidden" type="button">Comprobar código ahora</button>
+          </div>
+          <div id="admin-mfa-enrollment" class="mfa-enrollment hidden">
+            <div class="mfa-setup-grid">
+              <div class="mfa-qr-wrap"><img id="admin-mfa-qr" alt=""></div>
+              <div><h4>Configurá tu aplicación</h4><ol><li>Escaneá el QR con tu aplicación autenticadora.</li><li>Si no podés escanearlo, ingresá la clave manual.</li><li>Escribí el código de seis dígitos para verificar.</li></ol><div class="mfa-secret"><span>Clave manual temporal</span><code id="admin-mfa-secret"></code></div></div>
+            </div>
+            <form id="admin-mfa-enrollment-form" class="mfa-code-form">
+              <label>Código de verificación<input id="admin-mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"></label>
+              <button id="admin-mfa-verify" class="btn primary" type="submit">Verificar y activar</button>
+              <button id="admin-mfa-cancel" class="btn ghost" type="button">Cancelar</button>
+            </form>
+          </div>
+          <p id="admin-mfa-message" class="auth-feedback hidden" role="status" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section id="section-mfa" class="page-section hidden" aria-labelledby="mfa-challenge-title">
+        <div class="mfa-challenge-card card">
+          <p class="eyebrow">VERIFICACIÓN ADMINISTRATIVA</p>
+          <h2 id="mfa-challenge-title">Ingresá tu segundo factor</h2>
+          <p class="muted">Abrí tu aplicación autenticadora y escribí el código actual de seis dígitos.</p>
+          <form id="mfa-challenge-form" class="mfa-code-form">
+            <label>Aplicación autenticadora<select id="mfa-challenge-factor"></select></label>
+            <label>Código<input id="mfa-challenge-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"></label>
+            <button id="mfa-challenge-submit" class="btn primary" type="submit">Verificar identidad</button>
+            <button id="mfa-challenge-back" class="btn ghost" type="button">Volver a Mi perfil</button>
+          </form>
+          <p id="mfa-challenge-empty" class="auth-feedback hidden" data-type="error">No hay un factor verificado disponible. La exigencia no debe activarse hasta completar la inscripción y el respaldo.</p>
+          <p id="mfa-challenge-message" class="auth-feedback hidden" role="status" aria-live="polite"></p>
+        </div>
       </section>
 
       <section id="section-analytics" class="page-section hidden admin-only">
@@ -792,6 +833,7 @@
 
   <script src="js/app-init.js?v=checkout1"></script>
   <script src="supabase-bridge.js?v=checkout1"></script>
+  <script src="js/mfa-ui.js?v=mfa1"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=20261012-lifecycle1"></script>
   <script src="supabase-sales.js?v=checkout1"></script>

@@ -21,7 +21,14 @@ window.cubicaOpenOrdersLink = function(){
   return true;
 };
 window.cubicaNavigateAfterSignIn = function(){
+  if(window.cubicaAdminMfaChallengeRequired?.()){showSection("mfa");return;}
   if(!window.cubicaOpenOrdersLink()) showSection("store");
+};
+window.cubicaAdminMfaAccessAllowed=function(){
+  return session?.role!=="admin"||session?.adminMfaEnforcement!==true||session?.adminMfaAccessAllowed===true;
+};
+window.cubicaAdminMfaChallengeRequired=function(){
+  return session?.role==="admin"&&session?.adminMfaEnforcement===true&&session?.adminMfaAccessAllowed!==true;
 };
 
 const WELCOME_MESSAGES = [
@@ -54,6 +61,7 @@ function setupNav(){
 }
 function openAccountSidebar(){
   if(!session){showSection("login");return;}
+  if(window.cubicaAdminMfaChallengeRequired?.()){showSection("mfa");return;}
   const sidebar=$("account-sidebar"), overlay=$("account-sidebar-overlay");
   if(!sidebar||!overlay)return;
   renderAccountSidebar();
@@ -82,7 +90,7 @@ function renderAccountSidebar(){
     if(session?.avatarUrl){img.src=session.avatarUrl;img.classList.remove("hidden");fallback.classList.add("hidden");}
     else{img.removeAttribute("src");img.classList.add("hidden");fallback.classList.remove("hidden");}
   }
-  document.querySelectorAll(".account-sidebar .admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"));
+  document.querySelectorAll(".account-sidebar .admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed()));
   document.querySelectorAll(".account-sidebar .customer-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="customer"));
   document.querySelectorAll(".account-sidebar .session-only").forEach(el=>el.classList.toggle("hidden",!session));
   const ordersLabel=$("sidebar-orders-label");
@@ -110,10 +118,16 @@ function showSection(id){
     toast("Iniciá sesión para consultar tus pedidos.");
     id="login";
   }
-  if(["stock-finished","stock-supplies","budget","analytics","community","delivery"].includes(id) && session?.role!=="admin"){
-    toast("Esta sección es exclusiva del administrador.");
-    id="login";
+  if(["stock-finished","stock-supplies","budget","analytics","community","delivery"].includes(id)){
+    if(session?.role!=="admin"){
+      toast("Esta sección es exclusiva del administrador.");
+      id="login";
+    }else if(!window.cubicaAdminMfaAccessAllowed()){
+      toast("Verificá tu segundo factor para continuar.");
+      id="mfa";
+    }
   }
+  if(id==="mfa"&&session?.role!=="admin")id=session?"profile":"login";
   if(id==="profile" && !session){
     id="login";
   }
@@ -199,9 +213,9 @@ function renderApp(){
   document.querySelectorAll(".admin-only").forEach(el=>{
     if(el.closest?.("#account-sidebar")) return;
     if(el.classList.contains("page-section")){
-      if(session?.role!=="admin") el.classList.add("hidden");
+      if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed()) el.classList.add("hidden");
     }else{
-      el.classList.toggle("hidden",session?.role!=="admin");
+      el.classList.toggle("hidden",session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed());
     }
   });
   document.querySelectorAll(".customer-only").forEach(el=>{

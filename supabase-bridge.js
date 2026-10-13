@@ -71,6 +71,20 @@
     return data || { id:user.id, email:user.email || "", display_name:user.email || "", role:"customer" };
   }
 
+  async function adminMfaStatusFor(profile){
+    if(profile?.role!=="admin")return {enforcement_enabled:false,current_level:"aal1",verified_factor_count:0,access_allowed:true};
+    try{
+      const {data,error}=await client.rpc("get_admin_mfa_status");
+      if(error)throw error;
+      return data?.is_admin===true?data:{enforcement_enabled:false,current_level:"aal1",verified_factor_count:0,access_allowed:true};
+    }catch(error){
+      // The database remains the security boundary. During staged rollout, an
+      // unavailable status RPC must not lock the only administrator out.
+      console.warn("No se pudo consultar el estado MFA administrativo.");
+      return {enforcement_enabled:false,current_level:"aal1",verified_factor_count:0,access_allowed:true,status_unavailable:true};
+    }
+  }
+
   async function applySupabaseSession(sbSession, showToast=false){
     if(!sbSession?.user){
       session = null;
@@ -81,6 +95,7 @@
     }
 
     const profile = await profileFor(sbSession.user);
+    const adminMfa=await adminMfaStatusFor(profile);
     const metadata=sbSession.user.user_metadata||{};
     const rawProviders=Array.isArray(sbSession.user.app_metadata?.providers)
       ? sbSession.user.app_metadata.providers
@@ -97,11 +112,22 @@
       avatarUrl: metadata.avatar_url || metadata.picture || "",
       avatarPath: metadata.avatar_path || "",
       authProvider: provider,
-      authProviders
+      authProviders,
+      adminMfaEnforcement: adminMfa.enforcement_enabled===true,
+      adminMfaAal: adminMfa.current_level||"aal1",
+      adminMfaVerifiedFactors: Number(adminMfa.verified_factor_count)||0,
+      adminMfaAccessAllowed: adminMfa.access_allowed!==false,
+      adminMfaStatusUnavailable: adminMfa.status_unavailable===true
     };
     writeLocal(STORAGE.session, session);
     renderApp();
-    window.dispatchEvent(new CustomEvent("cubica:auth-ready",{detail:{role:session.role}}));
+    window.dispatchEvent(new CustomEvent("cubica:auth-ready",{detail:{role:session.role,mfa:{
+      enforced:session.adminMfaEnforcement,aal:session.adminMfaAal,
+      verifiedFactors:session.adminMfaVerifiedFactors,accessAllowed:session.adminMfaAccessAllowed
+    }}}));
+    if(session.role==="admin"&&session.adminMfaEnforcement&&!session.adminMfaAccessAllowed){
+      window.dispatchEvent(new CustomEvent("cubica:mfa-required"));
+    }
     if(showToast) toast(session.role === "admin" ? "Sesión de administrador iniciada" : "Sesión iniciada");
   }
 
@@ -573,6 +599,12 @@
   window.cubicaSendPasswordReset=sendPasswordReset;
   window.cubicaUpdatePassword=updatePassword;
   window.cubicaSignOut=signOutCubica;
+  window.cubicaRefreshSupabaseSession=async function(){
+    const {data,error}=await client.auth.getSession();
+    if(error)throw error;
+    await applySupabaseSession(data.session,false);
+    return data.session;
+  };
 
   // Suscribirse antes de getSession o consultas: PASSWORD_RECOVERY no se repite.
   // Diferir el trabajo para liberar el bloqueo interno de Auth antes de usar su API.
