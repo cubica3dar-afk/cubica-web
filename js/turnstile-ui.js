@@ -91,6 +91,17 @@
   function complete(){reset();message("");}
 
   document.addEventListener("DOMContentLoaded",()=>{if(enabled())load().catch(()=>{});});
+  document.addEventListener("cubica:turnstile-verify-probe",async()=>{
+    const host=el("checkout-turnstile");if(!host)return;
+    host.dataset.verificationProbe="pending";
+    try{
+      const result=await verifyOnly();
+      host.dataset.verificationProbe=result?.verified===true?"verified":"failed";
+    }catch(error){
+      handleFailure(error);
+      host.dataset.verificationProbe=`error:${String(error?.code||"verification_failed")}`;
+    }
+  });
   window.cubicaTurnstile={enabled,load,requireToken,createOrder,verifyOnly,handleFailure,complete,reset};
 })();
 
