@@ -31,6 +31,21 @@ function setup({siteverify=validSiteverify(),existing=null,createError=null,user
   return {send,calls,siteverifyCalls:()=>siteverifyCalls};
 }
 
+test("verificación aislada confirma Siteverify y secretos sin crear ni consultar pedidos",async()=>{
+  const s=setup(),response=await s.send({verification_only:true,turnstile_token:"XXXX.DUMMY.TOKEN.XXXX",client_order_id:requestId});
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,verified:true,configuration_ready:true});
+  assert.equal(s.siteverifyCalls(),1);assert.equal(s.calls.length,0);
+});
+
+test("la protección exige una sal privada explícita",async()=>{
+  const s=setup();
+  const originalSend=s.send;
+  const envValues={SUPABASE_URL:"https://project.supabase.co",SUPABASE_SERVICE_ROLE_KEY:"service-secret",SUPABASE_ANON_KEY:"publishable",TURNSTILE_SECRET_KEY:testSecret,TURNSTILE_ALLOW_TEST_KEYS:"true",TURNSTILE_EXPECTED_HOSTNAMES:"cubica3d.ar",TURNSTILE_EXPECTED_ACTION:"create_order",ORDER_RATE_LIMIT_SALT:""};
+  const handler=createHandler({env:name=>envValues[name],createClient:()=>({}),fetchImpl:async()=>{throw new Error("must not call Siteverify");}});
+  const response=await handler(new Request("https://project.supabase.co/functions/v1/create-order",{method:"POST",headers:{origin:"https://cubica3d.ar","content-type":"application/json"},body:JSON.stringify(baseBody())}));
+  assert.equal(response.status,503);assert.equal((await response.json()).error,"order_protection_not_configured");assert.equal(typeof originalSend,"function");
+});
+
 test("pedido invitado válido verifica Siteverify y usa solamente la RPC de servicio",async()=>{
   const s=setup(),response=await s.send();assert.equal(response.status,201);assert.equal(s.siteverifyCalls(),1);
   assert.deepEqual(s.calls.map(x=>x.name),["lookup_verified_delivery_order","create_verified_delivery_order"]);
@@ -87,5 +102,4 @@ test("normalización excluye precios, user_id y campos privados",()=>{
   const body=baseBody();body.items[0].price=1;body.user_id="spoof";body.delivery.actual_cost_ars=0;
   const normalized=normalizeOrderRequest(body);assert.equal(normalized.rpc.p_items[0].price,undefined);assert.equal(normalized.rpc.p_user_id,undefined);assert.equal(normalized.rpc.p_delivery.actual_cost_ars,undefined);
 });
-
 

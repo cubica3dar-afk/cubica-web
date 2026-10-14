@@ -73,6 +73,17 @@
     if(!response.ok){const error=new Error(friendlyError(result.error,result.retry_after));error.code=result.error||"order_creation_failed";error.retryAfter=result.retry_after||0;throw error;}
     return result;
   }
+  async function verifyOnly(){
+    const cfg=config(),verificationToken=await requireToken();
+    const response=await fetch(`${String(cfg.supabaseUrl).replace(/\/$/,"")}/functions/v1/create-order`,{
+      method:"POST",headers:{apikey:cfg.supabasePublishableKey,Authorization:`Bearer ${cfg.supabasePublishableKey}`,"Content-Type":"application/json"},
+      body:JSON.stringify({verification_only:true,turnstile_token:verificationToken,client_order_id:crypto.randomUUID()}),signal:AbortSignal.timeout(20000),
+    });
+    let result={};try{result=await response.json();}catch{/* fixed error below */}
+    if(!response.ok){const error=new Error(friendlyError(result.error,result.retry_after));error.code=result.error||"turnstile_verification_failed";throw error;}
+    reset();message("Verificación comprobada correctamente.");
+    return result;
+  }
   function handleFailure(error){
     const code=error?.code||"";
     if(/^turnstile_/.test(code)){reset();message(friendlyError(code,error.retryAfter),true);}
@@ -80,7 +91,6 @@
   function complete(){reset();message("");}
 
   document.addEventListener("DOMContentLoaded",()=>{if(enabled())load().catch(()=>{});});
-  window.cubicaTurnstile={enabled,load,requireToken,createOrder,handleFailure,complete,reset};
+  window.cubicaTurnstile={enabled,load,requireToken,createOrder,verifyOnly,handleFailure,complete,reset};
 })();
-
 

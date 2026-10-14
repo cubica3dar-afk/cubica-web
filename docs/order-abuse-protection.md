@@ -1,10 +1,10 @@
 # Order abuse protection and Turnstile rollout
 
-Status on 14 October 2026: **prepared, not enforced**. The service-only order
-path, atomic rate limits, Edge Function, frontend widget integration, activation
-script and rollback are deployed/prepared. The public Site Key is blank and the
-legacy `create_delivery_order` grant remains open so checkout continues working
-until production Cloudflare credentials are configured and verified.
+Status on 14 October 2026: **production widget configured, legacy route still
+open**. The service-only order path, atomic rate limits, Edge Function, frontend
+widget integration, activation script and rollback are deployed. The production
+Site Key is public in `github-config.js`; the legacy `create_delivery_order`
+grant remains open until the real widget and a controlled order are verified.
 
 Do not claim Turnstile protection is active before completing the activation
 checklist below.
@@ -44,6 +44,12 @@ The secret never appears in GitHub Pages, request JSON, responses or logs. Test
 keys are accepted only when `TURNSTILE_ALLOW_TEST_KEYS=true`; production
 deployment rejects Cloudflare dummy secrets by default.
 
+The Edge Function also accepts a narrow `verification_only` probe containing
+only a Turnstile token and UUID. It performs the same real Siteverify checks and
+returns before Auth, rate limits, order RPCs, stock or email. A successful probe
+therefore proves the widget, production secret, explicit private
+`ORDER_RATE_LIMIT_SALT`, hostname and action without creating a sale.
+
 Before Siteverify, the Edge Function performs a service-only exact replay lookup.
 A retry for an order that was already committed returns that result without using
 another Turnstile token, changing stock or enqueueing email again. A new request
@@ -51,7 +57,9 @@ must pass Siteverify before any order RPC runs. Provider failures fail closed.
 
 ## Rate limiting
 
-Counters are atomic PostgreSQL upserts in `private.order_rate_limits`. Keys are
+Counters are atomic PostgreSQL upserts in `private.order_rate_limits`. An
+explicit `ORDER_RATE_LIMIT_SALT` is mandatory; the Edge Function fails closed
+when it is absent. Keys are
 salted SHA-256 hashes; raw IPs, emails, user IDs and guest tokens are not stored.
 Expired rows are removed daily and retained for at most roughly two days after
 their window.
@@ -109,5 +117,4 @@ the protected path promptly after the incident.
 
 These recommendations are documented only; this block changes orders and email
 abuse protection as requested.
-
 

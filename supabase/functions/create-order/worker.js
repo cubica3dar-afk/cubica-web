@@ -62,6 +62,14 @@ export function normalizeOrderRequest(body){
   };
 }
 
+function normalizeVerificationRequest(body){
+  if(!body||typeof body!=="object"||Array.isArray(body)||body.verification_only!==true)throw new OrderError("invalid_request");
+  const token=text(body.turnstile_token,2048),requestId=text(body.client_order_id,40);
+  if(!token)throw new OrderError("turnstile_required",400);
+  if(!UUID.test(requestId))throw new OrderError("invalid_request");
+  return {token,requestId};
+}
+
 export function createBackendClient(url,serviceKey,fetchImpl=fetch){
   const base=url.replace(/\/$/,"");
   return {
@@ -151,12 +159,22 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
     if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{...headers,"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"authorization, apikey, x-client-info, content-type"}});
     if(request.method!=="POST")return Response.json({error:"method_not_allowed"},{status:405,headers});
 
-    const url=env("SUPABASE_URL"),serviceKey=env("SUPABASE_SERVICE_ROLE_KEY"),secret=env("TURNSTILE_SECRET_KEY");
-    if(!url||!serviceKey||!secret||TEST_SECRETS.has(secret)&&env("TURNSTILE_ALLOW_TEST_KEYS")!=="true"){
+    const url=env("SUPABASE_URL"),serviceKey=env("SUPABASE_SERVICE_ROLE_KEY"),secret=env("TURNSTILE_SECRET_KEY"),salt=env("ORDER_RATE_LIMIT_SALT");
+    if(!url||!serviceKey||!secret||!salt||TEST_SECRETS.has(secret)&&env("TURNSTILE_ALLOW_TEST_KEYS")!=="true"){
       return Response.json({error:"order_protection_not_configured"},{status:503,headers});
     }
     try{
-      const order=normalizeOrderRequest(await readJson(request));
+      const body=await readJson(request);
+      if(body?.verification_only===true){
+        const verification=normalizeVerificationRequest(body);
+        await verifyTurnstile({
+          token:verification.token,secret,remoteip:remoteAddress(request),idempotencyKey:verification.requestId,
+          expectedHostnames:new Set(String(env("TURNSTILE_EXPECTED_HOSTNAMES")||"cubica3d.ar,www.cubica3d.ar").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean)),
+          expectedAction:env("TURNSTILE_EXPECTED_ACTION")||"create_order",fetchImpl,now,
+        });
+        return Response.json({ok:true,verified:true,configuration_ready:true},{headers});
+      }
+      const order=normalizeOrderRequest(body);
       const client=createClient(url,serviceKey,fetchImpl);
       const authorization=request.headers.get("authorization")||"",bearer=authorization.match(/^Bearer\s+(.+)$/i)?.[1]||"";
       if(authorization&&!bearer)throw new OrderError("invalid_authentication",401);
@@ -185,7 +203,6 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
         throw error;
       }
 
-      const salt=env("ORDER_RATE_LIMIT_SALT")||serviceKey;
       const identityPrefix=userId?"auth":"guest",identityValue=userId||order.guestToken;
       const limits=[
         {key:await hashKey(identityPrefix,identityValue,salt,cryptoImpl),limit:positiveInt(env(userId?"ORDER_AUTH_10M_LIMIT":"ORDER_GUEST_10M_LIMIT"),userId?5:4,1,100),window_seconds:600},
@@ -202,5 +219,4 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
     }
   };
 }
-
 
