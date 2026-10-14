@@ -90,8 +90,7 @@
   }
   function complete(){reset();message("");}
 
-  document.addEventListener("DOMContentLoaded",()=>{if(enabled())load().catch(()=>{});});
-  document.addEventListener("cubica:turnstile-verify-probe",async()=>{
+  async function runVerificationProbe(){
     const host=el("checkout-turnstile");if(!host)return;
     host.dataset.verificationProbe="pending";
     try{
@@ -101,7 +100,15 @@
       handleFailure(error);
       host.dataset.verificationProbe=`error:${String(error?.code||"verification_failed")}`;
     }
+  }
+  document.addEventListener("DOMContentLoaded",()=>{
+    if(enabled())load().catch(()=>{});
+    const probe=el("checkout-turnstile-probe");
+    if(probe&&new URLSearchParams(location.search).get("turnstile_probe")==="1"){
+      probe.classList.remove("hidden");probe.addEventListener("click",runVerificationProbe);
+    }
   });
+  document.addEventListener("cubica:turnstile-verify-probe",runVerificationProbe);
   window.cubicaTurnstile={enabled,load,requireToken,createOrder,verifyOnly,handleFailure,complete,reset};
 })();
 
