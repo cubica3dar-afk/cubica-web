@@ -310,16 +310,22 @@
         supplyPlan:calculateOrderSupplyPlan(items)
       };
 
-      const {data,error}=await client.rpc("create_delivery_order",{
-        p_client_order_id:draftOrder.id,
-        p_customer_name:name,
-        p_customer_email:email,
-        p_phone:phone,
-        p_payment:draftOrder.payment,
-        p_notes:draftOrder.notes,
-        p_items:rpcItems,
-        p_delivery:delivery
-      });
+      const orderPayload={
+        client_order_id:draftOrder.id,customer_name:name,customer_email:email,
+        phone,payment:draftOrder.payment,notes:draftOrder.notes,items:rpcItems,delivery
+      };
+      let data,error=null;
+      if(window.cubicaTurnstile?.enabled()){
+        orderPayload.turnstile_token=await window.cubicaTurnstile.requireToken();
+        data=await window.cubicaTurnstile.createOrder(orderPayload);
+      }else{
+        const legacy=await client.rpc("create_delivery_order",{
+          p_client_order_id:draftOrder.id,p_customer_name:name,p_customer_email:email,
+          p_phone:phone,p_payment:draftOrder.payment,p_notes:draftOrder.notes,
+          p_items:rpcItems,p_delivery:delivery
+        });
+        data=legacy.data;error=legacy.error;
+      }
 
       if(error){
         throw error;
@@ -356,11 +362,13 @@
         });
       }
       toast(`${order.orderNumber||"Pedido registrado"}: pedido guardado en Cúbica.`);
+      window.cubicaTurnstile?.complete();
       await window.cubicaDelivery?.afterOrderSaved();
       form.reset();
       window.cubicaCheckoutComplete?.(order);
     }catch(err){
       console.error("Pedido Supabase",err);
+      window.cubicaTurnstile?.handleFailure(err);
       toast(err.message||"No se pudo registrar el pedido.");
     }finally{
       orderSubmitting=false;
@@ -389,3 +397,4 @@
     if(save) save.onclick=saveBudgetSupabase;
   });
 })();
+

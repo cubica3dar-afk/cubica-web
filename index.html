@@ -214,6 +214,7 @@
           </div>
           <aside class="checkout-summary" aria-labelledby="checkout-summary-title">
             <h2 id="checkout-summary-title">Tu pedido</h2><div id="checkout-summary-items"></div><div id="checkout-delivery-total-host"></div>
+            <div id="checkout-turnstile" class="checkout-turnstile hidden" aria-label="Verificación de seguridad"><div id="checkout-turnstile-widget"></div><p id="checkout-turnstile-message" role="status" aria-live="polite"></p></div>
             <p id="checkout-summary-message" role="status" aria-live="polite"></p>
             <button id="checkout-confirm-btn" class="btn primary full" type="submit" form="checkout-form">Confirmar pedido</button>
             <button id="checkout-summary-cart" class="btn ghost full" type="button">Revisar carrito</button>
@@ -801,7 +802,7 @@
     </div>
   </div>
 
-  <script src="github-config.js?v=20261009-refactor2"></script>
+  <script src="github-config.js?v=order-protection1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=20261009-refactor2"></script>
@@ -836,7 +837,8 @@
   <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=mfa2"></script>
-  <script src="supabase-sales.js?v=mfa2"></script>
+  <script src="js/turnstile-ui.js?v=order-protection1"></script>
+  <script src="supabase-sales.js?v=order-protection1"></script>
   <script src="js/delivery-ui.js?v=checkout1"></script>
   <script src="js/checkout-profile.js?v=checkout1"></script>
   <script src="js/checkout-ui.js?v=checkout1"></script>
@@ -846,3 +848,4 @@
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
+

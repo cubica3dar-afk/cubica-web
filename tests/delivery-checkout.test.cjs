@@ -9,11 +9,11 @@ const requestId="b6deef29-dcf3-4b7a-8b67-6d993e85d955";
 const delivery={mode:"shipping",request_id:requestId,quote_token:"a".repeat(64),quote_id:"581dd859-bc40-46c2-b8db-9929d4f82d61",address:{recipient:"Cliente",phone:"1112345678",street:"Rivadavia",number:"5000",city:"Caballito",province:"Ciudad Autónoma de Buenos Aires",postal_code:"1405"}};
 const serverOrder={order_id:"b6fe635b-67bd-4f54-bf81-afedaf9a180c",order_number:"CUB-1042",total:3499};
 
-function setup({user=null,respond,validate}={}){
+function setup({user=null,respond,validate,turnstile=null}={}){
   const domReady=[],calls=[],writes=[],events=[],steps=[],notifications=[];
   let validateCalls=0,afterSavedCalls=0,resetCalls=0;
   const button={disabled:false,textContent:"Confirmar pedido"},form={querySelector:()=>button,reset(){resetCalls++;steps.push("form-reset");}},nodes={"checkout-form":form,"customer-name":{value:"Cliente de prueba"},"customer-email":{value:"cliente@example.invalid"},"customer-phone":{value:"1112345678"},"payment-method":{value:"Transferencia"},"customer-notes":{value:"Nota"}};
-  const context={console:{error(){},log(){}},Date,String,Number,Math,session:user,cart:[{productId:"product-1",qty:2,color:"Blanco"}],products:[{id:"product-1",name:"Velador",price:1000,stock:7}],orders:[],STORAGE:{orders:"orders",products:"products",cart:"cart",quotes:"quotes"},$:id=>nodes[id]||null,read:(_key,fallback)=>fallback,writeLocal:(key,value)=>writes.push({key,value:JSON.parse(JSON.stringify(value))}),calculateOrderSupplyPlan:()=>({products:[],supplies:[]}),toast:message=>notifications.push(message),closeModal:id=>steps.push(`close:${id}`),renderProducts:()=>steps.push("render-products"),renderCart:()=>steps.push("render-cart"),renderOrders:()=>steps.push("render-orders"),renderAnalytics(){},document:{addEventListener:(name,fn)=>{if(name==="DOMContentLoaded")domReady.push(fn);}},window:{addEventListener(){},cubicaSupabase:{rpc:async(name,args)=>{
+  const context={console:{error(){},log(){}},Date,String,Number,Math,session:user,cart:[{productId:"product-1",qty:2,color:"Blanco"}],products:[{id:"product-1",name:"Velador",price:1000,stock:7}],orders:[],STORAGE:{orders:"orders",products:"products",cart:"cart",quotes:"quotes"},$:id=>nodes[id]||null,read:(_key,fallback)=>fallback,writeLocal:(key,value)=>writes.push({key,value:JSON.parse(JSON.stringify(value))}),calculateOrderSupplyPlan:()=>({products:[],supplies:[]}),toast:message=>notifications.push(message),closeModal:id=>steps.push(`close:${id}`),renderProducts:()=>steps.push("render-products"),renderCart:()=>steps.push("render-cart"),renderOrders:()=>steps.push("render-orders"),renderAnalytics(){},document:{addEventListener:(name,fn)=>{if(name==="DOMContentLoaded")domReady.push(fn);}},window:{addEventListener(){},cubicaTurnstile:turnstile,cubicaSupabase:{rpc:async(name,args)=>{
     calls.push({name,args:JSON.parse(JSON.stringify(args||{}))});
     if(name==="get_customer_orders")return {data:[{id:serverOrder.order_id,order_number:serverOrder.order_number,created_at:new Date().toISOString(),total:serverOrder.total,status:"Pendiente",order_items:[{product_id:"product-1",name:"Velador",qty:2,unit_price:1000,color:"Blanco"}]}],error:null};
     return respond?respond(name,args,calls.filter(c=>c.name==="create_delivery_order").length):{data:serverOrder,error:null};
@@ -53,5 +53,13 @@ test("RPC ausente no genera una venta local ni descuenta stock",async()=>{
 
 test("validación de entrega impide consultar el RPC hasta tener modalidad/cotización válida",async()=>{
   const s=setup({validate:async()=>{throw new Error("Calculá un envío vigente antes de confirmar el pedido.");}});await s.submit();assert.equal(s.calls.length,0);assert.equal(s.context.cart.length,1);assert.equal(s.writes.length,0);assert.match(s.notifications[0],/envío vigente/);assert.equal(s.button.disabled,false);
+});
+
+test("Turnstile activo usa la Edge Function y no la RPC pública",async()=>{
+  let protectedPayload,completed=0;
+  const turnstile={enabled:()=>true,requireToken:async()=>"valid-token",createOrder:async payload=>{protectedPayload=payload;return serverOrder;},complete:()=>completed++,handleFailure(){}};
+  const s=setup({turnstile});await s.submit();
+  assert.equal(s.calls.some(c=>c.name==="create_delivery_order"),false);assert.equal(protectedPayload.turnstile_token,"valid-token");
+  assert.equal(protectedPayload.client_order_id,requestId);assert.equal(protectedPayload.items[0].price,undefined);assert.equal(completed,1);assert.equal(s.context.orders.length,1);
 });
 

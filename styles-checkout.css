@@ -65,6 +65,7 @@
 #checkout-summary-message:empty{display:none}
 #checkout-summary-message.checkout-error{color:var(--danger)}
 #checkout-confirm-btn{width:100%;min-height:52px;font-size:16px;margin-top:24px}
+.checkout-turnstile{margin-top:18px;min-height:0}.checkout-turnstile:not(.hidden){display:grid;gap:7px;justify-items:center}.checkout-turnstile>p{min-height:18px;margin:0;color:var(--muted);font-size:12px;line-height:1.45;text-align:center}.checkout-turnstile>p[data-state="error"]{color:#ffb6b6}.checkout-turnstile iframe{max-width:100%}
 #checkout-summary-cart{margin-top:10px}
 .checkout-summary-assurance{font-size:12px;line-height:1.65;color:var(--muted);margin:14px 0 0;text-align:center}
 .checkout-empty{padding:32px;border:1px solid var(--line);background:var(--panel);border-radius:22px;max-width:720px}

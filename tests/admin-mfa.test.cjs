@@ -15,6 +15,7 @@ const client={auth:{mfa:{
  unenroll:async()=>({data:{},error:null})
 }}};
 const ctx={console:{log:x=>logs.push(x),error:x=>logs.push(x)},document:{getElementById:node,addEventListener:(type,fn)=>handlers[type]=fn},window:{session:{role:'admin',adminMfaEnforcement:false,adminMfaAal:'aal1'},cubicaSupabase:client,cubicaRefreshSupabaseSession:async()=>{},cubicaSignOut:async()=>{ctx.signedOut=true;ctx.session=null},addEventListener:(type,fn)=>windowHandlers[type]=fn,confirm:()=>true},session:{role:'admin'},showSection:id=>ctx.lastSection=id,escapeHtml:String,setTimeout,toast:()=>{},CustomEvent:function(){}};
+ctx.window.cubicaAdminMfaAccessAllowed=()=>ctx.session?.role!=="admin"||ctx.session?.adminMfaEnforcement!==true||ctx.session?.adminMfaAccessAllowed===true;
 ctx.window.cubicaAdminMfaChallengeRequired=()=>ctx.session.role==='admin'&&ctx.session.adminMfaEnforcement===true&&ctx.session.adminMfaAccessAllowed!==true;
 vm.createContext(ctx);vm.runInContext(source,ctx);handlers.DOMContentLoaded();
 (async()=>{
@@ -45,3 +46,4 @@ vm.createContext(ctx);vm.runInContext(source,ctx);handlers.DOMContentLoaded();
  assert(node('admin-mfa-card').classList.values.has('hidden'),'customer sees admin MFA card');
  console.log('PASS: admin enrollment, temporary secret handling, AAL1 challenge, invalid code, verified code, challenge logout, customer isolation');
 })().catch(e=>{console.error(e);process.exit(1)});
+

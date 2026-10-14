@@ -9,6 +9,11 @@ window.CUBICA_CONFIG = {
   supabaseUrl: "https://mymrbpwvghxmqqpzzdqk.supabase.co",
   supabasePublishableKey: "sb_publishable_jLx1W-mzf4pL2Z09MLr_Pw_tWS84NWV",
 
+  // Se completa con la Site Key pública de Cloudflare únicamente después de
+  // guardar TURNSTILE_SECRET_KEY en Supabase y verificar la Edge Function.
+  // Vacío mantiene el checkout actual durante la preparación por etapas.
+  turnstileSiteKey: "",
+
   // Backend opcional y exclusivamente dedicado al slicing (OrcaSlicer).
   // Vacío = visor 3D disponible, slicing real deshabilitado.
   slicerApiBase: ""
@@ -18,3 +23,4 @@ window.cubicaSlicerApiUrl = function(path){
   const base=String(window.CUBICA_CONFIG?.slicerApiBase||"").replace(/\/$/,"");
   return base ? base+path : path;
 };
+
