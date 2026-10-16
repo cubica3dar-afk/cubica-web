@@ -103,7 +103,9 @@
         let result={};try{result=await response.json();}catch{/* fixed result below */}
         return {status:response.status,result};
       };
-      const first=await verify(),second=await verify();
+      const first=await verify();
+      await new Promise(resolve=>setTimeout(resolve,2000));
+      const second=await verify();
       reset();
       if(first.status!==200||first.result?.verified!==true||second.status!==400||second.result?.error!=="turnstile_expired_or_used"){
         throw Object.assign(new Error("No se pudo comprobar el uso único del token."),{code:"turnstile_single_use_failed"});
