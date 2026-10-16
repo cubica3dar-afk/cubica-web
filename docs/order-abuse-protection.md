@@ -15,7 +15,7 @@ checklist below.
 |---|---|---|---|
 | `create_delivery_order` | `anon`, `authenticated` | Direct order and email abuse while staged | Server prices, quote/pickup validation and idempotency exist. Activation revokes this route after the Edge path is verified. |
 | `create_public_order` | none of `anon`/`authenticated` | Legacy checkout bypass | Already revoked; only internal transactional code reaches it. |
-| `create-order` Edge Function | public HTTP | Intended protected checkout | Fails closed until secret exists; validates Turnstile, Auth, hostname/action, size and request shape; calls service-only RPC. |
+| `create-order` Edge Function | public HTTP | Intended protected checkout | Fails closed until secrets exist; validates Turnstile, Auth, hostname/action, size and request shape; reserves a salted token hash atomically; calls service-only RPC. |
 | `lookup_verified_delivery_order` / `create_verified_delivery_order` | `service_role` only | Privileged order creation | Edge-only service credentials, exact replay binding, advisory lock, rate limits and existing transaction. |
 | `shipping-quotes` Edge Function | guests and authenticated users | Quote/provider abuse | CORS, request validation, verified Auth, guest capability, hashed network key and SQL rate limiting. Commercial carrier adapters remain disabled. |
 | `prepare_delivery_quote` / `finalize_delivery_quote` | `service_role` only | Forged quote snapshots | Edge-only; browser prices, user IDs and costs are ignored. |
@@ -38,22 +38,30 @@ The Edge Function calls Cloudflare Siteverify and requires:
 - hostname `cubica3d.ar` or `www.cubica3d.ar`;
 - action `create_order`;
 - a challenge timestamp within the token lifetime;
-- an unexpired, single-use token.
+- an unexpired token;
+- a new salted token hash in the private transactional replay ledger.
 
 The secret never appears in GitHub Pages, request JSON, responses or logs. Test
 keys are accepted only when `TURNSTILE_ALLOW_TEST_KEYS=true`; production
 deployment rejects Cloudflare dummy secrets by default.
 
-The Edge Function also accepts a narrow `verification_only` probe containing
-only a Turnstile token and UUID. It performs the same real Siteverify checks and
-returns before Auth, rate limits, order RPCs, stock or email. A successful probe
-therefore proves the widget, production secret, explicit private
-`ORDER_RATE_LIMIT_SALT`, hostname and action without creating a sale.
+During production diagnosis, Cloudflare accepted the same token twice even
+without an idempotency key. The cause remains unconfirmed. A temporary
+`verification_only` probe demonstrated the behavior without creating a sale and
+was removed after the test so production exposes no diagnostic endpoint.
+
+After successful Siteverify validation, `create-order` derives a salted SHA-256
+hash from the token and calls the service-only `consume_turnstile_token` RPC.
+The primary key on `private.turnstile_token_uses` allows exactly one request to
+reserve a token, including concurrent requests. The raw token and Cloudflare
+secret are never stored. Rows expire after 15 minutes and `pg_cron` removes
+expired hashes every 15 minutes.
 
 Before Siteverify, the Edge Function performs a service-only exact replay lookup.
 A retry for an order that was already committed returns that result without using
 another Turnstile token, changing stock or enqueueing email again. A new request
-must pass Siteverify before any order RPC runs. Provider failures fail closed.
+must pass Siteverify and reserve its token hash before the order creation RPC
+runs. Provider, database and replay failures fail closed.
 
 ## Rate limiting
 
@@ -117,4 +125,3 @@ the protected path promptly after the incident.
 
 These recommendations are documented only; this block changes orders and email
 abuse protection as requested.
-

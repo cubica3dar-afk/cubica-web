@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHandler, normalizeOrderRequest, verifyTurnstile } from "../supabase/functions/create-order/worker.js";
+import { createBackendClient, createHandler, normalizeOrderRequest, verifyTurnstile } from "../supabase/functions/create-order/worker.js";
 
 const requestId="b6deef29-dcf3-4b7a-8b67-6d993e85d955";
 const guestToken="a".repeat(64);
@@ -12,14 +12,23 @@ const baseBody=()=>({
 });
 const validSiteverify=()=>({success:true,challenge_ts:new Date().toISOString(),hostname:"cubica3d.ar",action:"create_order","error-codes":[]});
 
-function setup({siteverify=validSiteverify(),existing=null,createError=null,user=null,allowTest=true}={}){
+test("el cliente RPC acepta una respuesta void sin convertir el éxito en error",async()=>{
+  const client=createBackendClient("https://project.supabase.co","service-secret",async()=>new Response(null,{status:204}));
+  assert.deepEqual(await client.rpc("consume_turnstile_token",{}),{data:null,error:null});
+});
+
+function setup({siteverify=validSiteverify(),existing=null,createError=null,user=null,allowTest=true,replayLedger=new Set()}={}){
   const calls=[];
   const client={
     getUser:async()=>user?{user,error:false}:{user:null,error:true},
     rpc:async(name,args)=>{
       calls.push({name,args});
       if(name==="lookup_verified_delivery_order")return {data:existing,error:null};
-      if(createError)return {data:null,error:createError};
+      if(name==="consume_turnstile_token"){
+        if(replayLedger.has(args.p_token_hash))return {data:null,error:{code:"order_turnstile_replayed",retryAfter:0}};
+        replayLedger.add(args.p_token_hash);return {data:null,error:null};
+      }
+      if(name==="create_verified_delivery_order"&&createError)return {data:null,error:createError};
       return {data:{ok:true,order_id:"b6fe635b-67bd-4f54-bf81-afedaf9a180c",order_number:"CUB-1042",total:2000},error:null};
     },
   };
@@ -30,12 +39,6 @@ function setup({siteverify=validSiteverify(),existing=null,createError=null,user
   const send=(body=baseBody(),headers={})=>handler(new Request("https://project.supabase.co/functions/v1/create-order",{method:"POST",headers:{origin:"https://cubica3d.ar",apikey:"publishable",authorization:"Bearer publishable","content-type":"application/json",...headers},body:JSON.stringify(body)}));
   return {send,calls,siteverifyCalls:()=>siteverifyCalls};
 }
-
-test("verificación aislada confirma Siteverify y secretos sin crear ni consultar pedidos",async()=>{
-  const s=setup(),response=await s.send({verification_only:true,turnstile_token:"XXXX.DUMMY.TOKEN.XXXX",client_order_id:requestId});
-  assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,verified:true,configuration_ready:true});
-  assert.equal(s.siteverifyCalls(),1);assert.equal(s.calls.length,0);
-});
 
 test("la protección exige una sal privada explícita",async()=>{
   const s=setup();
@@ -48,15 +51,15 @@ test("la protección exige una sal privada explícita",async()=>{
 
 test("pedido invitado válido verifica Siteverify y usa solamente la RPC de servicio",async()=>{
   const s=setup(),response=await s.send();assert.equal(response.status,201);assert.equal(s.siteverifyCalls(),1);
-  assert.deepEqual(s.calls.map(x=>x.name),["lookup_verified_delivery_order","create_verified_delivery_order"]);
-  const created=s.calls[1].args;assert.equal(created.p_user_id,null);assert.equal(created.p_items[0].price,undefined);assert.equal(created.p_rate_limits.length,4);
+  assert.deepEqual(s.calls.map(x=>x.name),["lookup_verified_delivery_order","consume_turnstile_token","create_verified_delivery_order"]);
+  const created=s.calls[2].args;assert.equal(created.p_user_id,null);assert.equal(created.p_items[0].price,undefined);assert.equal(created.p_rate_limits.length,4);
   assert(created.p_rate_limits.every(x=>/^(guest|ip):[0-9a-f]{64}$/.test(x.key)));assert(!JSON.stringify(created.p_rate_limits).includes(guestToken));
 });
 
 test("pedido autenticado deriva el usuario del Auth API",async()=>{
   const user={id:"0acb1b4d-a367-4363-8bdc-e0030893968b"},s=setup({user});
-  const response=await s.send(baseBody(),{authorization:"Bearer real-user-jwt"});assert.equal(response.status,201);assert.equal(s.calls[1].args.p_user_id,user.id);
-  assert(s.calls[1].args.p_rate_limits.some(x=>x.key.startsWith("auth:")));
+  const response=await s.send(baseBody(),{authorization:"Bearer real-user-jwt"});assert.equal(response.status,201);assert.equal(s.calls[2].args.p_user_id,user.id);
+  assert(s.calls[2].args.p_rate_limits.some(x=>x.key.startsWith("auth:")));
 });
 
 test("reintento idempotente recupera el pedido antes de gastar otro token",async()=>{
@@ -81,14 +84,35 @@ test("token reutilizado vuelve a consultar idempotencia y no genera emails falso
   assert.equal(response.status,400);assert.equal((await response.json()).error,"turnstile_expired_or_used");assert.deepEqual(s.calls.map(x=>x.name),["lookup_verified_delivery_order","lookup_verified_delivery_order"]);
 });
 
+test("la barrera local rechaza el mismo token en otro pedido aunque Siteverify lo acepte",async()=>{
+  const s=setup(),first=baseBody(),second=baseBody();
+  second.client_order_id="11111111-1111-4111-8111-111111111111";
+  second.delivery={...second.delivery,request_id:second.client_order_id,quote_token:"b".repeat(64)};
+  let response=await s.send(first);assert.equal(response.status,201);
+  response=await s.send(second);assert.equal(response.status,400);assert.equal((await response.json()).error,"order_turnstile_replayed");
+  assert.equal(s.siteverifyCalls(),2);assert.equal(s.calls.filter(x=>x.name==="create_verified_delivery_order").length,1);
+  const reservation=s.calls.find(x=>x.name==="consume_turnstile_token");
+  assert.match(reservation.args.p_token_hash,/^turnstile:[0-9a-f]{64}$/);
+  assert(!JSON.stringify(reservation.args).includes("XXXX.DUMMY.TOKEN.XXXX"));
+});
+
+test("dos pedidos concurrentes con el mismo token crean como máximo uno",async()=>{
+  const s=setup(),first=baseBody(),second=baseBody();
+  second.client_order_id="22222222-2222-4222-8222-222222222222";
+  second.delivery={...second.delivery,request_id:second.client_order_id,quote_token:"b".repeat(64)};
+  const responses=await Promise.all([s.send(first),s.send(second)]),statuses=responses.map(x=>x.status).sort();
+  assert.deepEqual(statuses,[201,400]);
+  assert.equal(s.calls.filter(x=>x.name==="create_verified_delivery_order").length,1);
+});
+
 test("límite devuelve 429 y Retry-After sin intentar otra creación",async()=>{
   const s=setup({createError:{code:"order_rate_limit",retryAfter:93}}),response=await s.send();assert.equal(response.status,429);assert.equal(response.headers.get("retry-after"),"93");assert.equal((await response.json()).retry_after,93);
 });
 
 test("dos compradores detrás de una IP comparten solo el límite de red",async()=>{
   const a=setup(),b=setup();await a.send(baseBody(),{"cf-connecting-ip":"203.0.113.8"});
-  const changed=baseBody();changed.delivery.quote_token="b".repeat(64);await b.send(changed,{"cf-connecting-ip":"203.0.113.8"});
-  const aKeys=a.calls[1].args.p_rate_limits,bKeys=b.calls[1].args.p_rate_limits;
+  const changed=baseBody();changed.delivery.quote_token="b".repeat(64);changed.turnstile_token="SECOND.DUMMY.TOKEN";await b.send(changed,{"cf-connecting-ip":"203.0.113.8"});
+  const aKeys=a.calls[2].args.p_rate_limits,bKeys=b.calls[2].args.p_rate_limits;
   assert.notEqual(aKeys[0].key,bKeys[0].key);assert.equal(aKeys[2].key,bKeys[2].key);
 });
 
@@ -102,4 +126,3 @@ test("normalización excluye precios, user_id y campos privados",()=>{
   const body=baseBody();body.items[0].price=1;body.user_id="spoof";body.delivery.actual_cost_ars=0;
   const normalized=normalizeOrderRequest(body);assert.equal(normalized.rpc.p_items[0].price,undefined);assert.equal(normalized.rpc.p_user_id,undefined);assert.equal(normalized.rpc.p_delivery.actual_cost_ars,undefined);
 });
-

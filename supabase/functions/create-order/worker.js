@@ -62,14 +62,6 @@ export function normalizeOrderRequest(body){
   };
 }
 
-function normalizeVerificationRequest(body){
-  if(!body||typeof body!=="object"||Array.isArray(body)||body.verification_only!==true)throw new OrderError("invalid_request");
-  const token=text(body.turnstile_token,2048),requestId=text(body.client_order_id,40);
-  if(!token)throw new OrderError("turnstile_required",400);
-  if(!UUID.test(requestId))throw new OrderError("invalid_request");
-  return {token,requestId};
-}
-
 export function createBackendClient(url,serviceKey,fetchImpl=fetch){
   const base=url.replace(/\/$/,"");
   return {
@@ -98,7 +90,8 @@ export function createBackendClient(url,serviceKey,fetchImpl=fetch){
           }catch{/* return only a fixed safe code */}
           return {data:null,error:{code,retryAfter}};
         }
-        return {data:await response.json(),error:null};
+        const payload=await response.text();
+        return {data:payload?JSON.parse(payload):null,error:null};
       }catch{return {data:null,error:{code:"database_unavailable",retryAfter:0}};}
     }
   };
@@ -107,7 +100,9 @@ export function createBackendClient(url,serviceKey,fetchImpl=fetch){
 async function callRpc(client,name,args){
   const result=await client.rpc(name,args);
   if(result.error){
-    const status=result.error.code==="order_rate_limit"?429:result.error.code==="order_not_available"?403:503;
+    const status=result.error.code==="order_rate_limit"?429:
+      result.error.code==="order_turnstile_replayed"?400:
+      result.error.code==="order_not_available"?403:503;
     throw new OrderError(result.error.code||"database_error",status,result.error.retryAfter||0);
   }
   return result.data;
@@ -166,20 +161,8 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
     }
     try{
       const body=await readJson(request);
-      if(body?.verification_only===true){
-        const verification=normalizeVerificationRequest(body);
-        const siteverify=await verifyTurnstile({
-          token:verification.token,secret,remoteip:remoteAddress(request),idempotencyKey:null,
-          expectedHostnames:new Set(String(env("TURNSTILE_EXPECTED_HOSTNAMES")||"cubica3d.ar,www.cubica3d.ar").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean)),
-          expectedAction:env("TURNSTILE_EXPECTED_ACTION")||"create_order",fetchImpl,now,
-        });
-        return Response.json({ok:true,verified:true,configuration_ready:true,diagnostics:{
-          hostname:siteverify.hostname,action:siteverify.action,challenge_ts:siteverify.challenge_ts,
-          test_secret_in_use:TEST_SECRETS.has(secret),test_keys_allowed:env("TURNSTILE_ALLOW_TEST_KEYS")==="true",
-        }},{headers});
-      }
-      const order=normalizeOrderRequest(body);
       const client=createClient(url,serviceKey,fetchImpl);
+      const order=normalizeOrderRequest(body);
       const authorization=request.headers.get("authorization")||"",bearer=authorization.match(/^Bearer\s+(.+)$/i)?.[1]||"";
       if(authorization&&!bearer)throw new OrderError("invalid_authentication",401);
       let userId=null;
@@ -199,8 +182,12 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
           expectedHostnames:new Set(String(env("TURNSTILE_EXPECTED_HOSTNAMES")||"cubica3d.ar,www.cubica3d.ar").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean)),
           expectedAction:env("TURNSTILE_EXPECTED_ACTION")||"create_order",fetchImpl,now,
         });
+        await callRpc(client,"consume_turnstile_token",{
+          p_token_hash:await hashKey("turnstile",order.token,salt,cryptoImpl),
+          p_request_id:order.requestId,p_purpose:"order",
+        });
       }catch(error){
-        if(error instanceof OrderError&&error.code==="turnstile_expired_or_used"){
+        if(error instanceof OrderError&&["turnstile_expired_or_used","order_turnstile_replayed"].includes(error.code)){
           const replay=await callRpc(client,"lookup_verified_delivery_order",identity);
           if(replay)return Response.json(replay,{headers});
         }

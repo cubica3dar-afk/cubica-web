@@ -74,64 +74,12 @@
     if(!response.ok){const error=new Error(friendlyError(result.error,result.retry_after));error.code=result.error||"order_creation_failed";error.retryAfter=result.retry_after||0;throw error;}
     return result;
   }
-  async function verifyOnly(){
-    const cfg=config(),verificationToken=await requireToken();
-    const response=await fetch(`${String(cfg.supabaseUrl).replace(/\/$/,"")}/functions/v1/create-order`,{
-      method:"POST",headers:{apikey:cfg.supabasePublishableKey,Authorization:`Bearer ${cfg.supabasePublishableKey}`,"Content-Type":"application/json"},
-      body:JSON.stringify({verification_only:true,turnstile_token:verificationToken,client_order_id:crypto.randomUUID()}),signal:AbortSignal.timeout(20000),
-    });
-    let result={};try{result=await response.json();}catch{/* fixed error below */}
-    if(!response.ok){const error=new Error(friendlyError(result.error,result.retry_after));error.code=result.error||"turnstile_verification_failed";throw error;}
-    reset();message("Verificación comprobada correctamente.");
-    return result;
-  }
   function handleFailure(error){
     const code=error?.code||"";
     if(/^turnstile_/.test(code)||code==="order_turnstile_replayed"){reset();message(friendlyError(code,error.retryAfter),true);}
   }
   function complete(){reset();message("");}
 
-  async function runVerificationProbe(){
-    const host=el("checkout-turnstile");if(!host)return;
-    host.dataset.verificationProbe="pending";
-    try{
-      const cfg=config(),verificationToken=await requireToken();
-      const verify=async()=>{
-        const response=await fetch(`${String(cfg.supabaseUrl).replace(/\/$/,"")}/functions/v1/create-order`,{
-          method:"POST",headers:{apikey:cfg.supabasePublishableKey,Authorization:`Bearer ${cfg.supabasePublishableKey}`,"Content-Type":"application/json"},
-          body:JSON.stringify({verification_only:true,turnstile_token:verificationToken,client_order_id:crypto.randomUUID()}),signal:AbortSignal.timeout(20000),
-        });
-        let result={};try{result=await response.json();}catch{/* fixed result below */}
-        return {status:response.status,result};
-      };
-      const first=await verify();
-      const diagnostics=first.result?.diagnostics||{};
-      host.dataset.siteverifyHostname=String(diagnostics.hostname||"");
-      host.dataset.siteverifyAction=String(diagnostics.action||"");
-      host.dataset.siteverifyChallengeTs=String(diagnostics.challenge_ts||"");
-      host.dataset.siteverifyTestSecret=String(diagnostics.test_secret_in_use===true);
-      host.dataset.siteverifyTestKeysAllowed=String(diagnostics.test_keys_allowed===true);
-      host.dataset.siteverifyTokenFingerprint=String(diagnostics.token_fingerprint||"");
-      await new Promise(resolve=>setTimeout(resolve,2000));
-      const second=await verify();
-      reset();
-      if(first.status!==200||first.result?.verified!==true||second.status!==400||!["turnstile_expired_or_used","order_turnstile_replayed"].includes(second.result?.error)){
-        throw Object.assign(new Error("No se pudo comprobar el uso único del token."),{code:"turnstile_single_use_failed"});
-      }
-      message("Verificación real y uso único comprobados correctamente.");
-      host.dataset.verificationProbe="verified-single-use";
-    }catch(error){
-      handleFailure(error);
-      host.dataset.verificationProbe=`error:${String(error?.code||"verification_failed")}`;
-    }
-  }
-  document.addEventListener("DOMContentLoaded",()=>{
-    if(enabled())load().catch(()=>{});
-    const probe=el("checkout-turnstile-probe");
-    if(probe&&new URLSearchParams(location.search).get("turnstile_probe")==="1"){
-      probe.classList.remove("hidden");probe.addEventListener("click",runVerificationProbe);
-    }
-  });
-  document.addEventListener("cubica:turnstile-verify-probe",runVerificationProbe);
-  window.cubicaTurnstile={enabled,load,requireToken,createOrder,verifyOnly,handleFailure,complete,reset};
+  document.addEventListener("DOMContentLoaded",()=>{if(enabled())load().catch(()=>{});});
+  window.cubicaTurnstile={enabled,load,requireToken,createOrder,handleFailure,complete,reset};
 })();
