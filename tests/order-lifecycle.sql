@@ -83,7 +83,7 @@ begin
  result:=public.change_order_status(missing_id,'En producción',1);
  if result->>'confirmation_required'<>'true' or (result->'plan'->'products'->0->>'recipe_missing')::boolean is not true then raise exception 'Absent recipe treated as shortage'; end if;
  perform public.change_order_status(missing_id,'En producción',1,true,result->>'fingerprint');
- if exists(select 1 from public.inventory_movements where order_id=missing_id) then raise exception 'Invented recipe usage'; end if;
+ if exists(select 1 from public.inventory_movements where order_id=missing_id and reason='production') then raise exception 'Invented recipe usage'; end if;
  perform public.change_order_status(missing_id,'Preparado',2);
  if not exists(select 1 from jsonb_array_elements(public.get_customer_orders()) o where o->>'id'=missing_id::text and o->>'status'='Listo para entregar') then raise exception 'Prepared customer mapping'; end if;
  perform public.change_order_status(missing_id,'Entregado',3);
@@ -148,4 +148,3 @@ begin
 end;
 $$;
 rollback;
-

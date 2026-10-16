@@ -6,9 +6,11 @@ Ventas / Pedidos → Gestionar pedido muestra cliente, artículos, estado, recet
 
 Mi perfil → Mis pedidos recibe una proyección comercial del backend: Pedido recibido, Listo para entregar, Entregado o Cancelado. Las columnas internas de orders tampoco son legibles por REST para authenticated. Se mantienen las políticas RLS existentes; los administradores acceden a los pedidos completos mediante RPC con validación de auth.uid() y private.is_admin().
 
-## Consumo y faltantes
+## Reserva de productos terminados, consumo y faltantes
 
-create_public_order no fue modificado. Conserva su descuento de productos terminados en checkout; no descuenta materiales. El primer inicio de producción calcula recetas reales para TODAS las cantidades compradas, agrega materiales compartidos y guarda una fotografía inmutable del plan. order_material_consumptions tiene una clave primaria por pedido; los movimientos de producción también tienen unicidad por pedido/insumo.
+create_public_order conserva el descuento de productos terminados en checkout y no descuenta materiales. Desde la migración de trazabilidad, cada descuento queda registrado como `checkout_reserved`, vinculado al pedido y al artículo. El movimiento guarda la cantidad solicitada, la realmente reservada y el faltante, por lo que cubre stock completo, parcial y cero sin inventar unidades. La transacción silencia el movimiento genérico del trigger para que el mismo cambio no aparezca también como ajuste manual.
+
+El primer inicio de producción calcula recetas reales para TODAS las cantidades compradas, agrega materiales compartidos y guarda una fotografía inmutable del plan. order_material_consumptions tiene una clave primaria por pedido; los movimientos de producción también tienen unicidad por pedido/insumo.
 
 Se conservó supplies_qty_check (qty >= 0). Cuando el administrador acepta un faltante, se descuenta solo el stock disponible hasta cero y se registran por separado required y deficit en inventory_movements. El déficit no se presenta como stock físico consumido. Reponer inventario o resolver un déficit es una tarea manual; volver a seleccionar En producción no vuelve a consumir ni resuelve automáticamente ese faltante. Los insumos inactivos cuentan como no disponibles. Las recetas ausentes generan una advertencia explícita, sin movimientos inventados.
 
@@ -22,14 +24,18 @@ Nunca se devuelven materiales automáticamente. Cada artículo requiere una deci
 - Terminada y estándar reutilizable: el administrador indica la cantidad terminada y se incorpora una vez a products.stock.
 - Terminada y personalizada: se registra la decisión sin aumentar el stock comercial.
 
-Antes de producción no se permite declarar piezas fabricadas. Los pedidos antiguos que ya estaban Preparado permiten la decisión explícita, sin inventar consumos históricos. El esquema actual no clasifica automáticamente personalizaciones. La incorporación de piezas fabricadas no es un reembolso del descuento comercial que ya hace el checkout.
+Antes de producción, cancelar repone únicamente las unidades que ese pedido reservó realmente durante el checkout. La reposición se registra como `checkout_restocked`, conserva el vínculo con el pedido y el artículo y tiene una clave única que impide devolver dos veces ante recargas, reintentos o cancelaciones concurrentes. Si el checkout no descontó stock, la cancelación no crea unidades. Después de entrar en producción se mantiene la regla anterior: los materiales no vuelven automáticamente y cualquier pieza terminada requiere la decisión explícita del administrador.
+
+Antes de producción no se permite declarar piezas fabricadas. Los pedidos antiguos que ya estaban Preparado permiten la decisión explícita, sin inventar consumos históricos. El esquema actual no clasifica automáticamente personalizaciones.
 
 Movimientos, en Insumos y Productos terminados, muestra los últimos 200 cambios; el detalle del pedido conserva todos sus movimientos. Se registran ajustes de stock posteriores a la activación. Las referencias y nombres de los movimientos permanecen aunque se retire un insumo o producto del catálogo. Las ediciones del inventario y catálogo conservan los cambios concurrentes de stock; los cambios explícitos de cantidad comparan el valor previamente leído.
 
 ## Backend desplegado
 
 - Migración 20261012032310_order_lifecycle_and_inventory.sql.
+- Migraciones 20261016053000_checkout_inventory_traceability.sql y 20261016144500_inventory_correction_order_index.sql.
 - Tablas: order_status_history, order_material_consumptions e inventory_movements, con RLS y lectura exclusiva para administradores.
+- Auditoría privada inventory_movement_corrections, sin acceso directo de clientes, para conservar correcciones puntuales de movimientos históricos.
 - orders: lifecycle_version, production_started_at, ready_recorded y ready_email_sent.
 - RPC: change_order_status, get_order_management, get_admin_orders, get_customer_orders y save_admin_inventory_row.
 - Funciones privadas para el plan, guardia de estados y auditoría de stock.
@@ -39,6 +45,7 @@ El primer Preparado inserta una sola entrada ready en order_email_outbox. No hay
 
 ## Validación
 
+- tests/checkout-inventory-traceability.sql, ejecutado dentro de BEGIN/ROLLBACK: stock suficiente, parcial y cero; varios artículos; vínculo pedido/artículo; rechazo AAL1; cancelación AAL2; reposición exacta; reintento idempotente; ausencia de consumo BOM; rollback completo de fixtures y emails.
 - tests/order-lifecycle.sql, ejecutado en la base real dentro de BEGIN/ROLLBACK: checkout autenticado/invitado, cero consumo inicial y en Confirmado, consumo exacto y compartido, estados atrás/reintentos, versión desactualizada, bloqueo de UPDATE directo, faltantes con autorización y huella, receta ausente, cancelación antes/después, piezas estándar/personalizadas/no terminadas, email ready único y bandera separada, proyección comercial, permisos de columnas, rechazo de acceso cliente/anónimo y protección ante stock desactualizado. No quedan fixtures ni emails de prueba comprometidos.
 - 20 pruebas de correos/worker, incluida plantilla lista sin datos internos y la clave independiente ready/v1; retries, errores y autenticación del worker.
 - Pruebas de navegación: invitados, sesión iniciada, retorno Google, prioridad de recuperación y login normal.

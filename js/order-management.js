@@ -4,6 +4,14 @@
   let current=null,busy=false,opening=0;
   const number=value=>new Intl.NumberFormat("es-AR",{maximumFractionDigits:4}).format(Number(value)||0);
   const e=escapeHtml;
+  const movementReason=reason=>({
+    production:"Inicio de producción",
+    cancelled_finished:"Pieza cancelada terminada al stock",
+    checkout_reserved:"Reserva de stock para pedido",
+    checkout_restocked:"Reposición por cancelación previa a producción",
+    manual_supply:"Ajuste manual de insumos",
+    manual_finished:"Ajuste manual de productos terminados"
+  })[reason]||"Movimiento de inventario";
   const adminAccessAllowed=()=>session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
 
   function planHtml(plan){
@@ -33,7 +41,7 @@
       <div id="order-production-confirm" class="hidden"></div>
       <p id="order-management-message" role="status" aria-live="polite"></p>
       <details><summary>Historial de estados (${history.length})</summary>${history.map(h=>`<p>${e(h.from_status)} → <strong>${e(h.to_status)}</strong><br><span class="muted">${e(formatDate(h.created_at))}</span>${h.cancellation?`<br>${h.cancellation.map(c=>{const item=items.find(i=>String(i.id)===String(c.item_id));return `${e(item?.name||"Producto")}: ${c.disposition==="finished_standard"?"estándar al stock":c.disposition==="finished_personalized"?"personalizada sin stock":"sin pieza terminada"} (${number(c.qty)})`;}).join("<br>")}`:""}</p>`).join("")||'<p class="muted">Sin transiciones registradas. Los pedidos anteriores conservan su estado original.</p>'}</details>
-      <details><summary>Movimientos del pedido (${movements.length})</summary>${movements.map(m=>`<p><strong>${e(m.name)}</strong>: ${m.delta>0?"+":""}${number(m.delta)} ${e(m.unit)}<br><span class="muted">${m.reason==="production"?"Inicio de producción":"Pieza cancelada terminada al stock"} · ${e(formatDate(m.created_at))}</span>${m.deficit>0?`<br><span class="order-shortage">Necesario ${number(m.required)} · Faltante autorizado ${number(m.deficit)} ${e(m.unit)}</span>`:""}</p>`).join("")||'<p class="muted">Sin movimientos de materiales o piezas canceladas.</p>'}</details>`;
+      <details><summary>Movimientos del pedido (${movements.length})</summary>${movements.map(m=>`<p><strong>${e(m.name)}</strong>: ${m.delta>0?"+":""}${number(m.delta)} ${e(m.unit)}<br><span class="muted">${e(movementReason(m.reason))} · ${e(formatDate(m.created_at))}</span>${m.deficit>0?`<br><span class="order-shortage">Necesario ${number(m.required)} · Faltante ${number(m.deficit)} ${e(m.unit)}</span>`:""}</p>`).join("")||'<p class="muted">Sin movimientos de inventario para este pedido.</p>'}</details>`;
     window.cubicaDelivery?.renderAdminOrder(o.id,$("order-delivery-panel"));
     $("order-next-status")?.addEventListener("change",()=>{
       $("order-cancellation").classList.toggle("hidden",$("order-next-status").value!=="Cancelado");
@@ -116,7 +124,7 @@
       if(error)throw error;
       if(!adminAccessAllowed())return;
       $("inventory-history-title").textContent=type==="supplies"?"Movimientos de insumos":"Movimientos de productos terminados";
-      $("inventory-history-content").innerHTML=`<p class="muted">Últimos 200 movimientos. Historial registrado desde la activación de este bloque.</p>${(data||[]).map(m=>`<article class="order-consumption"><strong>${e(m.name)} · ${m.delta>0?"+":""}${number(m.delta)} ${e(m.unit)}</strong><br>${e(m.order_number||"Inventario")} · ${m.reason==="production"?"Inicio de producción":m.reason==="cancelled_finished"?"Pieza cancelada terminada al stock":m.reason==="manual_supply"?"Ajuste de insumos":"Venta o ajuste de productos terminados"}<br><span class="muted">${e(formatDate(m.created_at))} · ${number(m.quantity_before)} → ${number(m.quantity_after)}</span>${m.deficit>0?`<br><span class="order-shortage">Faltante autorizado: ${number(m.deficit)} ${e(m.unit)}</span>`:""}</article>`).join("")||"<p>Sin movimientos registrados.</p>"}`;
+      $("inventory-history-content").innerHTML=`<p class="muted">Últimos 200 movimientos. Historial registrado desde la activación de este bloque.</p>${(data||[]).map(m=>`<article class="order-consumption"><strong>${e(m.name)} · ${m.delta>0?"+":""}${number(m.delta)} ${e(m.unit)}</strong><br>${e(m.order_number||"Inventario")} · ${e(movementReason(m.reason))}<br><span class="muted">${e(formatDate(m.created_at))} · ${number(m.quantity_before)} → ${number(m.quantity_after)}</span>${m.deficit>0?`<br><span class="order-shortage">Faltante: ${number(m.deficit)} ${e(m.unit)}</span>`:""}</article>`).join("")||"<p>Sin movimientos registrados.</p>"}`;
       openModal("inventory-history-modal");
     }catch(error){toast(error.message||"No se pudo cargar el historial.");}
   };
