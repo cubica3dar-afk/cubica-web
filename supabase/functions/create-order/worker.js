@@ -116,7 +116,8 @@ async function callRpc(client,name,args){
 export async function verifyTurnstile({token,secret,remoteip,idempotencyKey,expectedHostnames,expectedAction,fetchImpl=fetch,now=Date.now}){
   let response;
   try{
-    const form=new URLSearchParams({secret,response:token,idempotency_key:idempotencyKey});
+    const form=new URLSearchParams({secret,response:token});
+    if(idempotencyKey)form.set("idempotency_key",idempotencyKey);
     if(remoteip&&remoteip!=="unknown")form.set("remoteip",remoteip);
     response=await fetchImpl("https://challenges.cloudflare.com/turnstile/v0/siteverify",{
       method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:form,signal:AbortSignal.timeout(8000),
@@ -168,7 +169,7 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
       if(body?.verification_only===true){
         const verification=normalizeVerificationRequest(body);
         await verifyTurnstile({
-          token:verification.token,secret,remoteip:remoteAddress(request),idempotencyKey:verification.requestId,
+          token:verification.token,secret,remoteip:remoteAddress(request),idempotencyKey:null,
           expectedHostnames:new Set(String(env("TURNSTILE_EXPECTED_HOSTNAMES")||"cubica3d.ar,www.cubica3d.ar").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean)),
           expectedAction:env("TURNSTILE_EXPECTED_ACTION")||"create_order",fetchImpl,now,
         });
@@ -219,4 +220,3 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
     }
   };
 }
-
