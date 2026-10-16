@@ -94,8 +94,22 @@
     const host=el("checkout-turnstile");if(!host)return;
     host.dataset.verificationProbe="pending";
     try{
-      const result=await verifyOnly();
-      host.dataset.verificationProbe=result?.verified===true?"verified":"failed";
+      const cfg=config(),verificationToken=await requireToken();
+      const verify=async()=>{
+        const response=await fetch(`${String(cfg.supabaseUrl).replace(/\/$/,"")}/functions/v1/create-order`,{
+          method:"POST",headers:{apikey:cfg.supabasePublishableKey,Authorization:`Bearer ${cfg.supabasePublishableKey}`,"Content-Type":"application/json"},
+          body:JSON.stringify({verification_only:true,turnstile_token:verificationToken,client_order_id:crypto.randomUUID()}),signal:AbortSignal.timeout(20000),
+        });
+        let result={};try{result=await response.json();}catch{/* fixed result below */}
+        return {status:response.status,result};
+      };
+      const first=await verify(),second=await verify();
+      reset();
+      if(first.status!==200||first.result?.verified!==true||second.status!==400||second.result?.error!=="turnstile_expired_or_used"){
+        throw Object.assign(new Error("No se pudo comprobar el uso único del token."),{code:"turnstile_single_use_failed"});
+      }
+      message("Verificación real y uso único comprobados correctamente.");
+      host.dataset.verificationProbe="verified-single-use";
     }catch(error){
       handleFailure(error);
       host.dataset.verificationProbe=`error:${String(error?.code||"verification_failed")}`;
@@ -111,4 +125,3 @@
   document.addEventListener("cubica:turnstile-verify-probe",runVerificationProbe);
   window.cubicaTurnstile={enabled,load,requireToken,createOrder,verifyOnly,handleFailure,complete,reset};
 })();
-
