@@ -314,22 +314,13 @@
         client_order_id:draftOrder.id,customer_name:name,customer_email:email,
         phone,payment:draftOrder.payment,notes:draftOrder.notes,items:rpcItems,delivery
       };
-      let data,error=null;
-      if(window.cubicaTurnstile?.enabled()){
-        orderPayload.turnstile_token=await window.cubicaTurnstile.requireToken();
-        data=await window.cubicaTurnstile.createOrder(orderPayload);
-      }else{
-        const legacy=await client.rpc("create_delivery_order",{
-          p_client_order_id:draftOrder.id,p_customer_name:name,p_customer_email:email,
-          p_phone:phone,p_payment:draftOrder.payment,p_notes:draftOrder.notes,
-          p_items:rpcItems,p_delivery:delivery
-        });
-        data=legacy.data;error=legacy.error;
+      if(!window.cubicaTurnstile?.enabled()){
+        const protectionError=new Error("La verificación de seguridad no está disponible temporalmente. Tus datos y el carrito siguen guardados; reintentá en unos minutos.");
+        protectionError.code="order_protection_not_configured";
+        throw protectionError;
       }
-
-      if(error){
-        throw error;
-      }
+      orderPayload.turnstile_token=await window.cubicaTurnstile.requireToken();
+      const data=await window.cubicaTurnstile.createOrder(orderPayload);
 
       const result=data||{};
       const order={
@@ -397,4 +388,3 @@
     if(save) save.onclick=saveBudgetSupabase;
   });
 })();
-

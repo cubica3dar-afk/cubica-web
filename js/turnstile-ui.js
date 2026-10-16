@@ -1,5 +1,5 @@
-/* Cloudflare Turnstile for the final order confirmation. The public site key is
-   optional during staged rollout; the secret exists only in the Edge Function. */
+/* Cloudflare Turnstile is mandatory for final order confirmation. The public
+   site key is safe in GitHub Pages; the secret exists only in the Edge Function. */
 (function(){
   "use strict";
   const config=()=>window.CUBICA_CONFIG||{};
@@ -12,6 +12,11 @@
     node.textContent=value||"";node.dataset.state=error?"error":"info";
   }
   function clearToken(){token="";}
+  function unavailableError(){
+    const error=new Error("La verificación de seguridad no está disponible temporalmente. Tus datos y el carrito siguen guardados; reintentá en unos minutos.");
+    error.code="order_protection_not_configured";
+    return error;
+  }
   function reset(){
     clearToken();
     if(widgetId!==null&&window.turnstile?.reset)window.turnstile.reset(widgetId);
@@ -42,7 +47,7 @@
     return readyPromise;
   }
   async function requireToken(){
-    if(!enabled())return null;
+    if(!enabled())throw unavailableError();
     await load();
     if(!token){message("Completá la verificación de seguridad antes de confirmar.",true);throw new Error("Completá la verificación de seguridad antes de confirmar el pedido.");}
     return token;
@@ -60,7 +65,7 @@
   }
   async function createOrder(payload){
     const cfg=config(),client=window.cubicaSupabase;
-    if(!enabled()||!client){const error=new Error(friendlyError("order_protection_not_configured"));error.code="order_protection_not_configured";throw error;}
+    if(!enabled()||!client)throw unavailableError();
     let authToken=cfg.supabasePublishableKey;
     try{const {data}=await client.auth.getSession();if(data?.session?.access_token)authToken=data.session.access_token;}catch{/* guest checkout */}
     let response;
@@ -80,6 +85,9 @@
   }
   function complete(){reset();message("");}
 
-  document.addEventListener("DOMContentLoaded",()=>{if(enabled())load().catch(()=>{});});
+  document.addEventListener("DOMContentLoaded",()=>{
+    if(enabled())load().catch(()=>{});
+    else{el("checkout-turnstile")?.classList.remove("hidden");message(unavailableError().message,true);}
+  });
   window.cubicaTurnstile={enabled,load,requireToken,createOrder,handleFailure,complete,reset};
 })();
