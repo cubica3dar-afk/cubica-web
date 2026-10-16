@@ -50,6 +50,7 @@
   function friendlyError(code,retryAfter){
     if(code==="order_rate_limit")return `Se realizaron demasiados intentos. Esperá ${Math.max(1,Math.ceil((Number(retryAfter)||60)/60))} minuto(s) y volvé a intentar.`;
     if(code==="turnstile_expired_or_used")return "La verificación venció o ya fue utilizada. Completala nuevamente.";
+    if(code==="order_turnstile_replayed")return "La verificación ya fue utilizada. Completala nuevamente.";
     if(["turnstile_invalid","turnstile_hostname_mismatch","turnstile_action_mismatch","turnstile_required"].includes(code))return "No pudimos validar la verificación de seguridad. Completala nuevamente.";
     if(code==="turnstile_unavailable")return "La verificación de seguridad no está disponible temporalmente. Reintentá en unos minutos.";
     if(code==="order_protection_not_configured")return "La protección del pedido todavía no está configurada. Contactanos si el problema continúa.";
@@ -86,7 +87,7 @@
   }
   function handleFailure(error){
     const code=error?.code||"";
-    if(/^turnstile_/.test(code)){reset();message(friendlyError(code,error.retryAfter),true);}
+    if(/^turnstile_/.test(code)||code==="order_turnstile_replayed"){reset();message(friendlyError(code,error.retryAfter),true);}
   }
   function complete(){reset();message("");}
 
@@ -110,10 +111,11 @@
       host.dataset.siteverifyChallengeTs=String(diagnostics.challenge_ts||"");
       host.dataset.siteverifyTestSecret=String(diagnostics.test_secret_in_use===true);
       host.dataset.siteverifyTestKeysAllowed=String(diagnostics.test_keys_allowed===true);
+      host.dataset.siteverifyTokenFingerprint=String(diagnostics.token_fingerprint||"");
       await new Promise(resolve=>setTimeout(resolve,2000));
       const second=await verify();
       reset();
-      if(first.status!==200||first.result?.verified!==true||second.status!==400||second.result?.error!=="turnstile_expired_or_used"){
+      if(first.status!==200||first.result?.verified!==true||second.status!==400||!["turnstile_expired_or_used","order_turnstile_replayed"].includes(second.result?.error)){
         throw Object.assign(new Error("No se pudo comprobar el uso único del token."),{code:"turnstile_single_use_failed"});
       }
       message("Verificación real y uso único comprobados correctamente.");
