@@ -1,6 +1,22 @@
 -- No committed accounts, orders, comments or email deliveries.
 begin;
 do $$
+begin
+ if has_function_privilege('anon','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('authenticated','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('anon','private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('authenticated','private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute') then
+  raise exception 'Legacy delivery checkout is still browser-callable';
+ end if;
+end
+$$;
+
+-- Keep the historical server-validation fixture while production remains
+-- closed. These grants exist only inside this rollback transaction.
+grant execute on function private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) to anon, authenticated;
+grant execute on function public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) to anon, authenticated;
+
+do $$
 declare a uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); adm uuid:=gen_random_uuid();
  old_email text:='old-'||gen_random_uuid()::text||'@example.invalid';
  email_a text:=a::text||'@example.invalid'; email_b text:=b::text||'@example.invalid';

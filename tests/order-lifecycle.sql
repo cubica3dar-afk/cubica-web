@@ -1,6 +1,22 @@
 -- Run against the actual migrated database. No fixture or email becomes committed.
 begin;
 do $$
+begin
+ if has_function_privilege('anon','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('authenticated','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('anon','private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('authenticated','private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute') then
+  raise exception 'Legacy delivery checkout is still browser-callable';
+ end if;
+end
+$$;
+
+-- The guest-order fixture below exercises lifecycle compatibility through the
+-- legacy wrapper. Its temporary grants are contained by this transaction.
+grant execute on function private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) to anon, authenticated;
+grant execute on function public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) to anon, authenticated;
+
+do $$
 declare admin_id uuid; customer_id uuid; prefix text:='lifecycle-test-'||gen_random_uuid()::text;
  p1 text; p2 text; p3 text; s1 text; s2 text; oid uuid; short_id uuid; missing_id uuid; cancelled_id uuid;
  result jsonb; snapshot jsonb; initial_customer_count integer; item1 bigint; item2 bigint; v integer;
@@ -148,3 +164,4 @@ begin
 end;
 $$;
 rollback;
+

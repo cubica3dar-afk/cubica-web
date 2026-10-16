@@ -26,7 +26,7 @@ begin
   end if;
 
   if has_function_privilege('anon','public.create_verified_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid,jsonb)','execute')
-    or has_function_privilege('authenticated','public.create_verified_delivery_order(text,text,text,text,text,jsonb,jsonb,uuid,jsonb)','execute')
+    or has_function_privilege('authenticated','public.create_verified_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid,jsonb)','execute')
     or not has_function_privilege('service_role','public.create_verified_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid,jsonb)','execute')
     or has_function_privilege('anon','public.lookup_verified_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid)','execute')
     or has_function_privilege('authenticated','public.lookup_verified_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid)','execute')
@@ -38,4 +38,5 @@ begin
   end if;
 end
 $$;
+
 

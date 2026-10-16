@@ -1,4 +1,4 @@
--- Staged order protection. Fixtures, orders, counters and emails roll back.
+-- Mandatory order protection. Fixtures, orders, counters and emails roll back.
 begin;
 do $$
 declare
@@ -22,8 +22,18 @@ begin
     or not has_function_privilege('service_role','public.create_verified_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid,jsonb)','execute') then
     raise exception 'Protected order RPC grants are incorrect';
   end if;
-  if not has_function_privilege('anon','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute') then
-    raise exception 'Staged migration activated the gate before production credentials';
+  if exists(
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname in ('public','private')
+      and p.proname in ('create_delivery_order','create_public_order')
+      and (
+        has_function_privilege('anon',p.oid,'execute')
+        or has_function_privilege('authenticated',p.oid,'execute')
+      )
+  ) then
+    raise exception 'A legacy order creation route is still browser-callable';
   end if;
   if exists(select 1 from pg_policies where schemaname='private' and tablename='order_rate_limits') then
     raise exception 'Rate counters unexpectedly expose an RLS policy';
@@ -102,6 +112,6 @@ begin
 
   perform set_config('role','none',true);
 end $$;
-select 'Staged order protection checks passed' as result;
+select 'Mandatory order protection checks passed' as result;
 rollback;
 

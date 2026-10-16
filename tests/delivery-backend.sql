@@ -2,6 +2,22 @@
 -- remain uncommitted and disappear at ROLLBACK; no real customer emails are sent.
 begin;
 do $$
+begin
+ if has_function_privilege('anon','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('authenticated','public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('anon','private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute')
+   or has_function_privilege('authenticated','private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)','execute') then
+  raise exception 'Legacy delivery checkout is still browser-callable';
+ end if;
+end
+$$;
+
+-- The rest of this transaction exercises the legacy wrapper's delivery rules as
+-- a fixture only. These temporary grants disappear with the final ROLLBACK.
+grant execute on function private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) to anon, authenticated;
+grant execute on function public.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) to anon, authenticated;
+
+do $$
 declare
  prefix text:='delivery-qa-'||gen_random_uuid()::text;
  a uuid; b uuid; adm uuid; p1 text; p2 text; p3 text; p4 text; sid text;
