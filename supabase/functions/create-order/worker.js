@@ -133,7 +133,7 @@ export async function verifyTurnstile({token,secret,remoteip,idempotencyKey,expe
   if(String(result.action||"")!==expectedAction)throw new OrderError("turnstile_action_mismatch",403);
   const challenged=Date.parse(result.challenge_ts);
   if(!Number.isFinite(challenged)||challenged>now()+60000||challenged<now()-330000)throw new OrderError("turnstile_expired_or_used",400);
-  return true;
+  return {hostname:String(result.hostname||""),action:String(result.action||""),challenge_ts:String(result.challenge_ts||"")};
 }
 
 export async function hashKey(prefix,value,salt,cryptoImpl=crypto){
@@ -168,12 +168,15 @@ export function createHandler({env,createClient=createBackendClient,fetchImpl=fe
       const body=await readJson(request);
       if(body?.verification_only===true){
         const verification=normalizeVerificationRequest(body);
-        await verifyTurnstile({
+        const siteverify=await verifyTurnstile({
           token:verification.token,secret,remoteip:remoteAddress(request),idempotencyKey:null,
           expectedHostnames:new Set(String(env("TURNSTILE_EXPECTED_HOSTNAMES")||"cubica3d.ar,www.cubica3d.ar").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean)),
           expectedAction:env("TURNSTILE_EXPECTED_ACTION")||"create_order",fetchImpl,now,
         });
-        return Response.json({ok:true,verified:true,configuration_ready:true},{headers});
+        return Response.json({ok:true,verified:true,configuration_ready:true,diagnostics:{
+          hostname:siteverify.hostname,action:siteverify.action,challenge_ts:siteverify.challenge_ts,
+          test_secret_in_use:TEST_SECRETS.has(secret),test_keys_allowed:env("TURNSTILE_ALLOW_TEST_KEYS")==="true",
+        }},{headers});
       }
       const order=normalizeOrderRequest(body);
       const client=createClient(url,serviceKey,fetchImpl);

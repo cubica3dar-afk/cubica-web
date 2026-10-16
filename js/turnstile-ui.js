@@ -104,6 +104,12 @@
         return {status:response.status,result};
       };
       const first=await verify();
+      const diagnostics=first.result?.diagnostics||{};
+      host.dataset.siteverifyHostname=String(diagnostics.hostname||"");
+      host.dataset.siteverifyAction=String(diagnostics.action||"");
+      host.dataset.siteverifyChallengeTs=String(diagnostics.challenge_ts||"");
+      host.dataset.siteverifyTestSecret=String(diagnostics.test_secret_in_use===true);
+      host.dataset.siteverifyTestKeysAllowed=String(diagnostics.test_keys_allowed===true);
       await new Promise(resolve=>setTimeout(resolve,2000));
       const second=await verify();
       reset();
