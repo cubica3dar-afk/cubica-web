@@ -16,8 +16,22 @@ let detailPurchaseBusy=false;
 let detailPurchaseVersion=0;
 let detailHistoryNavigation=false;
 
-function finishedCategories(){
-  return [...new Set([...DEFAULT_FINISHED_CATEGORIES, ...products.map(p=>p.category).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"es"));
+function finishedCategoryRows(){
+  const rows=(Array.isArray(productCategories)?productCategories:[]).map((category,index)=>({
+    name:String(category?.name??category??"").trim(),
+    sortOrder:Number(category?.sortOrder??category?.sort_order)||((index+1)*10),
+    active:category?.active!==false
+  })).filter(category=>category.name);
+  const known=new Set(rows.map(category=>category.name.toLocaleLowerCase("es")));
+  for(const name of products.map(product=>String(product.category||"").trim()).filter(Boolean)){
+    if(known.has(name.toLocaleLowerCase("es")))continue;
+    rows.push({name,sortOrder:(rows.length+1)*10,active:true,legacy:true});
+    known.add(name.toLocaleLowerCase("es"));
+  }
+  return rows.sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name,"es",{sensitivity:"base"}));
+}
+function finishedCategories({activeOnly=false}={}){
+  return finishedCategoryRows().filter(category=>!activeOnly||category.active).map(category=>category.name);
 }
 function normalizeProduct(p){
   p.colors=Array.isArray(p.colors)?p.colors:[];
@@ -156,10 +170,50 @@ function deleteProduct(id){if(!confirm("¿Eliminar este producto?"))return;produ
 function renderFinishedCategorySelect(selected=""){
   const select=$("finished-category");
   if(!select)return;
-  const cats=finishedCategories();
+  const cats=finishedCategories({activeOnly:true});
+  if(selected&&!cats.includes(selected))cats.push(selected);
   select.innerHTML=cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
   select.value=cats.includes(selected)?selected:(cats[0]||"");
 }
+function renderFinishedCategoryManager(){
+  const list=$("finished-category-list");if(!list)return;
+  const rows=finishedCategoryRows();
+  list.innerHTML=rows.map((category,index)=>{
+    const encoded=encodeURIComponent(category.name),count=products.filter(product=>product.category===category.name).length;
+    return `<div class="finished-category-row ${category.active?"":"is-inactive"}">
+      <input id="finished-category-name-${index}" value="${escapeHtml(category.name)}" maxlength="40" aria-label="Nombre de la categoría ${escapeHtml(category.name)}">
+      <button class="btn secondary" type="button" onclick="renameFinishedCategory('${encoded}',${index})">Renombrar</button>
+      <button class="btn ghost" type="button" onclick="toggleFinishedCategory('${encoded}',${category.active?"false":"true"})">${category.active?"Desactivar":"Activar"}</button>
+      <span class="finished-category-meta">${count} producto${count===1?"":"s"} · ${category.active?"Disponible para asignar":"No disponible para productos nuevos"}</span>
+    </div>`;
+  }).join("")||'<div class="inline-empty">Todavía no hay categorías.</div>';
+}
+function normalizedFinishedCategoryName(value){return String(value||"").trim().replace(/\s+/g," ");}
+async function manageFinishedCategory(action,name,{newName=null,active=null}={}){
+  if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return toast("Verificá tu segundo factor para administrar categorías.");
+  const cleanName=normalizedFinishedCategoryName(name),cleanNew=newName===null?null:normalizedFinishedCategoryName(newName);
+  if(!cleanName||(cleanNew!==null&&!cleanNew))return toast("La categoría necesita un nombre.");
+  if((cleanNew||cleanName).length>40)return toast("El nombre puede tener hasta 40 caracteres.");
+  try{
+    if(typeof window.cubicaManageProductCategory==="function"){
+      await window.cubicaManageProductCategory(action,cleanName,{newName:cleanNew,active});
+    }else if(action==="create"){
+      if(finishedCategoryRows().some(category=>category.name.toLocaleLowerCase("es")===cleanName.toLocaleLowerCase("es")))throw new Error("Esa categoría ya existe.");
+      productCategories.push({name:cleanName,sortOrder:(productCategories.length+1)*10,active:true});
+    }else if(action==="rename"){
+      const row=productCategories.find(category=>category.name===cleanName);if(row)row.name=cleanNew;
+      products.forEach(product=>{if(product.category===cleanName)product.category=cleanNew;});
+    }else if(action==="set_active"){
+      const row=productCategories.find(category=>category.name===cleanName);if(row)row.active=active===true;
+    }
+    writeLocal(STORAGE.productCategories,productCategories);
+    renderFinishedCategoryManager();renderFinishedStock();renderFinishedCategorySelect();renderProducts();
+    toast(action==="create"?"Categoría creada.":action==="rename"?"Categoría renombrada.":active?"Categoría activada.":"Categoría desactivada.");
+  }catch(error){console.error("Categorías de terminados",error);toast(error.message||"No se pudo actualizar la categoría.");}
+}
+async function createFinishedCategory(name){return manageFinishedCategory("create",name);}
+async function renameFinishedCategory(encoded,index){const current=decodeURIComponent(encoded),next=$("finished-category-name-"+index)?.value||"";if(normalizedFinishedCategoryName(next)===current)return toast("El nombre no cambió.");return manageFinishedCategory("rename",current,{newName:next});}
+async function toggleFinishedCategory(encoded,active){return manageFinishedCategory("set_active",decodeURIComponent(encoded),{active:active===true});}
 function renderFinishedColors(){
   const list=$("finished-colors-list"), empty=$("finished-colors-empty");
   list.innerHTML=finishedColors.map((c,i)=>`<div class="color-chip"><span class="color-dot" style="--color-dot:${escapeHtml(c.hex)}"></span><span>${escapeHtml(c.name)}</span><small>${escapeHtml(c.hex)}</small><button type="button" onclick="removeFinishedColor(${i})">×</button></div>`).join("");
@@ -527,6 +581,10 @@ window.setFinishedPage=setFinishedPage;
 window.setFinishedPageSize=setFinishedPageSize;
 window.toggleProductPublication=toggleProductPublication;
 window.moveFinishedProduct=moveFinishedProduct;
+window.createFinishedCategory=createFinishedCategory;
+window.renameFinishedCategory=renameFinishedCategory;
+window.toggleFinishedCategory=toggleFinishedCategory;
+window.renderFinishedCategoryManager=renderFinishedCategoryManager;
 window.openProductDetail=openProductDetail;
 window.setProductMedia=setProductMedia;
 window.changeProductMedia=changeProductMedia;
@@ -536,5 +594,6 @@ window.setProductQuantity=setProductQuantity;
 window.addDetailToCart=addDetailToCart;
 window.buyProductNow=buyProductNow;
 window.backToProductCatalog=backToProductCatalog;
+window.cubicaFinishedCategoryInternals={finishedCategoryRows,finishedCategories,normalizedFinishedCategoryName};
 
 
