@@ -173,8 +173,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     renderBudgetSupplyRows();
     calculateBudget();
   };
-  $("save-budget").onclick=saveBudget;
-  $("copy-budget").onclick=copyBudget;
+  // Persistencia, emisión y copiado se enlazan en budget-ui.js.
 
   document.querySelectorAll(".period-tabs .tab[data-period]").forEach(t=>t.onclick=()=>{
     salesPeriod=t.dataset.period;
@@ -193,4 +192,3 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   initBudgetDefaults();
 });
-

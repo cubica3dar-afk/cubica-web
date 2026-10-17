@@ -29,6 +29,7 @@
     $("order-management-title").textContent=`Pedido ${o.order_number||o.id}`;
     $("order-management-content").innerHTML=`
       <div class="order-management-summary"><strong class="order-status">${e(o.status)}</strong><strong>${money(o.total)}</strong></div>
+      ${o.origin==="budget"?`<p class="budget-private-note"><strong>Pedido interno de presupuesto</strong><br>${e(o.quote_id||"")} · ${e(o.commercial_status||"accepted_unpaid")}<br>Sin emails automáticos y fuera del historial del cliente.</p>`:""}
       <p><strong>${e(o.customer_name)}</strong><br><span class="muted">${e(o.customer_email)} · ${e(o.phone||"Teléfono no informado")}<br>Pago: ${e(o.payment)}</span></p>
       <p class="order-notes">${e(o.notes||"Sin observaciones")}</p>
       <div id="order-delivery-panel"></div><h3>Productos</h3><ul>${items.map(i=>`<li>${e(i.name)}${i.color?` · ${e(i.color)}`:""} × ${number(i.qty)}</li>`).join("")}</ul>

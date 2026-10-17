@@ -31,6 +31,10 @@
       notes:row.notes||"",
       total:Number(row.total)||0,
       status:row.status||"Pendiente",
+      origin:row.origin||"store",
+      quoteId:row.quote_id||null,
+      quoteVersion:row.quote_version||null,
+      commercialStatus:row.commercial_status||"store_checkout",
       lifecycleVersion:Number(row.lifecycle_version)||0,
       productionStartedAt:row.production_started_at||null,
       username:row.username||"guest",
@@ -51,26 +55,10 @@
     };
   }
 
-  function remoteQuoteToLocal(row){
-    return {
-      id:String(row.id),
-      date:row.created_at,
-      title:row.title||"",
-      data:row.data||{},
-      summary:row.summary||""
-    };
-  }
-
   async function fetchRemoteSales(){
-    const [{data:orderRows,error:orderErr},{data:quoteRows,error:quoteErr}]=await Promise.all([
-      client.rpc("get_admin_orders"),
-      client.from("quotes")
-        .select("id,created_at,title,data,summary,created_by")
-        .order("created_at",{ascending:false})
-    ]);
+    const {data:orderRows,error:orderErr}=await client.rpc("get_admin_orders");
     if(orderErr) throw orderErr;
-    if(quoteErr) throw quoteErr;
-    return {orderRows:orderRows||[],quoteRows:quoteRows||[]};
+    return {orderRows:orderRows||[]};
   }
 
   async function migrateLocalOrders(localOrders,remoteRows){
@@ -124,25 +112,6 @@
     return migrated;
   }
 
-  async function migrateLocalQuotes(localQuotes,remoteRows){
-    if(!Array.isArray(localQuotes)||!localQuotes.length) return 0;
-    const remoteIds=new Set((remoteRows||[]).map(r=>String(r.id)));
-    const missing=localQuotes.filter(q=>q?.id && !remoteIds.has(String(q.id)));
-    if(!missing.length) return 0;
-
-    const rows=missing.map(q=>({
-      id:String(q.id),
-      created_at:q.date||new Date().toISOString(),
-      title:q.title||null,
-      data:q.data||{},
-      summary:String(q.summary||""),
-      created_by:session?.supabaseUserId||null
-    }));
-    const {error}=await client.from("quotes").insert(rows);
-    if(error) throw error;
-    return rows.length;
-  }
-
   async function loadSalesFromSupabase({migrateLocal=true}={}){
     if(!adminAccessAllowed() || salesLoading) return;
     salesLoading=true;
@@ -150,20 +119,16 @@
       setBadge("Datos: Supabase…","pending");
 
       const localOrders=read(STORAGE.orders,[]);
-      const localQuotes=read(STORAGE.quotes,[]);
       let remote=await fetchRemoteSales();
 
-      let migratedOrders=0,migratedQuotes=0;
+      let migratedOrders=0;
       if(migrateLocal){
         migratedOrders=await migrateLocalOrders(localOrders,remote.orderRows);
-        migratedQuotes=await migrateLocalQuotes(localQuotes,remote.quoteRows);
-        if(migratedOrders||migratedQuotes) remote=await fetchRemoteSales();
+        if(migratedOrders) remote=await fetchRemoteSales();
       }
 
       orders=remote.orderRows.map(remoteOrderToLocal);
-      const quotes=remote.quoteRows.map(remoteQuoteToLocal);
       writeLocal(STORAGE.orders,orders);
-      writeLocal(STORAGE.quotes,quotes);
       salesReady=true;
 
       if(session?.role==="admin"){
@@ -172,8 +137,8 @@
       }
       setBadge("Datos: Supabase","ok");
 
-      if(migratedOrders||migratedQuotes){
-        toast(`Supabase: migrados ${migratedOrders} pedido(s) y ${migratedQuotes} presupuesto(s).`);
+      if(migratedOrders){
+        toast(`Supabase: migrados ${migratedOrders} pedido(s).`);
       }
     }catch(err){
       console.error("Ventas/presupuestos Supabase",err);
@@ -206,42 +171,6 @@
     }
   }
   window.loadCubicaCustomerOrdersFromSupabase=loadCustomerOrdersFromSupabase;
-
-  async function saveBudgetSupabase(){
-    const b=window.lastBudget;
-    if(!b) return;
-    if(!adminAccessAllowed()){
-      toast(session?.role==="admin"?"Verificá tu segundo factor para guardar presupuestos.":"Iniciá sesión como administrador para guardar presupuestos.");
-      return;
-    }
-
-    const q={
-      id:uid("q"),
-      date:new Date().toISOString(),
-      data:b,
-      summary:budgetSummary()
-    };
-
-    try{
-      const {error}=await client.from("quotes").insert({
-        id:q.id,
-        created_at:q.date,
-        title:null,
-        data:q.data,
-        summary:q.summary,
-        created_by:session.supabaseUserId||null
-      });
-      if(error) throw error;
-
-      const qs=read(STORAGE.quotes,[]);
-      qs.push(q);
-      writeLocal(STORAGE.quotes,qs);
-      toast("Presupuesto guardado en Supabase.");
-    }catch(err){
-      console.error(err);
-      toast("No se pudo guardar el presupuesto en Supabase.");
-    }
-  }
 
   async function markOrderSupabase(id){
     const o=orders.find(x=>String(x.id)===String(id));
@@ -384,8 +313,5 @@
     const checkout=$("checkout-form");
     if(checkout) checkout.onsubmit=submitOrderSupabase;
 
-    const save=$("save-budget");
-    if(save) save.onclick=saveBudgetSupabase;
   });
 })();
-

@@ -594,8 +594,30 @@
             </div>
           </div>
         </div>
+        <div class="card budget-commercial-card">
+          <div class="form-block-head"><div><p class="eyebrow">DATOS COMERCIALES</p><h3 id="budget-editor-title">Nuevo presupuesto</h3><p class="muted">El PDF se genera recién al emitir. Los costos y notas internas nunca se muestran al cliente.</p></div><button id="budget-new" class="btn ghost" type="button">Nuevo</button></div>
+          <div class="form-grid">
+            <label>Nombre del cliente<input id="budget-customer-name" maxlength="180" placeholder="Nombre y apellido"></label>
+            <label>Email, opcional<input id="budget-customer-email" type="email" maxlength="320" placeholder="cliente@email.com"></label>
+            <label>Teléfono, opcional<input id="budget-customer-phone" maxlength="80"></label>
+            <label>Referencia interna, opcional<input id="budget-customer-reference" maxlength="120"></label>
+            <label class="full-span">Título del presupuesto<input id="budget-title" maxlength="180" placeholder="Ej.: Letras corpóreas personalizadas"></label>
+          </div>
+        </div>
         <div class="budget-layout">
           <form id="budget-form" class="card form-grid">
+            <label class="full-span">Concepto / pieza
+              <input id="budget-item-title" maxlength="180" value="Pieza impresa en 3D" required>
+            </label>
+            <label class="full-span">Descripción comercial
+              <textarea id="budget-item-description" maxlength="2000" rows="3" placeholder="Descripción que verá el cliente"></textarea>
+            </label>
+            <label>Cantidad de unidades
+              <input id="budget-item-quantity" type="number" min="1" max="100000" step="1" value="1" required>
+            </label>
+            <label>Color / variante
+              <input id="budget-item-color" maxlength="120" placeholder="Ej.: Blanco mate">
+            </label>
             <label>Material
               <select id="budget-material"></select>
             </label>
@@ -633,14 +655,41 @@
               <div id="budget-supplies"></div>
               <button type="button" id="add-budget-supply" class="btn secondary">+ Agregar insumo</button>
             </div>
+            <label class="full-span">Observaciones para el cliente
+              <textarea id="budget-item-customer-notes" maxlength="2000" rows="2"></textarea>
+            </label>
+            <label class="full-span">Observaciones técnicas internas
+              <textarea id="budget-item-internal-notes" maxlength="2000" rows="2"></textarea>
+            </label>
             <div class="budget-actions full-span">
               <button class="btn primary" type="submit">Calcular</button>
-              <button class="btn secondary" type="button" id="save-budget">Guardar presupuesto</button>
+              <button class="btn secondary" type="button" id="add-budget-item">Agregar concepto</button>
               <button class="btn ghost" type="button" id="copy-budget">Copiar resumen</button>
             </div>
           </form>
-          <aside id="budget-result" class="budget-result"></aside>
+          <aside class="budget-side">
+            <div id="budget-result" class="budget-result"></div>
+            <div class="card budget-items-card"><h3>Conceptos</h3><div id="budget-items-list" class="budget-items-list"><p class="muted">Todavía no agregaste conceptos.</p></div></div>
+          </aside>
         </div>
+        <div class="card budget-conditions-card">
+          <h3>Condiciones</h3>
+          <div class="form-grid">
+            <label>Plazo estimado<input id="budget-manufacturing-time" maxlength="300" placeholder="Ej.: 10 días hábiles"></label>
+            <label>Válido hasta<input id="budget-valid-until" type="date"></label>
+            <label>Condiciones de pago<textarea id="budget-payment-terms" maxlength="1000" rows="2" placeholder="Ej.: 50% de anticipo"></textarea></label>
+            <label>Entrega<textarea id="budget-delivery-terms" maxlength="1000" rows="2" placeholder="Ej.: Retiro coordinado"></textarea></label>
+            <label class="full-span">Notas comerciales<textarea id="budget-commercial-notes" maxlength="2000" rows="2"></textarea></label>
+            <label class="full-span">Notas internas generales<textarea id="budget-internal-notes" maxlength="4000" rows="2"></textarea></label>
+          </div>
+          <div class="budget-actions"><button id="save-budget" class="btn secondary" type="button">Guardar borrador</button><button id="emit-budget" class="btn primary" type="button">Emitir presupuesto</button><span id="budget-save-state" class="muted" role="status"></span></div>
+        </div>
+        <section class="budget-history">
+          <div class="section-head"><div><p class="eyebrow">HISTORIAL</p><h2>Presupuestos guardados</h2></div><button id="import-local-budgets" class="btn ghost hidden" type="button">Importar presupuestos de este navegador</button></div>
+          <div class="inventory-toolbar budget-history-toolbar"><div class="inventory-search"><span>⌕</span><input id="budget-search" placeholder="Número, cliente o título"></div><select id="budget-status-filter"><option value="all">Todos los estados</option><option value="draft">Borradores</option><option value="issued">Emitidos</option><option value="accepted">Aceptados</option><option value="rejected">Rechazados</option><option value="expired">Vencidos</option><option value="converted">Convertidos</option></select><select id="budget-sort"><option value="updated_desc">Más recientes</option><option value="updated_asc">Más antiguos</option><option value="total_desc">Mayor importe</option><option value="total_asc">Menor importe</option></select><select id="budget-page-size"><option>10</option><option>25</option><option>50</option></select></div>
+          <div id="budget-history-list" class="table-wrap"></div><div id="budget-pagination" class="pagination hidden"></div>
+          <div id="budget-detail" class="card budget-detail hidden"></div>
+        </section>
       </section>
     </main>
   </div>
@@ -836,7 +885,7 @@
   <script src="js/products-ui.js?v=catalog-admin1"></script>
   <script src="js/community-ui.js?v=mfa2"></script>
   <script src="js/inventory-ui.js?v=catalog-admin1"></script>
-  <script src="js/budget-ui.js?v=20261009-refactor2"></script>
+  <script src="js/budget-ui.js?v=budget-system1"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
     <div class="modal-card order-management-card">
       <button class="modal-close" data-close-modal="order-management-modal" aria-label="Cerrar">×</button>
@@ -863,7 +912,7 @@
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=catalog-admin1"></script>
   <script src="js/turnstile-ui.js?v=order-protection10"></script>
-  <script src="supabase-sales.js?v=catalog-admin1"></script>
+  <script src="supabase-sales.js?v=budget-system1"></script>
   <script src="js/delivery-ui.js?v=checkout1"></script>
   <script src="js/checkout-profile.js?v=checkout1"></script>
   <script src="js/checkout-ui.js?v=catalog-admin1"></script>
@@ -873,4 +922,3 @@
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
-
