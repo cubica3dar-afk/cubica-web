@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=hud-orders1">
+  <link rel="stylesheet" href="styles.css?v=admin-stage-a1">
   <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
   <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
   <link rel="stylesheet" href="styles-checkout.css?v=checkout1">
@@ -282,7 +282,16 @@
         </div>
         <div id="sales-kpis" class="kpi-grid"></div>
         <div id="payment-breakdown" class="payment-breakdown"></div>
+        <div id="orders-admin-toolbar" class="orders-admin-toolbar admin-only">
+          <div class="inventory-search orders-search"><span>⌕</span><input id="orders-search" placeholder="Buscar por pedido, cliente o email..." aria-label="Buscar pedidos"></div>
+          <select id="orders-status-filter" aria-label="Filtrar pedidos por estado">
+            <option value="all">Todos los estados</option><option value="Pendiente">Pendiente</option><option value="Confirmado">Confirmado</option><option value="En producción">En producción</option><option value="Preparado">Preparado</option><option value="Entregado">Entregado</option><option value="Cancelado">Cancelado</option>
+          </select>
+          <select id="orders-payment-filter" aria-label="Filtrar pedidos por medio de pago"><option value="all">Todos los medios de pago</option></select>
+          <select id="orders-sort" aria-label="Ordenar pedidos"><option value="recent">Más recientes primero</option><option value="oldest">Más antiguos primero</option></select>
+        </div>
         <div id="orders-list"></div>
+        <div id="orders-pagination" class="pagination hidden admin-only" aria-label="Paginación de pedidos"></div>
       </section>
 
       <section id="section-profile" class="page-section hidden">
@@ -422,7 +431,7 @@
       <section id="section-stock-finished" class="page-section hidden admin-only">
         <div class="section-head">
           <div><p class="eyebrow">INVENTARIO</p><h2>Productos terminados</h2><p class="muted">Figuras, veladores, accesorios y otros productos listos para vender.</p></div>
-          <div class="inventory-actions"><button class="btn ghost" onclick="openInventoryHistory('products')">Movimientos</button><button class="btn primary" data-open-modal="finished-modal">+ Producto</button></div>
+          <div class="inventory-actions"><button class="btn ghost" onclick="openInventoryHistory('products')">Movimientos</button><button id="add-finished-category" class="btn secondary" type="button">+ Categoría</button><button class="btn primary" data-open-modal="finished-modal">+ Producto</button></div>
         </div>
         <div class="inventory-toolbar finished-toolbar">
           <div class="inventory-search"><span>⌕</span><input id="finished-search" placeholder="Buscar producto por nombre, categoría o descripción..."></div>
@@ -901,13 +910,27 @@
     </div>
   </div>
 
+  <div id="finished-category-modal" class="modal hidden">
+    <div class="modal-card finished-category-modal">
+      <button class="modal-close" data-close-modal="finished-category-modal">×</button>
+      <p class="eyebrow">PRODUCTOS TERMINADOS</p>
+      <h2>Administrar categorías</h2>
+      <p class="muted">Creá, renombrá o desactivá categorías sin alterar productos, stock ni recetas.</p>
+      <form id="finished-category-form" class="finished-category-create">
+        <label for="new-finished-category">Nueva categoría</label>
+        <div><input id="new-finished-category" maxlength="40" required placeholder="Ej.: Macetas"><button class="btn primary" type="submit">Crear</button></div>
+      </form>
+      <div id="finished-category-list" class="finished-category-list" aria-live="polite"></div>
+    </div>
+  </div>
+
   <script src="github-config.js?v=order-protection2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <script src="js/core.js?v=catalog-admin1"></script>
+  <script src="js/core.js?v=admin-stage-a1"></script>
   <script src="js/ui-shell.js?v=hud-orders1"></script>
   <script src="js/store-ui.js?v=catalog-admin1"></script>
-  <script src="js/products-ui.js?v=catalog-admin1"></script>
+  <script src="js/products-ui.js?v=admin-stage-a1"></script>
   <script src="js/community-ui.js?v=mfa2"></script>
   <script src="js/inventory-ui.js?v=catalog-admin1"></script>
   <script src="js/budget-ui.js?v=hud-orders1"></script>
@@ -919,7 +942,7 @@
       <div id="order-management-content"></div>
     </div>
   </div>
-  <script src="js/orders-ui.js?v=hud-orders1"></script>
+  <script src="js/orders-ui.js?v=admin-stage-a1"></script>
   <script src="js/order-management.js?v=inventory-trace1"></script>
   <div id="inventory-history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-history-title">
     <div class="modal-card order-management-card">
@@ -931,8 +954,8 @@
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
 
 
-  <script src="js/app-init.js?v=hud-orders1"></script>
-  <script src="supabase-bridge.js?v=catalog-admin1"></script>
+  <script src="js/app-init.js?v=admin-stage-a1"></script>
+  <script src="supabase-bridge.js?v=admin-stage-a1"></script>
   <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=catalog-admin1"></script>
@@ -947,3 +970,4 @@
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
+
