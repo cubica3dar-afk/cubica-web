@@ -10,7 +10,8 @@ const STORAGE = {
   orders:"cubica_orders",
   cart:"cubica_cart",
   quotes:"cubica_quotes",
-  supplyCategories:"cubica_supply_categories"
+  supplyCategories:"cubica_supply_categories",
+  productCategories:"cubica_product_categories"
 };
 
 const DEFAULT_SUPPLY_CATEGORIES = ["Filamentos","Electrónica","Cajas","Electricidad","Iluminación","Packaging","Otros"];
@@ -45,6 +46,7 @@ const uid = p => p+Date.now().toString(36)+Math.random().toString(36).slice(2,7)
 let products = read(STORAGE.products, []);
 let supplies = read(STORAGE.supplies, []);
 let supplyCategories = read(STORAGE.supplyCategories, DEFAULT_SUPPLY_CATEGORIES);
+let productCategories = read(STORAGE.productCategories, DEFAULT_FINISHED_CATEGORIES.map((name,index)=>({name,sortOrder:(index+1)*10,active:true})));
 let orders = read(STORAGE.orders, []);
 let cart = read(STORAGE.cart, []);
 let session = read(STORAGE.session, null);
@@ -122,12 +124,19 @@ function initData(){
     return item;
   });
   supplyCategories=[...new Set([...DEFAULT_SUPPLY_CATEGORIES,...supplyCategories,...supplies.map(s=>s.category).filter(Boolean)])];
+  productCategories=(Array.isArray(productCategories)?productCategories:[]).map((category,index)=>({
+    name:String(category?.name??category??"").trim(),
+    sortOrder:Number(category?.sortOrder??category?.sort_order)||((index+1)*10),
+    active:category?.active!==false
+  })).filter(category=>category.name);
+  if(!productCategories.length)productCategories=DEFAULT_FINISHED_CATEGORIES.map((name,index)=>({name,sortOrder:(index+1)*10,active:true}));
 
   // localStorage funciona como caché/UI temporal. Supabase vuelve a cargar la
   // fuente de verdad apenas se inicializan sus adaptadores.
   writeLocal(STORAGE.products,products);
   writeLocal(STORAGE.supplies,supplies);
   writeLocal(STORAGE.supplyCategories,supplyCategories);
+  writeLocal(STORAGE.productCategories,productCategories);
 }
 
 function formatDate(iso){
