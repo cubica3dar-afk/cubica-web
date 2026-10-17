@@ -59,23 +59,63 @@ function setupNav(){
   });
   updateCartBadge();
 }
+function accountSidebarEligible(){
+  return Boolean(session)&&!window.cubicaAdminMfaChallengeRequired?.();
+}
+function shouldPinAccountSidebar(){
+  if(!accountSidebarEligible())return false;
+  const viewport=document.documentElement?.clientWidth||window.innerWidth||0;
+  const sidebarWidth=Math.min(276,Math.max(248,viewport*.22));
+  const usableMain=viewport-sidebarWidth-48;
+  return usableMain>=720&&window.matchMedia?.("(min-height: 520px)")?.matches!==false;
+}
+function refreshAccountSidebarLayout(){
+  const sidebar=$("account-sidebar"),overlay=$("account-sidebar-overlay"),menu=$("sidebar-menu-btn");
+  if(!sidebar||!overlay)return;
+  const eligible=accountSidebarEligible(),pinned=eligible&&shouldPinAccountSidebar();
+  document.body.classList.toggle("account-sidebar-pinned",pinned);
+  sidebar.classList.toggle("hidden",!eligible);
+  menu?.classList.toggle("hidden",!eligible||pinned);
+  if(menu)menu.setAttribute("aria-expanded",sidebar.classList.contains("open")&&!pinned?"true":"false");
+  if(pinned){
+    sidebar.classList.remove("open");
+    sidebar.setAttribute("aria-hidden","false");
+    overlay.classList.add("hidden");
+    overlay.classList.remove("visible");
+    document.body.classList.remove("sidebar-open");
+  }else if(!eligible){
+    sidebar.classList.remove("open");
+    sidebar.setAttribute("aria-hidden","true");
+    overlay.classList.add("hidden");
+    overlay.classList.remove("visible");
+    document.body.classList.remove("sidebar-open");
+  }else{
+    sidebar.setAttribute("aria-hidden",sidebar.classList.contains("open")?"false":"true");
+  }
+}
 function openAccountSidebar(){
   if(!session){showSection("login");return;}
   if(window.cubicaAdminMfaChallengeRequired?.()){showSection("mfa");return;}
+  closeProfileMenu();
   const sidebar=$("account-sidebar"), overlay=$("account-sidebar-overlay");
   if(!sidebar||!overlay)return;
   renderAccountSidebar();
+  if(shouldPinAccountSidebar()){refreshAccountSidebarLayout();return;}
   sidebar.classList.add("open");
   sidebar.setAttribute("aria-hidden","false");
+  $("sidebar-menu-btn")?.setAttribute("aria-expanded","true");
   overlay.classList.remove("hidden");
   requestAnimationFrame(()=>overlay.classList.add("visible"));
   document.body.classList.add("sidebar-open");
+  $("account-sidebar-close")?.focus({preventScroll:true});
 }
 function closeAccountSidebar(){
   const sidebar=$("account-sidebar"), overlay=$("account-sidebar-overlay");
   if(!sidebar||!overlay)return;
+  if(shouldPinAccountSidebar()){refreshAccountSidebarLayout();return;}
   sidebar.classList.remove("open");
   sidebar.setAttribute("aria-hidden","true");
+  $("sidebar-menu-btn")?.setAttribute("aria-expanded","false");
   overlay.classList.remove("visible");
   setTimeout(()=>{if(!sidebar.classList.contains("open"))overlay.classList.add("hidden");},180);
   document.body.classList.remove("sidebar-open");
@@ -97,6 +137,28 @@ function renderAccountSidebar(){
   if(ordersLabel)ordersLabel.textContent=session?.role==="admin"?"Ventas / Pedidos":"Mis pedidos";
   const editBadge=$("avatar-edit-badge");
   if(editBadge)editBadge.classList.toggle("hidden",session?.role!=="admin");
+  const avatarButton=$("sidebar-avatar-button"),canEditAvatar=session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+  if(avatarButton){avatarButton.disabled=!canEditAvatar;avatarButton.title=canEditAvatar?"Cambiar foto de perfil":"Foto de perfil";}
+  refreshAccountSidebarLayout();
+}
+function openProfileMenu(){
+  if(!session){showSection("login");return;}
+  if(window.cubicaAdminMfaChallengeRequired?.()){showSection("mfa");return;}
+  closeAccountSidebar();
+  const menu=$("profile-menu"),button=$("profile-btn");if(!menu||!button)return;
+  menu.classList.remove("hidden");button.setAttribute("aria-expanded","true");
+  menu.querySelector('[role="menuitem"]')?.focus({preventScroll:true});
+}
+function closeProfileMenu({restoreFocus=false}={}){
+  const menu=$("profile-menu"),button=$("profile-btn");if(!menu||!button)return;
+  const wasOpen=!menu.classList.contains("hidden");
+  menu.classList.add("hidden");button.setAttribute("aria-expanded","false");
+  if(wasOpen&&restoreFocus)button.focus({preventScroll:true});
+}
+function toggleProfileMenu(){
+  const menu=$("profile-menu");
+  if(!session){showSection("login");return;}
+  menu?.classList.contains("hidden")?openProfileMenu():closeProfileMenu({restoreFocus:true});
 }
 function showSection(id){
   if(window.cubicaAuthCallbackBlocked && id!=="login")id="login";
@@ -140,7 +202,8 @@ function showSection(id){
   $("section-"+id).classList.remove("hidden");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.section===id));
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.classList.toggle("active",b.dataset.sidebarSection===id));
-  closeAccountSidebar();
+  if(!shouldPinAccountSidebar())closeAccountSidebar();
+  closeProfileMenu();
   if(id==="store") renderProducts(); if(id==="cart") renderCart(); if(id==="orders") renderOrders();
   if(id==="profile") {renderProfile();window.cubicaDelivery?.renderProfile();window.cubicaBuyerProfile?.renderProfile();}
   if(id==="delivery")window.cubicaDelivery?.loadAdmin();
@@ -243,6 +306,8 @@ function renderApp(){
   renderProducts();
   renderCart();
 }
+
+window.cubicaShellInternals={accountSidebarEligible,shouldPinAccountSidebar,refreshAccountSidebarLayout};
 function paginationNumbers(totalPages,currentPage){
   if(totalPages<=7)return Array.from({length:totalPages},(_,i)=>i+1);
   const pages=[1];
@@ -280,4 +345,3 @@ function openModal(id){
 function closeModal(id){
   $(id)?.classList.add("hidden");
 }
-
