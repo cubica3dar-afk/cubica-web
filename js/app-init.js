@@ -35,10 +35,15 @@ document.addEventListener("DOMContentLoaded",()=>{
     });
   }
 
-  $("profile-btn")?.addEventListener("click",()=>session?openAccountSidebar():showSection("login"));
+  $("profile-btn")?.addEventListener("click",toggleProfileMenu);
+  $("sidebar-menu-btn")?.addEventListener("click",openAccountSidebar);
   $("account-sidebar-close")?.addEventListener("click",closeAccountSidebar);
   $("account-sidebar-overlay")?.addEventListener("click",closeAccountSidebar);
   document.querySelectorAll("[data-sidebar-section]").forEach(b=>b.addEventListener("click",()=>showSection(b.dataset.sidebarSection)));
+  document.querySelector('[data-profile-action="profile"]')?.addEventListener("click",()=>showSection("profile"));
+  document.addEventListener("pointerdown",e=>{
+    if(!e.target.closest(".profile-menu-wrap"))closeProfileMenu();
+  });
 
   $("sidebar-avatar-button")?.addEventListener("click",()=>{
     if(session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true)$("profile-avatar-input")?.click();
@@ -71,7 +76,26 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
 
   document.addEventListener("keydown",e=>{
-    if(e.key==="Escape")closeAccountSidebar();
+    if(e.key==="Escape"){
+      closeProfileMenu({restoreFocus:true});
+      if(!document.body.classList.contains("account-sidebar-pinned")){
+        const wasOpen=$("account-sidebar")?.classList.contains("open");
+        closeAccountSidebar();
+        if(wasOpen)$("sidebar-menu-btn")?.focus({preventScroll:true});
+      }
+      return;
+    }
+    if(e.key==="Tab"&&$("account-sidebar")?.classList.contains("open")&&!document.body.classList.contains("account-sidebar-pinned")){
+      const focusable=[...$("account-sidebar").querySelectorAll('button:not([disabled]):not(.hidden),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href]')].filter(el=>el.offsetParent!==null);
+      if(!focusable.length)return;
+      const first=focusable[0],last=focusable.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+  window.addEventListener("resize",()=>{
+    clearTimeout(window.__cubicaSidebarResize);
+    window.__cubicaSidebarResize=setTimeout(refreshAccountSidebarLayout,80);
   });
 
   $("product-search").oninput=()=>{
@@ -170,6 +194,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   };
   $("add-budget-supply").onclick=()=>{
     budgetRows.push({id:"",qty:1});
+    window.cubicaBudgetInternals?.markBudgetDirty?.();
     renderBudgetSupplyRows();
     calculateBudget();
   };
