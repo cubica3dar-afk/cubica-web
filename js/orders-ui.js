@@ -1,6 +1,33 @@
 /* CÚBICA 3D — interfaz de pedidos y planificación de insumos. */
 
 let salesPeriod="day";
+let orderPageSize=[10,25,50].includes(Number(globalThis.localStorage?.getItem("cubica_order_page_size")))?Number(globalThis.localStorage?.getItem("cubica_order_page_size")):10;
+let orderPage=1;
+let orderSortMode=globalThis.localStorage?.getItem("cubica_order_sort")==="oldest"?"oldest":"recent";
+
+function orderSearchText(order){
+  return [order?.orderNumber,order?.id,order?.customerName,order?.customerEmail].join(" ").toLocaleLowerCase("es");
+}
+function adminOrderView(list,{search="",status="all",payment="all",sort="recent"}={}){
+  const needle=String(search||"").trim().toLocaleLowerCase("es");
+  return [...(list||[])].filter(order=>(!needle||orderSearchText(order).includes(needle))
+    &&(status==="all"||order.status===status)
+    &&(payment==="all"||order.payment===payment))
+    .sort((a,b)=>{
+      const date=String(a.date||"").localeCompare(String(b.date||""));
+      const stable=String(a.id||a.orderNumber||"").localeCompare(String(b.id||b.orderNumber||""));
+      return sort==="oldest"?(date||stable):(-date||-stable);
+    });
+}
+function renderOrderPaymentOptions(list){
+  const select=$("orders-payment-filter");if(!select)return;
+  const current=select.value||"all";
+  const values=[...new Set((list||[]).map(order=>String(order.payment||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"}));
+  select.innerHTML='<option value="all">Todos los medios de pago</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
+  select.value=values.includes(current)?current:"all";
+}
+function setOrderPage(page){orderPage=Math.max(1,Math.trunc(Number(page)||1));renderOrders();$("orders-admin-toolbar")?.scrollIntoView({behavior:"smooth",block:"start"});}
+function setOrderPageSize(size){const next=Number(size);if(![10,25,50].includes(next))return;orderPageSize=next;orderPage=1;globalThis.localStorage?.setItem("cubica_order_page_size",String(next));renderOrders();}
 function customerOrderStage(order){
   const status=String(order?.status||"Pendiente"),shipping=order?.delivery?.mode==="shipping";
   const preparedLabel=shipping?"Preparado para envío":"Listo para entregar";
@@ -47,41 +74,34 @@ function renderOrders(){
   if(!session)return;
   const isAdmin=session.role==="admin";
   const mine=isAdmin?orders:orders.filter(o=>String(o.customerEmail||"").toLowerCase()===String(session.email||"").toLowerCase()||o.userId===session.supabaseUserId);
-
   const eyebrow=$("orders-eyebrow"),title=$("orders-title"),subtitle=$("orders-subtitle");
   if(eyebrow)eyebrow.textContent=isAdmin?"VENTAS":"CUENTA";
   if(title)title.textContent=isAdmin?"Ventas / Pedidos":"Mis pedidos";
-  if(subtitle)subtitle.textContent=isAdmin?"Historial agrupable por día, mes y año.":"Consultá tus compras realizadas con esta cuenta y su estado.";
+  if(subtitle)subtitle.textContent=isAdmin?"Buscá y combiná filtros sin alterar el ciclo de cada pedido.":"Consultá tus compras realizadas con esta cuenta y su estado.";
 
-  const periods=document.querySelector("#section-orders .period-tabs"),kpis=$("sales-kpis"),payments=$("payment-breakdown");
-  periods?.classList.toggle("hidden",!isAdmin);
-  kpis?.classList.toggle("hidden",!isAdmin);
-  payments?.classList.toggle("hidden",!isAdmin);
+  const periods=document.querySelector("#section-orders .period-tabs"),kpis=$("sales-kpis"),payments=$("payment-breakdown"),toolbar=$("orders-admin-toolbar"),pagination=$("orders-pagination");
+  periods?.classList.toggle("hidden",!isAdmin);kpis?.classList.toggle("hidden",!isAdmin);payments?.classList.toggle("hidden",!isAdmin);toolbar?.classList.toggle("hidden",!isAdmin);pagination?.classList.toggle("hidden",!isAdmin);
   if(!isAdmin){
     $("orders-list").classList.add("customer-orders-list");
     $("orders-list").innerHTML=mine.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(customerOrderCard).join("")||'<div class="card customer-orders-empty"><span aria-hidden="true">▤</span><h3>Todavía no tenés pedidos</h3><p class="muted">Cuando hagas una compra, vas a poder seguirla desde acá.</p><button class="btn primary" type="button" onclick="showSection(\'store\')">Volver a la tienda</button></div>';
     return;
   }
   $("orders-list").classList.remove("customer-orders-list");
-
-  const groups={};
-  mine.forEach(o=>{
-    const d=new Date(o.date),key=salesPeriod==="day"?todayKey(o.date):salesPeriod==="month"?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`:String(d.getFullYear());
-    (groups[key]??=[]).push(o);
-  });
-  const revenue=mine.reduce((a,o)=>a+Number(o.total||0),0),units=mine.reduce((a,o)=>a+(o.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
-  const cash=mine.filter(o=>o.payment==="Efectivo").reduce((a,o)=>a+Number(o.total||0),0);
-  const transfer=mine.filter(o=>o.payment==="Transferencia").reduce((a,o)=>a+Number(o.total||0),0);
-
-  $("sales-kpis").innerHTML=`<div class="kpi"><span>Pedidos</span><strong>${mine.length}</strong></div><div class="kpi"><span>Unidades</span><strong>${units}</strong></div><div class="kpi"><span>Facturación total</span><strong>${money(revenue)}</strong></div><div class="kpi"><span>Período</span><strong>${salesPeriod==="day"?"Día":salesPeriod==="month"?"Mes":"Año"}</strong></div>`;
-
-  $("payment-breakdown").innerHTML=`<div class="payment-card"><span>💵 Efectivo</span><strong>${money(cash)}</strong></div><div class="payment-card"><span>🏦 Transferencia</span><strong>${money(transfer)}</strong></div><div class="payment-card total"><span>Total</span><strong>${money(cash+transfer)}</strong></div>`;
-
-  $("orders-list").innerHTML=Object.keys(groups).sort().reverse().map(k=>`<div><h3>${escapeHtml(k)}</h3>${groups[k].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`
+  renderOrderPaymentOptions(mine);
+  const filtered=adminOrderView(mine,{search:$("orders-search")?.value||"",status:$("orders-status-filter")?.value||"all",payment:$("orders-payment-filter")?.value||"all",sort:$("orders-sort")?.value||orderSortMode});
+  const totalPages=Math.max(1,Math.ceil(filtered.length/orderPageSize));orderPage=Math.min(Math.max(1,orderPage),totalPages);
+  const pageStart=(orderPage-1)*orderPageSize,pageItems=filtered.slice(pageStart,pageStart+orderPageSize),groups=new Map();
+  pageItems.forEach(o=>{const d=new Date(o.date),key=salesPeriod==="day"?todayKey(o.date):salesPeriod==="month"?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`:String(d.getFullYear());if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);});
+  const revenue=filtered.reduce((a,o)=>a+Number(o.total||0),0),units=filtered.reduce((a,o)=>a+(o.items||[]).reduce((x,i)=>x+(Number(i.qty)||0),0),0);
+  const cash=filtered.filter(o=>o.payment==="Efectivo").reduce((a,o)=>a+Number(o.total||0),0),transfer=filtered.filter(o=>o.payment==="Transferencia").reduce((a,o)=>a+Number(o.total||0),0);
+  $("sales-kpis").innerHTML=`<div class="kpi"><span>Pedidos encontrados</span><strong>${filtered.length}</strong></div><div class="kpi"><span>Unidades</span><strong>${units}</strong></div><div class="kpi"><span>Facturación filtrada</span><strong>${money(revenue)}</strong></div><div class="kpi"><span>Agrupación</span><strong>${salesPeriod==="day"?"Día":salesPeriod==="month"?"Mes":"Año"}</strong></div>`;
+  $("payment-breakdown").innerHTML=`<div class="payment-card"><span>💵 Efectivo</span><strong>${money(cash)}</strong></div><div class="payment-card"><span>🏦 Transferencia</span><strong>${money(transfer)}</strong></div><div class="payment-card total"><span>Total filtrado</span><strong>${money(revenue)}</strong></div>`;
+  $("orders-list").innerHTML=[...groups.entries()].map(([key,groupOrders])=>`<div><div class="orders-result-heading"><h3>${escapeHtml(key)}</h3><span>${groupOrders.length} en esta página</span></div>${groupOrders.map(o=>`
     <article class="order-card"><div class="order-head"><div><strong>${escapeHtml(String(o.orderNumber||o.id).startsWith("CUB-")?(o.orderNumber||o.id):`#${String(o.id).slice(-8).toUpperCase()}`)}</strong><div class="muted">${formatDate(o.date)}</div></div><strong>${money(o.total)}</strong></div>
-    <div class="order-body">${window.cubicaDelivery?.customerHtml(o.delivery)||""}<div class="order-items">${(o.items||[]).map(i=>`${escapeHtml(i.name)}${i.color?` · ${escapeHtml(i.color)}`:''} × ${i.qty} — ${money(i.price*i.qty)}`).join("<br>")} </div>
-    <p class="muted">Cliente: ${escapeHtml(o.customerName)} · Pago: ${escapeHtml(o.payment)} · Estado: <strong>${escapeHtml(o.status)}</strong></p>
-    <p class="muted">${o.productionStartedAt?"Consumo de materiales registrado":"Materiales sin consumir"}</p><button class="btn ghost" onclick="openOrderManagement('${escapeHtml(o.id)}')">Gestionar pedido</button></div></article>`).join("")}</div>`).join("") || '<div class="card" style="padding:20px">Todavía no hay pedidos asociados a esta cuenta.</div>';
+    <div class="order-body">${o.origin==="budget"?'<span class="order-origin-badge">Pedido interno de presupuesto</span>':""}${window.cubicaDelivery?.customerHtml(o.delivery)||""}<div class="order-items">${(o.items||[]).map(i=>`${escapeHtml(i.name)}${i.color?` · ${escapeHtml(i.color)}`:""} × ${i.qty} — ${money(i.price*i.qty)}`).join("<br>")} </div>
+    <p class="muted">Cliente: ${escapeHtml(o.customerName)}${o.customerEmail?` · ${escapeHtml(o.customerEmail)}`:""} · Pago: ${escapeHtml(o.payment)} · Estado: <strong>${escapeHtml(o.status)}</strong></p>
+    <p class="muted">${o.productionStartedAt?"Consumo de materiales registrado":"Materiales sin consumir"}</p><button class="btn ghost" onclick="openOrderManagement('${escapeHtml(o.id)}')">Gestionar pedido</button></div></article>`).join("")}</div>`).join("")||'<div class="card" style="padding:20px">No se encontraron pedidos con esos filtros.</div>';
+  renderPagination("orders-pagination",{page:orderPage,totalPages,totalItems:filtered.length,pageSize:orderPageSize,setter:"setOrderPage",pageSizeSetter:"setOrderPageSize"});
 }
 function markOrder(id){return window.openOrderManagement?.(id)}
 
@@ -115,4 +135,7 @@ function calculateOrderSupplyPlan(items){
 }
 
 window.markOrder=markOrder;
-window.cubicaOrderUiInternals={customerOrderStage,customerOrderStatus,orderTimelineHtml};
+window.setOrderPage=setOrderPage;
+window.setOrderPageSize=setOrderPageSize;
+window.cubicaOrderUiInternals={customerOrderStage,customerOrderStatus,orderTimelineHtml,adminOrderView,orderSearchText};
+
