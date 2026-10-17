@@ -560,7 +560,10 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 
 
 /* Orden y marca de insumos */
-.supply-toolbar{grid-template-columns:minmax(240px,1fr) minmax(160px,220px) minmax(170px,220px)}
+.supply-toolbar{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));align-items:stretch}
+.supply-toolbar>*{width:100%;min-width:0;max-width:100%}
+.supply-toolbar .inventory-search{grid-column:span 4;min-width:0}
+.supply-toolbar select{grid-column:span 2}
 .supply-sort-hint{margin:-4px 0 12px;font-size:11px}
 .supply-order-col{width:92px}
 .supply-order-cell{white-space:nowrap}
@@ -568,12 +571,12 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 .supply-move{width:34px;min-width:34px;height:32px;padding:0;display:grid;place-items:center;font-size:15px}
 .supply-move:disabled{opacity:.28;cursor:not-allowed}
 @media(max-width:900px){
-  .supply-toolbar{grid-template-columns:1fr 1fr}
+  .supply-toolbar{grid-template-columns:repeat(12,minmax(0,1fr))}
   .supply-toolbar .inventory-search{grid-column:1/-1}
+  .supply-toolbar select{grid-column:span 6}
 }
 @media(max-width:600px){
-  .supply-toolbar{grid-template-columns:1fr}
-  .supply-toolbar .inventory-search{grid-column:auto}
+  .supply-toolbar .inventory-search,.supply-toolbar select{grid-column:1/-1}
   .supply-order-col{width:78px}
   .supply-move{width:31px;min-width:31px}
 }
@@ -601,8 +604,8 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 
 
 /* Orden y paginación de productos terminados */
-.finished-toolbar,.supply-toolbar{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.finished-toolbar .inventory-search,.supply-toolbar .inventory-search{min-width:250px}
+.finished-toolbar{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.finished-toolbar .inventory-search{min-width:250px}
 .status-stack{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
 .status-pill{display:inline-flex;align-items:center;width:max-content;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:800;line-height:1;border:1px solid transparent}
 .status-pill.is-published,.status-pill.is-active{color:#a8f0c6;background:rgba(66,190,118,.12);border-color:rgba(66,190,118,.25)}
@@ -619,6 +622,22 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
   .finished-toolbar{grid-template-columns:1fr 1fr}
   .finished-toolbar .inventory-search{grid-column:1/-1}
 }
+
+/* Administración A: pedidos y categorías de productos terminados */
+.orders-admin-toolbar{display:grid;grid-template-columns:minmax(260px,2fr) repeat(3,minmax(160px,1fr));gap:10px;margin:18px 0 14px}
+.orders-admin-toolbar>*{width:100%;min-width:0}
+.orders-result-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 9px}
+.orders-result-heading h3{margin:0}.orders-result-heading span{font-size:11px;color:var(--muted)}
+.order-origin-badge{display:inline-flex;margin:0 0 9px;padding:5px 8px;border-radius:999px;background:rgba(129,140,248,.13);border:1px solid rgba(129,140,248,.25);font-size:10px;font-weight:800;color:#cdd2ff}
+.finished-category-modal{width:min(680px,100%)}
+.finished-category-create{margin:18px 0;padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}
+.finished-category-create label{display:block;margin-bottom:7px;color:var(--muted);font-size:12px}.finished-category-create>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.finished-category-list{display:grid;gap:9px;max-height:min(52vh,480px);overflow:auto;padding-right:3px}
+.finished-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.025)}
+.finished-category-row input{min-width:0}.finished-category-row .btn{white-space:nowrap}.finished-category-row.is-inactive{opacity:.7}
+.finished-category-meta{grid-column:1/-1;color:var(--muted);font-size:11px}
+@media(max-width:1050px){.orders-admin-toolbar{grid-template-columns:1fr 1fr}.orders-admin-toolbar .orders-search{grid-column:1/-1}}
+@media(max-width:600px){.orders-admin-toolbar{grid-template-columns:1fr}.orders-admin-toolbar .orders-search{grid-column:auto}.finished-category-create>div,.finished-category-row{grid-template-columns:1fr}.finished-category-row .btn{width:100%}}
 @media(max-width:600px){
   .finished-toolbar{grid-template-columns:1fr}
   .finished-toolbar .inventory-search{grid-column:auto}
@@ -706,3 +725,4 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 #community-form{margin-top:22px;display:grid;gap:10px}#community-form label{font-weight:600}
 #community-message{color:#ffc475;overflow-wrap:anywhere}#product-performance-table table{min-width:1350px}
 @media(max-width:600px){.community-actions .btn{padding:8px 11px;font-size:12px}.community-replies{padding-left:12px}.community-author{gap:6px}.community-actions label{flex:1;min-width:130px}}
+
