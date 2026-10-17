@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=budget-system1">
+  <link rel="stylesheet" href="styles.css?v=hud-orders1">
   <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
   <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
   <link rel="stylesheet" href="styles-checkout.css?v=checkout1">
@@ -34,6 +34,9 @@
 
   <div id="app" class="hidden">
     <header class="topbar">
+      <button id="sidebar-menu-btn" class="sidebar-menu-btn hidden" type="button" aria-label="Abrir menú de navegación" aria-controls="account-sidebar" aria-expanded="false">
+        <span aria-hidden="true">☰</span>
+      </button>
       <div id="brand-home" class="brand brand-home" role="button" tabindex="0" aria-label="Ir a la tienda">
         <img src="assets/logo.jpg" alt="Cúbica">
         <div><strong>Cúbica</strong><small>Impresión 3D</small></div>
@@ -42,10 +45,16 @@
       <div class="top-actions">
         <button id="server-sync-badge" class="sync-badge hidden" type="button" title="Estado de almacenamiento">Datos: conectando…</button>
         <button id="cart-icon-btn" class="cart-icon-btn" type="button" aria-label="Carrito de compras" title="Carrito de compras"><span class="cart-icon" aria-hidden="true">🛒</span><span id="cart-badge" class="cart-badge hidden">0</span></button>
-        <button id="profile-btn" class="profile-icon-btn" type="button" aria-label="Cuenta" title="Cuenta">
-          <span id="profile-icon-fallback" class="profile-icon-fallback" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
-          <img id="profile-avatar-top" class="profile-avatar-top hidden" alt="Foto de perfil">
-        </button>
+        <div class="profile-menu-wrap">
+          <button id="profile-btn" class="profile-icon-btn" type="button" aria-label="Cuenta" title="Cuenta" aria-haspopup="menu" aria-controls="profile-menu" aria-expanded="false">
+            <span id="profile-icon-fallback" class="profile-icon-fallback" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
+            <img id="profile-avatar-top" class="profile-avatar-top hidden" alt="Foto de perfil">
+          </button>
+          <div id="profile-menu" class="profile-menu hidden" role="menu" aria-label="Opciones de cuenta">
+            <button type="button" role="menuitem" data-profile-action="profile"><span aria-hidden="true">◉</span>Mi perfil</button>
+            <button id="logout-btn" type="button" role="menuitem"><span aria-hidden="true">↪</span>Cerrar sesión</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -76,7 +85,6 @@
       <nav id="account-sidebar-nav" class="account-sidebar-nav">
         <button type="button" data-sidebar-section="store"><span>⌂</span><span>Tienda</span></button>
         <button type="button" data-sidebar-section="orders" class="session-only"><span>▤</span><span id="sidebar-orders-label">Mis pedidos</span></button>
-        <button type="button" data-sidebar-section="profile" class="session-only"><span>◉</span><span>Mi perfil</span></button>
         <button type="button" data-sidebar-section="stock-finished" class="admin-only"><span>▣</span><span>Terminados</span></button>
         <button type="button" data-sidebar-section="stock-supplies" class="admin-only"><span>◫</span><span>Insumos</span></button>
         <button type="button" data-sidebar-section="budget" class="admin-only"><span>⌁</span><span>Presupuestos</span></button>
@@ -84,10 +92,6 @@
         <button type="button" data-sidebar-section="delivery" class="admin-only"><span>↗</span><span>Entregas</span></button>
         <button type="button" data-sidebar-section="community" class="admin-only"><span>☏</span><span>Comunidad</span></button>
       </nav>
-
-      <div class="account-sidebar-footer">
-        <button id="logout-btn" class="btn ghost full hidden" type="button">Cerrar sesión</button>
-      </div>
     </aside>
 
     <main class="container">
@@ -486,12 +490,23 @@
           <div><p class="eyebrow">COSTOS</p><h2>Presupuesto de producto</h2><p class="muted">Modelo basado en tu Excel: material + electricidad + máquina + fallos + insumos, con 50% sobre el costo.</p></div>
         </div>
 
-        <div id="github-pages-mode" class="github-pages-mode">
+        <div class="budget-tabs" role="tablist" aria-label="Presupuestos">
+          <button id="budget-tab-create" class="budget-tab active" type="button" role="tab" aria-selected="true" aria-controls="budget-panel-create" data-budget-tab="create">Crear presupuesto</button>
+          <button id="budget-tab-history" class="budget-tab" type="button" role="tab" aria-selected="false" aria-controls="budget-panel-history" data-budget-tab="history">Historial</button>
+          <button id="budget-tab-detail" class="budget-tab" type="button" role="tab" aria-selected="false" aria-controls="budget-panel-detail" data-budget-tab="detail">Detalle</button>
+        </div>
+        <div id="budget-panel-create" class="budget-stepper" role="tabpanel" aria-labelledby="budget-tab-create" data-budget-tab-panel="create">
+          <button class="budget-step active" type="button" data-budget-step="1"><span>1</span>Cliente y condiciones</button>
+          <button class="budget-step" type="button" data-budget-step="2"><span>2</span>Producción y conceptos</button>
+          <button class="budget-step" type="button" data-budget-step="3"><span>3</span>Revisión y emisión</button>
+        </div>
+
+        <div id="github-pages-mode" class="github-pages-mode" data-budget-tab-panel="create" data-budget-step-panel="2">
           <strong>Modo GitHub Pages</strong>
           <span>La tienda, carrito, presupuestos y visor 3D funcionan en el navegador. El slicing real, el correo y la base compartida requieren un backend externo.</span>
         </div>
 
-        <div class="slicer-budget-panel card">
+        <div class="slicer-budget-panel card" data-budget-tab-panel="create" data-budget-step-panel="2">
           <div class="slicer-panel-head">
             <div>
               <p class="eyebrow">ANALIZADOR 3D</p>
@@ -594,7 +609,7 @@
             </div>
           </div>
         </div>
-        <div class="card budget-commercial-card">
+        <div class="card budget-commercial-card" data-budget-tab-panel="create" data-budget-step-panel="1">
           <div class="form-block-head"><div><p class="eyebrow">DATOS COMERCIALES</p><h3 id="budget-editor-title">Nuevo presupuesto</h3><p class="muted">El PDF se genera recién al emitir. Los costos y notas internas nunca se muestran al cliente.</p></div><button id="budget-new" class="btn ghost" type="button">Nuevo</button></div>
           <div class="form-grid">
             <label>Nombre del cliente<input id="budget-customer-name" maxlength="180" placeholder="Nombre y apellido"></label>
@@ -604,7 +619,7 @@
             <label class="full-span">Título del presupuesto<input id="budget-title" maxlength="180" placeholder="Ej.: Letras corpóreas personalizadas"></label>
           </div>
         </div>
-        <div class="budget-layout">
+        <div class="budget-layout" data-budget-tab-panel="create" data-budget-step-panel="2">
           <form id="budget-form" class="card form-grid">
             <label class="full-span">Concepto / pieza
               <input id="budget-item-title" maxlength="180" value="Pieza impresa en 3D" required>
@@ -672,7 +687,8 @@
             <div class="card budget-items-card"><h3>Conceptos</h3><div id="budget-items-list" class="budget-items-list"><p class="muted">Todavía no agregaste conceptos.</p></div></div>
           </aside>
         </div>
-        <div class="card budget-conditions-card">
+        <div class="budget-step-actions" data-budget-tab-panel="create" data-budget-step-panel="2"><button class="btn ghost" type="button" data-budget-step-go="1">← Volver</button><button class="btn primary" type="button" data-budget-step-go="3">Revisar presupuesto →</button></div>
+        <div class="card budget-conditions-card" data-budget-tab-panel="create" data-budget-step-panel="1">
           <h3>Condiciones</h3>
           <div class="form-grid">
             <label>Plazo estimado<input id="budget-manufacturing-time" maxlength="300" placeholder="Ej.: 10 días hábiles"></label>
@@ -682,12 +698,21 @@
             <label class="full-span">Notas comerciales<textarea id="budget-commercial-notes" maxlength="2000" rows="2"></textarea></label>
             <label class="full-span">Notas internas generales<textarea id="budget-internal-notes" maxlength="4000" rows="2"></textarea></label>
           </div>
-          <div class="budget-actions"><button id="save-budget" class="btn secondary" type="button">Guardar borrador</button><button id="emit-budget" class="btn primary" type="button">Emitir presupuesto</button><span id="budget-save-state" class="muted" role="status"></span></div>
+          <div class="budget-step-actions"><span class="muted">Los datos se mantienen mientras avanzás.</span><button class="btn primary" type="button" data-budget-step-go="2">Continuar a producción →</button></div>
         </div>
-        <section class="budget-history">
+        <section class="card budget-review-card" data-budget-tab-panel="create" data-budget-step-panel="3">
+          <div class="form-block-head"><div><p class="eyebrow">REVISIÓN FINAL</p><h3>Comprobá los datos antes de guardar o emitir</h3><p class="muted">La emisión congela una versión, genera el PDF comercial y envía únicamente el correo interno configurado.</p></div></div>
+          <div id="budget-review-summary" class="budget-review-summary"></div>
+          <div class="budget-step-actions"><button class="btn ghost" type="button" data-budget-step-go="2">← Volver a producción</button><div class="budget-actions"><button id="save-budget" class="btn secondary" type="button">Guardar borrador</button><button id="emit-budget" class="btn primary" type="button">Emitir presupuesto</button></div></div>
+          <span id="budget-save-state" class="muted" role="status" aria-live="polite"></span>
+        </section>
+        <section id="budget-panel-history" class="budget-history hidden" role="tabpanel" aria-labelledby="budget-tab-history" data-budget-tab-panel="history">
           <div class="section-head"><div><p class="eyebrow">HISTORIAL</p><h2>Presupuestos guardados</h2></div><button id="import-local-budgets" class="btn ghost hidden" type="button">Importar presupuestos de este navegador</button></div>
           <div class="inventory-toolbar budget-history-toolbar"><div class="inventory-search"><span>⌕</span><input id="budget-search" placeholder="Número, cliente o título"></div><select id="budget-status-filter"><option value="all">Todos los estados</option><option value="draft">Borradores</option><option value="issued">Emitidos</option><option value="accepted">Aceptados</option><option value="rejected">Rechazados</option><option value="expired">Vencidos</option><option value="converted">Convertidos</option></select><select id="budget-sort"><option value="updated_desc">Más recientes</option><option value="updated_asc">Más antiguos</option><option value="total_desc">Mayor importe</option><option value="total_asc">Menor importe</option></select><select id="budget-page-size"><option>10</option><option>25</option><option>50</option></select></div>
           <div id="budget-history-list" class="table-wrap"></div><div id="budget-pagination" class="pagination hidden"></div>
+        </section>
+        <section id="budget-panel-detail" class="budget-detail-panel hidden" role="tabpanel" aria-labelledby="budget-tab-detail" data-budget-tab-panel="detail">
+          <div id="budget-detail-empty" class="card budget-detail-empty"><p class="eyebrow">DETALLE</p><h3>Seleccioná un presupuesto del historial</h3><p class="muted">Acá vas a ver sus versiones, PDF, estado y acciones disponibles.</p><button class="btn secondary" type="button" data-budget-tab="history">Ir al historial</button></div>
           <div id="budget-detail" class="card budget-detail hidden"></div>
         </section>
       </section>
@@ -880,12 +905,12 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/core.js?v=catalog-admin1"></script>
-  <script src="js/ui-shell.js?v=catalog-admin1"></script>
+  <script src="js/ui-shell.js?v=hud-orders1"></script>
   <script src="js/store-ui.js?v=catalog-admin1"></script>
   <script src="js/products-ui.js?v=catalog-admin1"></script>
   <script src="js/community-ui.js?v=mfa2"></script>
   <script src="js/inventory-ui.js?v=catalog-admin1"></script>
-  <script src="js/budget-ui.js?v=budget-system1"></script>
+  <script src="js/budget-ui.js?v=hud-orders1"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
     <div class="modal-card order-management-card">
       <button class="modal-close" data-close-modal="order-management-modal" aria-label="Cerrar">×</button>
@@ -894,7 +919,7 @@
       <div id="order-management-content"></div>
     </div>
   </div>
-  <script src="js/orders-ui.js?v=delivery1"></script>
+  <script src="js/orders-ui.js?v=hud-orders1"></script>
   <script src="js/order-management.js?v=inventory-trace1"></script>
   <div id="inventory-history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-history-title">
     <div class="modal-card order-management-card">
@@ -906,7 +931,7 @@
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
 
 
-  <script src="js/app-init.js?v=catalog-admin1"></script>
+  <script src="js/app-init.js?v=hud-orders1"></script>
   <script src="supabase-bridge.js?v=catalog-admin1"></script>
   <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
