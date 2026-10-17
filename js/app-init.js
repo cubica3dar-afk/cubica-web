@@ -155,6 +155,22 @@ document.addEventListener("DOMContentLoaded",()=>{
     renderSupplies();
   };
   $("add-supply-category").onclick=()=>openModal("supply-category-modal");
+  $("add-finished-category")?.addEventListener("click",()=>{
+    renderFinishedCategoryManager();
+    openModal("finished-category-modal");
+  });
+
+  $("orders-search")?.addEventListener("input",()=>{orderPage=1;renderOrders();});
+  for(const id of ["orders-status-filter","orders-payment-filter"]){
+    $(id)?.addEventListener("change",()=>{orderPage=1;renderOrders();});
+  }
+  if($("orders-sort"))$("orders-sort").value=orderSortMode;
+  $("orders-sort")?.addEventListener("change",event=>{
+    orderSortMode=event.target.value;
+    orderPage=1;
+    localStorage.setItem("cubica_order_sort",orderSortMode);
+    renderOrders();
+  });
 
   $("checkout-btn").onclick=()=>window.cubicaStartCheckout?.();
 
@@ -184,6 +200,12 @@ document.addEventListener("DOMContentLoaded",()=>{
     e.target.reset();
     closeModal("supply-category-modal");
   };
+  $("finished-category-form")?.addEventListener("submit",async event=>{
+    event.preventDefault();
+    const input=$("new-finished-category");
+    await createFinishedCategory(input?.value||"");
+    if(input)input.value="";
+  });
 
   $("budget-form").addEventListener("input",calculateBudget);
   $("budget-form").addEventListener("change",calculateBudget);
@@ -217,3 +239,4 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   initBudgetDefaults();
 });
+
