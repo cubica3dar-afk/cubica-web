@@ -29,7 +29,7 @@ begin
  (adm,'authenticated','authenticated',adm::text||'@example.invalid',now(),'{}');
  if (select role from public.profiles where id=a)<>'customer' then raise exception 'User metadata escalates profile role'; end if;
  update public.profiles set role='admin' where id=adm;
- insert into public.products(id,name,price,stock,color_mode) values(pid,'Discardable security fixture',100,10,'single');
+ insert into public.products(id,name,price,stock,color_mode,published) values(pid,'Discardable security fixture',100,10,'single',true);
  insert into public.product_colors(product_id,name) values(pid,'Blanco');
  insert into public.orders(customer_name,customer_email,total,status) values('Fixture',old_email,100,'Pendiente') returning id into old_oid;
  insert into public.orders(customer_name,customer_email,total,status) values('Fixture',email_b,100,'Pendiente') returning id into pending_oid;

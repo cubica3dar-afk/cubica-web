@@ -254,19 +254,14 @@ function paginationNumbers(totalPages,currentPage){
   pages.push(totalPages);
   return pages;
 }
-function renderPagination(id,{page,totalPages,totalItems,pageSize,setter}){
+function renderPagination(id,{page,totalPages,totalItems,pageSize,setter,pageSizeSetter}){
   const box=$(id);if(!box)return;
-  if(totalItems<=pageSize || totalItems===0){
-    box.classList.add("hidden");
-    box.innerHTML="";
-    return;
-  }
-  const start=(page-1)*pageSize+1;
+  const start=totalItems?(page-1)*pageSize+1:0;
   const end=Math.min(totalItems,page*pageSize);
   const pages=paginationNumbers(totalPages,page);
   box.classList.remove("hidden");
   box.innerHTML=`
-    <div class="pagination-summary">Mostrando <strong>${start}–${end}</strong> de <strong>${totalItems}</strong></div>
+    <div class="pagination-summary">${totalItems?`Mostrando <strong>${start}–${end}</strong> de <strong>${totalItems}</strong>`:"0 resultados"} · Página <strong>${page}</strong> de <strong>${totalPages}</strong></div>
     <div class="pagination-controls">
       <button class="pagination-btn pagination-arrow" type="button" onclick="${setter}(${page-1})" ${page<=1?"disabled":""} aria-label="Página anterior">‹</button>
       ${pages.map(p=>p==="…"
@@ -274,7 +269,8 @@ function renderPagination(id,{page,totalPages,totalItems,pageSize,setter}){
         : `<button class="pagination-btn ${p===page?"active":""}" type="button" onclick="${setter}(${p})" ${p===page?'aria-current="page"':""}>${p}</button>`
       ).join("")}
       <button class="pagination-btn pagination-arrow" type="button" onclick="${setter}(${page+1})" ${page>=totalPages?"disabled":""} aria-label="Página siguiente">›</button>
-    </div>`;
+    </div>
+    ${pageSizeSetter?`<label class="pagination-size">Por página <select onchange="${pageSizeSetter}(this.value)">${[10,25,50].map(size=>`<option value="${size}" ${Number(pageSize)===size?"selected":""}>${size}</option>`).join("")}</select></label>`:""}`;
 }
 
 function openModal(id){
@@ -284,3 +280,4 @@ function openModal(id){
 function closeModal(id){
   $(id)?.classList.add("hidden");
 }
+

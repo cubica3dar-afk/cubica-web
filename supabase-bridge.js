@@ -161,7 +161,10 @@
       stock: Number(row.stock) || 0,
       colorMode: row.color_mode === "multiple" ? "multiple" : "single",
       active: row.active !== false,
+      published: row.published !== false,
       sortOrder: Number(row.sort_order)||0,
+      createdAt: row.created_at||"",
+      updatedAt: row.updated_at||"",
       colors: (colorsByProduct.get(row.id) || []).map(c=>({name:c.name,hex:c.hex})),
       // Las recetas se migran en la próxima etapa. Mientras tanto conservamos
       // la receta local si existe en este navegador y el ID coincide.
@@ -172,18 +175,15 @@
   }
 
   async function fetchProductsCompat(){
-    let result=await client
-      .from("products")
-      .select("id,name,category,description,price,stock,color_mode,active,sort_order")
-      .eq("active", true)
-      .order("created_at", { ascending:true });
+    const admin=session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+    let query=client.from("products").select("id,name,category,description,price,stock,color_mode,active,published,sort_order,created_at,updated_at");
+    if(!admin)query=query.eq("active",true);
+    let result=await query.order("created_at", { ascending:true }).order("id",{ascending:true});
 
-    if(result.error && /sort_order|column .* does not exist/i.test(String(result.error.message||""))){
-      result=await client
-        .from("products")
-        .select("id,name,category,description,price,stock,color_mode,active")
-        .eq("active", true)
-        .order("created_at", { ascending:true });
+    if(result.error && /published|sort_order|updated_at|column .* does not exist/i.test(String(result.error.message||""))){
+      query=client.from("products").select("id,name,category,description,price,stock,color_mode,active,sort_order,created_at");
+      if(!admin)query=query.eq("active",true);
+      result=await query.order("created_at", { ascending:true }).order("id",{ascending:true});
     }
     return result;
   }
@@ -291,7 +291,8 @@
       stock:Math.max(0,Math.trunc(Number(p.stock)||0)),
       color_mode:p.colorMode==="multiple"?"multiple":"single",
       sort_order:Number(p.sortOrder)||0,
-      active:p.active!==false
+      active:p.active!==false,
+      published:p.published===true
     }));
   }
 
@@ -642,7 +643,7 @@
             toast(`Vinculamos ${claimed} pedido${claimed===1?"":"s"} anterior${claimed===1?"":"es"} a tu cuenta.`);
           }
         }
-        if(newSession?.user && !catalogLoadedFromSupabase) await loadCatalogFromSupabase();
+        if((session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true)||!newSession?.user||!catalogLoadedFromSupabase) await loadCatalogFromSupabase();
         if(!recoveryActive && ["INITIAL_SESSION","SIGNED_IN"].includes(event)){
           const opened=window.cubicaOpenCheckoutLink?.()||window.cubicaOpenOrdersLink?.()||window.cubicaOpenProductLink?.();
           if(!opened && event==="SIGNED_IN" && session?.role==="customer") showSection("store");
@@ -655,3 +656,4 @@
     loadCatalogFromSupabase();
   });
 })();
+

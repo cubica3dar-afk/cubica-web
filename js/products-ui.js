@@ -1,6 +1,6 @@
 /* CÚBICA 3D — productos: ficha pública y administración de terminados. */
 
-const FINISHED_PAGE_SIZE=12;
+let finishedPageSize=[10,25,50].includes(Number(localStorage.getItem("cubica_finished_page_size")))?Number(localStorage.getItem("cubica_finished_page_size")):10;
 let finishedPage=1;
 let finishedSortMode=localStorage.getItem("cubica_finished_sort")||"manual";
 let finishedColors=[];
@@ -26,6 +26,10 @@ function normalizeProduct(p){
   p.media=Array.isArray(p.media)?p.media:[];
   p.description=typeof p.description==="string"?p.description:"";
   p.sortOrder=Number(p.sortOrder??p.sort_order)||0;
+  p.active=p.active!==false;
+  p.published=p.published!==false;
+  p.createdAt=p.createdAt||p.created_at||"";
+  p.updatedAt=p.updatedAt||p.updated_at||"";
   return p;
 }
 function productCapacity(recipe){
@@ -44,14 +48,19 @@ function productCapacity(recipe){
 function sortedFinishedForView(list,mode=finishedSortMode){
   const copy=[...(list||[])];
   const byText=(a,b)=>String(a||"").localeCompare(String(b||""),"es",{sensitivity:"base"});
-  if(mode==="category")return copy.sort((a,b)=>byText(a.category,b.category)||byText(a.name,b.name));
-  if(mode==="name")return copy.sort((a,b)=>byText(a.name,b.name));
-  if(mode==="stock-desc")return copy.sort((a,b)=>(Number(b.stock)||0)-(Number(a.stock)||0)||byText(a.name,b.name));
-  if(mode==="stock-asc")return copy.sort((a,b)=>(Number(a.stock)||0)-(Number(b.stock)||0)||byText(a.name,b.name));
-  if(mode==="price-desc")return copy.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0)||byText(a.name,b.name));
-  if(mode==="price-asc")return copy.sort((a,b)=>(Number(a.price)||0)-(Number(b.price)||0)||byText(a.name,b.name));
-  return copy.sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||byText(a.name,b.name));
+  const stable=(a,b)=>byText(a.id,b.id);
+  if(mode==="category")return copy.sort((a,b)=>byText(a.category,b.category)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="name")return copy.sort((a,b)=>byText(a.name,b.name)||stable(a,b));
+  if(mode==="name-desc")return copy.sort((a,b)=>byText(b.name,a.name)||stable(a,b));
+  if(mode==="stock-desc")return copy.sort((a,b)=>(Number(b.stock)||0)-(Number(a.stock)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="stock-asc")return copy.sort((a,b)=>(Number(a.stock)||0)-(Number(b.stock)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="price-desc")return copy.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="price-asc")return copy.sort((a,b)=>(Number(a.price)||0)-(Number(b.price)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="date-desc")return copy.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||""))||stable(a,b));
+  if(mode==="date-asc")return copy.sort((a,b)=>String(a.createdAt||"").localeCompare(String(b.createdAt||""))||stable(a,b));
+  return copy.sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||byText(a.name,b.name)||stable(a,b));
 }
+function setFinishedPageSize(size){const next=Number(size);if(![10,25,50].includes(next))return;finishedPageSize=next;finishedPage=1;localStorage.setItem("cubica_finished_page_size",String(next));renderFinishedStock();}
 function moveFinishedProduct(id,direction){
   if(finishedSortMode!=="manual")return;
   const ordered=sortedFinishedForView(products,"manual");
@@ -81,6 +90,8 @@ function renderFinishedStock(){
     filter.value=cats.includes(current)?current:'all';
   }
   const cat=filter?.value||'all';
+  const publication=$('finished-publication-filter')?.value||'all';
+  const activeState=$('finished-active-filter')?.value||'all';
 
   const sortSelect=$("finished-sort");
   if(sortSelect){
@@ -90,15 +101,17 @@ function renderFinishedStock(){
 
   const filtered=products.filter(p=>{
     const hay=[p.name,p.category,p.description].join(' ').toLowerCase();
-    return (cat==='all'||p.category===cat)&&(!search||hay.includes(search));
+    const publicationMatch=publication==='all'||(publication==='published'?p.published===true:p.published!==true);
+    const activeMatch=activeState==='all'||(activeState==='active'?p.active!==false:p.active===false);
+    return (cat==='all'||p.category===cat)&&publicationMatch&&activeMatch&&(!search||hay.includes(search));
   });
   const ordered=sortedFinishedForView(filtered,finishedSortMode);
-  const canManualReorder=finishedSortMode==="manual" && !search && cat==="all";
+  const canManualReorder=finishedSortMode==="manual" && !search && cat==="all"&&publication==="all"&&activeState==="all";
 
-  const totalPages=Math.max(1,Math.ceil(ordered.length/FINISHED_PAGE_SIZE));
+  const totalPages=Math.max(1,Math.ceil(ordered.length/finishedPageSize));
   finishedPage=Math.min(Math.max(1,finishedPage),totalPages);
-  const pageStart=(finishedPage-1)*FINISHED_PAGE_SIZE;
-  const pageItems=ordered.slice(pageStart,pageStart+FINISHED_PAGE_SIZE);
+  const pageStart=(finishedPage-1)*finishedPageSize;
+  const pageItems=ordered.slice(pageStart,pageStart+finishedPageSize);
 
   const hint=$("finished-sort-hint");
   if(hint){
@@ -107,7 +120,7 @@ function renderFinishedStock(){
       : "Este orden es solo una vista. Elegí “Orden personalizado” para guardar tu propio orden.";
   }
 
-  $('finished-stock-table').innerHTML=`<table><thead><tr><th class="finished-order-col">Orden</th><th>Producto</th><th>Categoría</th><th>Color(es)</th><th>Precio</th><th>Stock</th><th>Capacidad por insumos</th><th>Valor stock</th><th></th></tr></thead><tbody>
+  $('finished-stock-table').innerHTML=`<table><thead><tr><th class="finished-order-col">Orden</th><th>Producto</th><th>Estado</th><th>Categoría</th><th>Color(es)</th><th>Precio</th><th>Stock</th><th>Capacidad por insumos</th><th>Valor stock</th><th></th></tr></thead><tbody>
   ${pageItems.length?pageItems.map((p,rowIndex)=>{
     const globalIndex=pageStart+rowIndex;
     const cap=productCapacity(p.recipe);
@@ -121,20 +134,23 @@ function renderFinishedStock(){
           :`<span class="muted">${globalIndex+1}</span>`}
       </td>
       <td><div class="finished-name-cell">${p.media?.find(m=>m.type==='image')?`<img src="${p.media.find(m=>m.type==='image').src}" alt="">`:''}<div><strong>${escapeHtml(p.name)}</strong><small class="capacity-note">${p.recipe?.length||0} insumo(s) · ${mediaCount} medio(s)</small></div></div></td>
+      <td><div class="status-stack"><span class="status-pill ${p.published?'is-published':'is-hidden'}">${p.published?'Publicado':'Oculto'}</span><span class="status-pill ${p.active?'is-active':'is-inactive'}">${p.active?'Activo':'Inactivo'}</span></div></td>
       <td>${escapeHtml(p.category)}</td><td><div class="mini-colors">${colors}</div></td><td><input type="number" min="0" value="${p.price}" onchange="updateProduct('${p.id}','price',this.value)"></td>
       <td><input type="number" min="0" value="${p.stock}" onchange="updateProduct('${p.id}','stock',this.value)"></td><td>${capacity}</td><td>${money(p.price*p.stock)}</td>
-      <td class="table-actions"><button class="btn ghost" onclick="editProduct('${p.id}')">Editar</button><button class="btn ghost" onclick="deleteProduct('${p.id}')">Eliminar</button></td>
+      <td class="table-actions"><button class="btn ghost" onclick="toggleProductPublication('${p.id}')">${p.published?'Ocultar':'Publicar'}</button><button class="btn ghost" onclick="editProduct('${p.id}')">Editar</button><button class="btn ghost" onclick="deleteProduct('${p.id}')">Eliminar</button></td>
     </tr>`;
-  }).join(''):`<tr><td colspan="9" class="empty-table">No se encontraron productos terminados con esos filtros.</td></tr>`}</tbody></table>`;
+  }).join(''):`<tr><td colspan="10" class="empty-table">No se encontraron productos terminados con esos filtros.</td></tr>`}</tbody></table>`;
 
   renderPagination("finished-pagination",{
     page:finishedPage,
     totalPages,
     totalItems:ordered.length,
-    pageSize:FINISHED_PAGE_SIZE,
-    setter:"setFinishedPage"
+    pageSize:finishedPageSize,
+    setter:"setFinishedPage",
+    pageSizeSetter:"setFinishedPageSize"
   });
 }
+function toggleProductPublication(id){const p=products.find(x=>x.id===id);if(!p)return;p.published=!p.published;write(STORAGE.products,products);renderFinishedStock();renderProducts();toast(p.published?"Producto publicado":"Producto ocultado");}
 function updateProduct(id,key,val){const p=products.find(x=>x.id===id);if(!p)return;p[key]=key==="price"||key==="stock"?Number(val):val;write(STORAGE.products,products);renderFinishedStock();renderProducts()}
 function deleteProduct(id){if(!confirm("¿Eliminar este producto?"))return;products=products.filter(p=>p.id!==id);write(STORAGE.products,products);renderFinishedStock();renderProducts()}
 function renderFinishedCategorySelect(selected=""){
@@ -366,7 +382,7 @@ function productPageState(kind){
 }
 function openProductDetail(id,options={}){
   if(recoveryOwnsNavigation())return false;
-  const p=window.cubicaCatalogEmpty?null:products.find(x=>String(x.id)===String(id)&&x.active!==false);
+  const p=window.cubicaCatalogEmpty?null:products.find(x=>String(x.id)===String(id)&&x.active!==false&&x.published!==false);
   const waitingForServer=window.CUBICA_CONFIG?.mode==='supabase'&&window.cubicaCatalogState!=='ready';
   const repeated=detailPageActive&&String(detailProductId)===String(id)&&!!p&&!waitingForServer;
   detailPageActive=true;
@@ -428,7 +444,7 @@ function selectProductColor(color){const p=products.find(x=>x.id===detailProduct
 function toggleProductColor(color){const p=products.find(x=>x.id===detailProductId);if(!p?.colors.some(c=>c.name===color))return;if(detailSelectedColors.includes(color))detailSelectedColors=detailSelectedColors.filter(c=>c!==color);else detailSelectedColors.push(color);detailSelectedColor=detailSelectedColors[0]||'';renderProductDetail();$("detail-color-"+p.colors.findIndex(c=>c.name===color))?.focus({preventScroll:true});}
 function addDetailToCart(checkout=false){
   if(detailPurchaseBusy||recoveryOwnsNavigation())return false;
-  const p=products.find(x=>x.id===detailProductId&&x.active!==false);if(!p)return false;
+  const p=products.find(x=>x.id===detailProductId&&x.active!==false&&x.published!==false);if(!p)return false;
   const feedback=$("product-purchase-feedback"),q=Number($("detail-qty")?.value??detailQuantity);
   const selected=p.colorMode==='multiple'?detailSelectedColors:[detailSelectedColor];
   let error=!Number.isSafeInteger(q)||q<1||q>100?'Elegí una cantidad entera entre 1 y 100.':null;
@@ -477,25 +493,26 @@ window.addEventListener('cubica:catalog-error',()=>{if(detailPageActive)productP
 function resetFinishedProductForm(){
   $("finished-id").value="";$("finished-modal-title").textContent="Nuevo producto terminado";$("finished-submit").textContent="Agregar producto";
   $("finished-form").reset();renderFinishedCategorySelect("Figuras");
-  finishedColors=[];finishedRecipe=[];finishedMedia=[];$("finished-multi-color").checked=false;renderFinishedColors();renderFinishedRecipe();renderFinishedMedia();
+  finishedColors=[];finishedRecipe=[];finishedMedia=[];$("finished-multi-color").checked=false;$("finished-active").checked=true;$("finished-published").checked=false;renderFinishedColors();renderFinishedRecipe();renderFinishedMedia();
 }
 function editProduct(id){
   const p=products.find(x=>x.id===id);if(!p)return;normalizeProduct(p);
   $("finished-id").value=p.id;$("finished-modal-title").textContent="Editar producto terminado";$("finished-submit").textContent="Guardar cambios";
   $("finished-name").value=p.name;$("finished-price").value=p.price;$("finished-qty").value=p.stock;$("finished-description").value=p.description||"";
+  $("finished-active").checked=p.active!==false;$("finished-published").checked=p.published===true;
   renderFinishedCategorySelect(p.category);finishedColors=p.colors.map(c=>({...c}));$("finished-multi-color").checked=p.colorMode==="multiple";finishedRecipe=p.recipe.map(r=>({...r}));finishedMedia=p.media.map(m=>({...m}));
   renderFinishedColors();renderFinishedRecipe();renderFinishedMedia();openModal("finished-modal");
 }
 function saveFinishedProduct(e){
   e.preventDefault();
-  const name=$("finished-name").value.trim(),category=$("finished-category").value,price=Number($("finished-price").value),stock=Number($("finished-qty").value),description=$("finished-description").value.trim(),colorMode=$("finished-multi-color").checked?"multiple":"single";
+  const name=$("finished-name").value.trim(),category=$("finished-category").value,price=Number($("finished-price").value),stock=Number($("finished-qty").value),description=$("finished-description").value.trim(),colorMode=$("finished-multi-color").checked?"multiple":"single",active=$("finished-active").checked,published=$("finished-published").checked;
   if(!name)return toast("El producto necesita un nombre.");
   const recipe=finishedRecipe.filter(r=>r.supplyId && Number(r.qty)>0).map(r=>({supplyId:r.supplyId,qty:Number(r.qty)}));
   const id=$("finished-id").value;
   if(id){
-    const p=products.find(x=>x.id===id);if(!p)return;Object.assign(p,{name,category,price,stock,description,colorMode,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m}))});toast("Producto actualizado");
+    const p=products.find(x=>x.id===id);if(!p)return;Object.assign(p,{name,category,price,stock,description,colorMode,active,published,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m}))});toast("Producto actualizado");
   }else{
-    products.push({id:uid("p"),name,category,price,stock,description,colorMode,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m})),sortOrder:Math.max(0,...products.map(x=>Number(x.sortOrder)||0))+10});toast("Producto agregado");
+    products.push({id:uid("p"),name,category,price,stock,description,colorMode,active,published,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m})),sortOrder:Math.max(0,...products.map(x=>Number(x.sortOrder)||0))+10,createdAt:new Date().toISOString()});toast(published?"Producto agregado y publicado":"Producto agregado como oculto");
   }
   write(STORAGE.products,products);e.target.reset();closeModal("finished-modal");renderFinishedStock();renderProducts();
 }
@@ -507,6 +524,8 @@ window.removeFinishedColor=removeFinishedColor;
 window.updateFinishedRecipe=updateFinishedRecipe;
 window.removeFinishedRecipe=removeFinishedRecipe;
 window.setFinishedPage=setFinishedPage;
+window.setFinishedPageSize=setFinishedPageSize;
+window.toggleProductPublication=toggleProductPublication;
 window.moveFinishedProduct=moveFinishedProduct;
 window.openProductDetail=openProductDetail;
 window.setProductMedia=setProductMedia;

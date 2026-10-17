@@ -9,7 +9,7 @@ begin
  (admin_id,'authenticated','authenticated',admin_id::text||'@example.invalid','{}');
  update public.profiles set role='admin' where id=admin_id;
  update auth.users set email_confirmed_at=now() where id in(a,b,admin_id);
- insert into public.products(id,name,price,stock) values(pid,'Community fixture',100,100),(pid||'-empty','Sin actividad fixture',100,1);
+ insert into public.products(id,name,price,stock,published) values(pid,'Community fixture',100,100,true),(pid||'-empty','Sin actividad fixture',100,1,true);
  perform set_config('request.jwt.claim.sub',a::text,true);
  perform set_config('role','authenticated',true);
  root_id:=public.create_community_comment(pid,'Opinión original',request);

@@ -11,7 +11,10 @@ const load=async path=>{
 const [index,config,sales,turnstile]=await Promise.all([
   load("index.html"),load("github-config.js"),load("supabase-sales.js"),load("js/turnstile-ui.js")
 ]);
-assert.match(index,/supabase-sales\.js\?v=order-protection3/);
+assert.match(index,/supabase-sales\.js\?v=catalog-admin1/);
+assert.match(index,/js\/store-ui\.js\?v=catalog-admin1/);
+assert.match(index,/js\/products-ui\.js\?v=catalog-admin1/);
+assert.match(index,/js\/inventory-ui\.js\?v=catalog-admin1/);
 assert.match(index,/turnstile-ui\.js\?v=order-protection10/);
 assert.match(config,/turnstileSiteKey:\s*"0x4AAAAAAFWyP3cVMucw34_n"/);
 assert.doesNotMatch(sales,/\.rpc\(["']create_delivery_order["']/);

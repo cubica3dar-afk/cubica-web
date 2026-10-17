@@ -28,7 +28,7 @@ begin
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
  perform set_config('request.jwt.claims',jsonb_build_object('sub',admin_id,'role','authenticated','aal','aal2')::text,true);
  p1:=prefix||'-p1';p2:=prefix||'-p2';p3:=prefix||'-p3';s1:=prefix||'-s1';s2:=prefix||'-s2';
- insert into public.products(id,name,price,stock) values(p1,'Fixture estándar',100,100),(p2,'Fixture personalizada',200,100),(p3,'Fixture sin receta',100,10);
+ insert into public.products(id,name,price,stock,published) values(p1,'Fixture estándar',100,100,true),(p2,'Fixture personalizada',200,100,true),(p3,'Fixture sin receta',100,10,true);
  insert into public.supplies(id,name,qty,unit) values(s1,'Fixture PLA',100,'gramos'),(s2,'Fixture LED',5,'unidades');
  insert into public.product_recipes(product_id,supply_id,qty_per_unit) values(p1,s1,10),(p2,s1,5);
  result:=public.create_public_order(prefix,'Fixture','fixture@example.invalid','','Efectivo','',jsonb_build_array(jsonb_build_object('product_id',p1,'qty',2),jsonb_build_object('product_id',p2,'qty',3)));

@@ -5,7 +5,7 @@
 
 
 /* Estado local del módulo de inventario. */
-const SUPPLY_PAGE_SIZE=12;
+let supplyPageSize=[10,25,50].includes(Number(localStorage.getItem("cubica_supply_page_size")))?Number(localStorage.getItem("cubica_supply_page_size")):10;
 let supplyPage=1;
 let supplySortMode=localStorage.getItem("cubica_supply_sort")||"manual";
 
@@ -39,13 +39,15 @@ function supplyDetailHtml(s){
 function sortedSuppliesForView(list,mode=supplySortMode){
   const copy=[...(list||[])];
   const byText=(a,b)=>String(a||"").localeCompare(String(b||""),"es",{sensitivity:"base"});
-  if(mode==="category")return copy.sort((a,b)=>byText(a.category,b.category)||byText(a.name,b.name));
-  if(mode==="name")return copy.sort((a,b)=>byText(a.name,b.name));
-  if(mode==="stock-desc")return copy.sort((a,b)=>(Number(b.qty)||0)-(Number(a.qty)||0)||byText(a.name,b.name));
-  if(mode==="stock-asc")return copy.sort((a,b)=>(Number(a.qty)||0)-(Number(b.qty)||0)||byText(a.name,b.name));
-  if(mode==="cost-desc")return copy.sort((a,b)=>(Number(b.cost)||0)-(Number(a.cost)||0)||byText(a.name,b.name));
-  if(mode==="cost-asc")return copy.sort((a,b)=>(Number(a.cost)||0)-(Number(b.cost)||0)||byText(a.name,b.name));
-  return copy.sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||byText(a.name,b.name));
+  const stable=(a,b)=>byText(a.id,b.id);
+  if(mode==="category")return copy.sort((a,b)=>byText(a.category,b.category)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="name")return copy.sort((a,b)=>byText(a.name,b.name)||stable(a,b));
+  if(mode==="name-desc")return copy.sort((a,b)=>byText(b.name,a.name)||stable(a,b));
+  if(mode==="stock-desc")return copy.sort((a,b)=>(Number(b.qty)||0)-(Number(a.qty)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="stock-asc")return copy.sort((a,b)=>(Number(a.qty)||0)-(Number(b.qty)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="cost-desc")return copy.sort((a,b)=>(Number(b.cost)||0)-(Number(a.cost)||0)||byText(a.name,b.name)||stable(a,b));
+  if(mode==="cost-asc")return copy.sort((a,b)=>(Number(a.cost)||0)-(Number(b.cost)||0)||byText(a.name,b.name)||stable(a,b));
+  return copy.sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||byText(a.name,b.name)||stable(a,b));
 }
 function moveSupply(id,direction){
   if(supplySortMode!=="manual")return;
@@ -65,6 +67,7 @@ function setSupplyPage(page){
   const toolbar=$("section-stock-supplies")?.querySelector(".inventory-toolbar");
   toolbar?.scrollIntoView({behavior:"smooth",block:"start"});
 }
+function setSupplyPageSize(size){const next=Number(size);if(![10,25,50].includes(next))return;supplyPageSize=next;supplyPage=1;localStorage.setItem("cubica_supply_page_size",String(next));renderSupplies();}
 function renderSupplies(){
   supplies=supplies.map(normalizeSupply);
   renderSupplyCategoryControls();
@@ -77,17 +80,23 @@ function renderSupplies(){
 
   const search=(($("supply-search")?.value)||"").trim().toLowerCase();
   const cat=$("supply-category-filter")?.value||"all";
+  const brandFilter=$("supply-brand-filter"),materialFilter=$("supply-material-filter");
+  if(brandFilter){const current=brandFilter.value;const values=[...new Set(supplies.map(s=>s.brand).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));brandFilter.innerHTML='<option value="all">Todas las marcas</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");brandFilter.value=values.includes(current)?current:"all";}
+  if(materialFilter){const current=materialFilter.value;const values=[...new Set(supplies.map(s=>s.materialType).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));materialFilter.innerHTML='<option value="all">Todos los materiales</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");materialFilter.value=values.includes(current)?current:"all";}
+  const brand=brandFilter?.value||"all";
+  const material=materialFilter?.value||"all";
+  const activeState=$("supply-active-filter")?.value||"all";
   const filtered=supplies.filter(s=>{
     const hay=[s.name,s.category,s.brand,s.materialType,s.colorName,s.colorHex].join(" ").toLowerCase();
-    return (!search||hay.includes(search)) && (cat==="all"||s.category===cat);
+    return (!search||hay.includes(search)) && (cat==="all"||s.category===cat) && (brand==="all"||s.brand===brand) && (material==="all"||s.materialType===material) && (activeState==="all"||(activeState==="active"?s.active!==false:s.active===false));
   });
   const ordered=sortedSuppliesForView(filtered,supplySortMode);
-  const canManualReorder=supplySortMode==="manual" && !search && cat==="all";
+  const canManualReorder=supplySortMode==="manual" && !search && cat==="all"&&brand==="all"&&material==="all"&&activeState==="all";
 
-  const totalPages=Math.max(1,Math.ceil(ordered.length/SUPPLY_PAGE_SIZE));
+  const totalPages=Math.max(1,Math.ceil(ordered.length/supplyPageSize));
   supplyPage=Math.min(Math.max(1,supplyPage),totalPages);
-  const pageStart=(supplyPage-1)*SUPPLY_PAGE_SIZE;
-  const pageItems=ordered.slice(pageStart,pageStart+SUPPLY_PAGE_SIZE);
+  const pageStart=(supplyPage-1)*supplyPageSize;
+  const pageItems=ordered.slice(pageStart,pageStart+supplyPageSize);
 
   const hint=$("supply-sort-hint");
   if(hint){
@@ -109,7 +118,7 @@ function renderSupplies(){
           `<div class="supply-order-buttons"><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',-1)" ${!canManualReorder||globalIndex===0?"disabled":""} title="Subir insumo">↑</button><button class="btn ghost supply-move" onclick="moveSupply('${item.id}',1)" ${!canManualReorder||globalIndex===ordered.length-1?"disabled":""} title="Bajar insumo">↓</button></div>`
           :`<span class="muted">${globalIndex+1}</span>`}
       </td>
-      <td><strong>${escapeHtml(item.name)}</strong></td>
+      <td><strong>${escapeHtml(item.name)}</strong><small class="capacity-note"><span class="status-pill ${item.active!==false?'is-active':'is-inactive'}">${item.active!==false?'Activo':'Inactivo'}</span></small></td>
       <td>${escapeHtml(item.category)}</td>
       <td>${supplyDetailHtml(item)}</td>
       <td>${money(item.cost)} <small class="table-unit">${escapeHtml(supplyCostLabel(item))}</small></td>
@@ -123,8 +132,9 @@ function renderSupplies(){
     page:supplyPage,
     totalPages,
     totalItems:ordered.length,
-    pageSize:SUPPLY_PAGE_SIZE,
-    setter:"setSupplyPage"
+    pageSize:supplyPageSize,
+    setter:"setSupplyPage",
+    pageSizeSetter:"setSupplyPageSize"
   });
 }
 function updateSupply(id,key,val){
@@ -147,6 +157,7 @@ function resetSupplyForm(){
   $("supply-material").value="PLA";
   $("supply-material-custom").value="";
   $("supply-brand").value="";
+  $("supply-active").checked=true;
   updateSupplyFilamentFields();
 }
 function updateSupplyFilamentFields({fromCategoryChange=false}={}){
@@ -187,6 +198,7 @@ function editSupply(id){
   $("supply-brand").value=s.brand||"";
   $("supply-color").value=s.colorHex||"#ffffff";
   $("supply-color-name").value=s.colorName||"";
+  $("supply-active").checked=s.active!==false;
   updateSupplyFilamentFields();
   openModal("supply-modal");
 }
@@ -211,6 +223,7 @@ function saveSupplyForm(e){
     brand:isFilament?$("supply-brand").value.trim():"",
     colorName:isFilament?$("supply-color-name").value.trim():"",
     colorHex:isFilament?$("supply-color").value:"#ffffff",
+    active:$("supply-active").checked,
     sortOrder:id?(supplies.find(x=>x.id===id)?.sortOrder||0):(Math.max(0,...supplies.map(x=>Number(x.sortOrder)||0))+10)
   });
   if(!data.name)return toast("El insumo necesita un nombre.");
@@ -249,8 +262,11 @@ function deleteSupplyCategory(name){
 }
 
 window.setSupplyPage=setSupplyPage;
+window.setSupplyPageSize=setSupplyPageSize;
 window.updateSupply=updateSupply;
 window.editSupply=editSupply;
 window.moveSupply=moveSupply;
 window.deleteSupply=deleteSupply;
 window.deleteSupplyCategory=deleteSupplyCategory;
+
+

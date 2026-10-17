@@ -287,7 +287,7 @@
       const items=[];
       const rpcItems=[];
       for(const c of cart){
-        const p=products.find(x=>x.id===c.productId);
+        const p=products.find(x=>x.id===c.productId&&x.active!==false&&x.published!==false);
         if(!p) throw new Error("Uno de los productos ya no está disponible.");
         const qty=Math.max(1,Math.trunc(Number(c.qty)||1));
         items.push({productId:p.id,name:p.name,qty,price:p.price,color:c.color||""});
@@ -388,3 +388,4 @@
     if(save) save.onclick=saveBudgetSupabase;
   });
 })();
+

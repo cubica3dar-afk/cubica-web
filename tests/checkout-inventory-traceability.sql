@@ -17,9 +17,9 @@ begin
 
   p_full:=prefix||'-full'; p_partial:=prefix||'-partial';
   p_zero:=prefix||'-zero'; p_other:=prefix||'-other';
-  insert into public.products(id,name,price,stock) values
-    (p_full,'Stock completo',100,10),(p_partial,'Stock parcial',200,2),
-    (p_zero,'Sin stock',300,0),(p_other,'Segundo artículo',400,5);
+  insert into public.products(id,name,price,stock,published) values
+    (p_full,'Stock completo',100,10,true),(p_partial,'Stock parcial',200,2,true),
+    (p_zero,'Sin stock',300,0,true),(p_other,'Segundo artículo',400,5,true);
 
   result:=public.create_public_order(prefix,'Fixture','fixture@example.invalid','1122334455','Efectivo','',jsonb_build_array(
     jsonb_build_object('product_id',p_full,'qty',3),jsonb_build_object('product_id',p_partial,'qty',5),
@@ -92,3 +92,4 @@ begin
 end;
 $$;
 rollback;
+

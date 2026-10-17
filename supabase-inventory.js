@@ -32,25 +32,25 @@
   async function fetchSuppliesCompat(){
     // v2: marca + orden personalizado.
     let result=await client.from("supplies")
-      .select("id,name,category,cost,qty,unit,material_type,brand,color_name,color_hex,sort_order,active")
-      .eq("active",true)
+      .select("id,name,category,cost,qty,unit,material_type,brand,color_name,color_hex,sort_order,active,created_at,updated_at")
       .order("sort_order",{ascending:true})
-      .order("created_at",{ascending:true});
+      .order("created_at",{ascending:true})
+      .order("id",{ascending:true});
 
     if(result.error && /brand|sort_order|column .* does not exist/i.test(String(result.error.message||""))){
       // v1: material y color, todavía sin marca/orden.
       result=await client.from("supplies")
-        .select("id,name,category,cost,qty,unit,material_type,color_name,color_hex,active")
-        .eq("active",true)
-        .order("created_at",{ascending:true});
+        .select("id,name,category,cost,qty,unit,material_type,color_name,color_hex,active,created_at,updated_at")
+        .order("created_at",{ascending:true})
+        .order("id",{ascending:true});
     }
 
     if(result.error && /material_type|color_name|color_hex|column .* does not exist/i.test(String(result.error.message||""))){
       // Compatibilidad con el esquema inicial.
       result=await client.from("supplies")
-        .select("id,name,category,cost,qty,unit,active")
-        .eq("active",true)
-        .order("created_at",{ascending:true});
+        .select("id,name,category,cost,qty,unit,active,created_at,updated_at")
+        .order("created_at",{ascending:true})
+        .order("id",{ascending:true});
     }
     return result;
   }
@@ -85,7 +85,10 @@
         brand:x.brand||"",
         colorName:x.color_name||"",
         colorHex:x.color_hex||"#ffffff",
-        sortOrder:Number(x.sort_order)||((i+1)*10)
+        sortOrder:Number(x.sort_order)||((i+1)*10),
+        active:x.active!==false,
+        createdAt:x.created_at||"",
+        updatedAt:x.updated_at||""
       }));
 
       const recipesByProduct=new Map();
@@ -308,3 +311,4 @@
     }
   });
 })();
+

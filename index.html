@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=mfa2">
+  <link rel="stylesheet" href="styles.css?v=catalog-admin1">
   <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
   <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
   <link rel="stylesheet" href="styles-checkout.css?v=checkout1">
@@ -238,6 +238,14 @@
           <div class="filters">
             <input id="product-search" placeholder="Buscar producto...">
             <select id="product-category"><option value="all">Todas las categorías</option></select>
+            <select id="product-sort" aria-label="Ordenar catálogo">
+              <option value="manual">Orden recomendado</option>
+              <option value="recent">Más recientes</option>
+              <option value="name-asc">Nombre A–Z</option>
+              <option value="name-desc">Nombre Z–A</option>
+              <option value="price-asc">Menor precio</option>
+              <option value="price-desc">Mayor precio</option>
+            </select>
           </div>
         </div>
         <div id="product-grid" class="product-grid"></div>
@@ -415,14 +423,19 @@
         <div class="inventory-toolbar finished-toolbar">
           <div class="inventory-search"><span>⌕</span><input id="finished-search" placeholder="Buscar producto por nombre, categoría o descripción..."></div>
           <select id="finished-category-filter"><option value="all">Todas las categorías</option></select>
+          <select id="finished-publication-filter" aria-label="Filtrar por publicación"><option value="all">Publicados y ocultos</option><option value="published">Publicados</option><option value="hidden">Ocultos</option></select>
+          <select id="finished-active-filter" aria-label="Filtrar por actividad"><option value="all">Activos e inactivos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select>
           <select id="finished-sort" aria-label="Ordenar productos terminados">
             <option value="manual">Orden personalizado</option>
             <option value="category">Categoría</option>
             <option value="name">Nombre A–Z</option>
+            <option value="name-desc">Nombre Z–A</option>
             <option value="stock-desc">Mayor stock</option>
             <option value="stock-asc">Menor stock</option>
             <option value="price-desc">Mayor precio</option>
             <option value="price-asc">Menor precio</option>
+            <option value="date-desc">Más recientes</option>
+            <option value="date-asc">Más antiguos</option>
           </select>
         </div>
         <p id="finished-sort-hint" class="finished-sort-hint muted">En “Orden personalizado” podés mover cada producto con las flechas ↑ y ↓.</p>
@@ -447,10 +460,14 @@
         <div class="inventory-toolbar supply-toolbar">
           <div class="inventory-search"><span>⌕</span><input id="supply-search" placeholder="Buscar insumo por nombre, marca, material o categoría..."></div>
           <select id="supply-category-filter"><option value="all">Todas las categorías</option></select>
+          <select id="supply-brand-filter" aria-label="Filtrar por marca"><option value="all">Todas las marcas</option></select>
+          <select id="supply-material-filter" aria-label="Filtrar por material"><option value="all">Todos los materiales</option></select>
+          <select id="supply-active-filter" aria-label="Filtrar por actividad"><option value="all">Activos e inactivos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select>
           <select id="supply-sort" aria-label="Ordenar insumos">
             <option value="manual">Orden personalizado</option>
             <option value="category">Categoría</option>
             <option value="name">Nombre A–Z</option>
+            <option value="name-desc">Nombre Z–A</option>
             <option value="stock-desc">Mayor stock</option>
             <option value="stock-asc">Menor stock</option>
             <option value="cost-desc">Mayor costo</option>
@@ -650,6 +667,12 @@
           <small>Unidades ya terminadas y listas para vender.</small>
         </label>
 
+        <div class="full-span publication-controls">
+          <label class="checkbox-row"><input id="finished-active" type="checkbox" checked><span>Producto activo para gestión e inventario</span></label>
+          <label class="checkbox-row"><input id="finished-published" type="checkbox"><span>Publicado en la tienda</span></label>
+          <small>Los productos nuevos comienzan ocultos. Publicalos cuando la ficha esté lista.</small>
+        </div>
+
         <label class="full-span">Descripción del producto
           <textarea id="finished-description" rows="4" maxlength="1200" placeholder="Contale al cliente qué es, para qué sirve, qué incluye y qué lo hace especial..."></textarea>
           <small>Esta descripción aparecerá en la vista pública del producto.</small>
@@ -784,6 +807,8 @@
           </div>
         </div>
 
+        <label class="checkbox-row full-span"><input id="supply-active" type="checkbox" checked><span>Insumo activo</span></label>
+
         <button id="supply-submit" class="btn primary full" type="submit">Agregar insumo</button>
       </form>
     </div>
@@ -805,12 +830,12 @@
   <script src="github-config.js?v=order-protection2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <script src="js/core.js?v=20261009-refactor2"></script>
-  <script src="js/ui-shell.js?v=mfa2"></script>
-  <script src="js/store-ui.js?v=delivery1"></script>
-  <script src="js/products-ui.js?v=checkout1"></script>
+  <script src="js/core.js?v=catalog-admin1"></script>
+  <script src="js/ui-shell.js?v=catalog-admin1"></script>
+  <script src="js/store-ui.js?v=catalog-admin1"></script>
+  <script src="js/products-ui.js?v=catalog-admin1"></script>
   <script src="js/community-ui.js?v=mfa2"></script>
-  <script src="js/inventory-ui.js?v=20261009-refactor2"></script>
+  <script src="js/inventory-ui.js?v=catalog-admin1"></script>
   <script src="js/budget-ui.js?v=20261009-refactor2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
     <div class="modal-card order-management-card">
@@ -832,19 +857,20 @@
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
 
 
-  <script src="js/app-init.js?v=mfa2"></script>
-  <script src="supabase-bridge.js?v=mfa2"></script>
+  <script src="js/app-init.js?v=catalog-admin1"></script>
+  <script src="supabase-bridge.js?v=catalog-admin1"></script>
   <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
-  <script src="supabase-inventory.js?v=mfa2"></script>
+  <script src="supabase-inventory.js?v=catalog-admin1"></script>
   <script src="js/turnstile-ui.js?v=order-protection10"></script>
-  <script src="supabase-sales.js?v=order-protection3"></script>
+  <script src="supabase-sales.js?v=catalog-admin1"></script>
   <script src="js/delivery-ui.js?v=checkout1"></script>
   <script src="js/checkout-profile.js?v=checkout1"></script>
-  <script src="js/checkout-ui.js?v=checkout1"></script>
+  <script src="js/checkout-ui.js?v=catalog-admin1"></script>
 
   <script src="supabase-analytics.js?v=mfa2"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
+

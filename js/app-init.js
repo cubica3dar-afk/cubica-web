@@ -82,6 +82,13 @@ document.addEventListener("DOMContentLoaded",()=>{
     productPage=1;
     renderProducts();
   };
+  $("product-sort").value=productSortMode;
+  $("product-sort").onchange=e=>{
+    productSortMode=e.target.value;
+    productPage=1;
+    localStorage.setItem("cubica_product_sort",productSortMode);
+    renderProducts();
+  };
 
   $("finished-search").oninput=()=>{
     finishedPage=1;
@@ -91,6 +98,9 @@ document.addEventListener("DOMContentLoaded",()=>{
     finishedPage=1;
     renderFinishedStock();
   };
+  for(const id of ["finished-publication-filter","finished-active-filter"]){
+    $(id).onchange=()=>{finishedPage=1;renderFinishedStock();};
+  }
   $("finished-sort").value=finishedSortMode;
   $("finished-sort").onchange=e=>{
     finishedSortMode=e.target.value;
@@ -110,6 +120,9 @@ document.addEventListener("DOMContentLoaded",()=>{
     supplyPage=1;
     renderSupplies();
   };
+  for(const id of ["supply-brand-filter","supply-material-filter","supply-active-filter"]){
+    $(id).onchange=()=>{supplyPage=1;renderSupplies();};
+  }
   $("supply-sort").value=supplySortMode;
   $("supply-sort").onchange=e=>{
     supplySortMode=e.target.value;
@@ -180,3 +193,4 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   initBudgetDefaults();
 });
+

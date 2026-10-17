@@ -33,10 +33,10 @@ begin
  (adm,'authenticated','authenticated',adm::text||'@example.invalid','{}');
  update public.profiles set role='admin' where id=adm;
  p1:=prefix||'-p1'; p2:=prefix||'-p2'; p3:=prefix||'-missing'; p4:=prefix||'-variants'; sid:=prefix||'-material';
- insert into public.products(id,name,price,stock) values(p1,'Fixture producto A',1000.25,100),(p2,'Fixture producto B',250.50,100),(p3,'Fixture sin dimensiones',500,100);
+ insert into public.products(id,name,price,stock,published) values(p1,'Fixture producto A',1000.25,100,true),(p2,'Fixture producto B',250.50,100,true),(p3,'Fixture sin dimensiones',500,100,true);
  insert into public.supplies(id,name,qty,unit) values(sid,'Fixture insumo no consumido',200,'unidades');
  insert into public.product_recipes(product_id,supply_id,qty_per_unit) values(p1,sid,4),(p2,sid,3);
- insert into public.products(id,name,price,stock,color_mode) values(p4,'Fixture colores múltiples',100,100,'multiple');
+ insert into public.products(id,name,price,stock,color_mode,published) values(p4,'Fixture colores múltiples',100,100,'multiple',true);
  insert into public.product_colors(product_id,name) values(p4,'Blanco'),(p4,'Negro');
  items:=jsonb_build_array(jsonb_build_object('product_id',p1,'qty',2,'price',0,'weight_g',1),jsonb_build_object('product_id',p1,'qty',1),jsonb_build_object('product_id',p2,'qty',2));
  logistics_settings:=jsonb_build_object('origin',jsonb_build_object('street','Origen privado fixture','number','100','city','Caballito','province','Ciudad Autónoma de Buenos Aires','postal_code','1405'),

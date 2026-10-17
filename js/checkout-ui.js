@@ -51,7 +51,7 @@
     if(!cart?.length)return {valid:false,message:"Tu carrito está vacío. Elegí productos para continuar."};
     if(window.CUBICA_CONFIG?.mode==="supabase"&&window.cubicaCatalogState!=="ready")return {valid:false,message:window.cubicaCatalogState==="error"?"No pudimos comprobar los productos. Reintentá cuando vuelva la conexión.":"Estamos comprobando los productos de tu carrito…"};
     for(const item of cart){
-      const p=products.find(p=>String(p.id)===String(item.productId)&&p.active!==false);
+      const p=products.find(p=>String(p.id)===String(item.productId)&&p.active!==false&&p.published!==false);
       if(!p||window.cubicaCatalogEmpty)return {valid:false,message:"Un producto del carrito ya no está disponible. Volvé al carrito para revisarlo."};
       if(!Number.isSafeInteger(Number(item.qty))||Number(item.qty)<1||Number(item.qty)>100)return {valid:false,message:"Revisá las cantidades del carrito antes de continuar."};
     }

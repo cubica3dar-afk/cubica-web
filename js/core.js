@@ -86,7 +86,10 @@ function normalizeSupply(s){
     brand:String(s?.brand??""),
     colorName:String(s?.colorName??s?.color_name??""),
     colorHex:/^#[0-9a-f]{6}$/i.test(String(s?.colorHex??s?.color_hex??""))?String(s?.colorHex??s?.color_hex):"#ffffff",
-    sortOrder:Number(s?.sortOrder??s?.sort_order)||0
+    sortOrder:Number(s?.sortOrder??s?.sort_order)||0,
+    active:s?.active!==false,
+    createdAt:s?.createdAt??s?.created_at??"",
+    updatedAt:s?.updatedAt??s?.updated_at??""
   };
 }
 
@@ -134,3 +137,5 @@ function formatDate(iso){
 function todayKey(iso=new Date().toISOString()){
   return new Date(iso).toLocaleDateString("sv-SE");
 }
+
+

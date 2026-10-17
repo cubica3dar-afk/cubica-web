@@ -40,7 +40,7 @@ begin
   end if;
 
   product_id:=prefix||'-product';
-  insert into public.products(id,name,price,stock,active) values(product_id,'Fixture protección',1000,20,true);
+  insert into public.products(id,name,price,stock,active,published) values(product_id,'Fixture protección',1000,20,true,true);
   insert into auth.users(id,aud,role,email,email_confirmed_at,raw_user_meta_data)
     values(auth_user,'authenticated','authenticated',auth_user::text||'@example.invalid',now(),'{}');
 
