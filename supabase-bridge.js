@@ -195,9 +195,15 @@
     try{
       setDataBadge("Datos: Supabase…","pending");
 
-      const { data: rows, error: productError } = await fetchProductsCompat();
+      const [{data:rows,error:productError},{data:categoryRows,error:categoryError}] = await Promise.all([
+        fetchProductsCompat(),
+        client.from("product_categories").select("name,sort_order,active").order("sort_order").order("name")
+      ]);
 
       if(productError) throw productError;
+      if(categoryError) throw categoryError;
+      productCategories=(categoryRows||[]).map((category,index)=>({name:category.name,sortOrder:Number(category.sort_order)||((index+1)*10),active:category.active!==false}));
+      writeLocal(STORAGE.productCategories,productCategories);
 
       if(!rows?.length){
         catalogLoadedFromSupabase = false;
@@ -205,6 +211,7 @@
         window.cubicaCatalogState="ready";
         window.cubicaCatalogEmpty=true;
         window.dispatchEvent(new CustomEvent("cubica:catalog-ready"));
+        if(session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true){renderFinishedStock();renderFinishedCategoryManager?.();}
 
         if(session?.role === "admin" && window.cubicaAdminMfaAccessAllowed?.()===true && !sessionStorage.getItem("cubica_catalog_migration_prompted")){
           sessionStorage.setItem("cubica_catalog_migration_prompted","1");
@@ -300,9 +307,19 @@
     const names=[...new Set(list.map(p=>String(p.category||"").trim()).filter(Boolean))];
     if(!names.length) return;
     const payload=names.map((name,i)=>({name,sort_order:(i+1)*10,active:true}));
-    const {error}=await client.from("product_categories").upsert(payload,{onConflict:"name"});
+    const {error}=await client.from("product_categories").upsert(payload,{onConflict:"name",ignoreDuplicates:true});
     if(error) throw error;
   }
+
+  async function manageProductCategory(action,name,{newName=null,active=null}={}){
+    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)throw new Error("Verificá tu segundo factor para administrar categorías.");
+    const {error}=await client.rpc("manage_admin_product_category",{
+      p_action:String(action||""),p_name:String(name||""),p_new_name:newName===null?null:String(newName),p_active:active===null?null:active===true
+    });
+    if(error)throw error;
+    await loadCatalogFromSupabase();
+  }
+  window.cubicaManageProductCategory=manageProductCategory;
 
   function isManagedProductMediaPath(path){
     return typeof path==="string" && path.startsWith("products/");
