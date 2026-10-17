@@ -5,7 +5,7 @@ const vm=require("node:vm");
 
 const root=path.resolve(__dirname,"..");
 const read=file=>fs.readFileSync(path.join(root,file),"utf8");
-const html=read("index.html"),css=read("styles.css"),ordersSource=read("js/orders-ui.js"),productsSource=read("js/products-ui.js"),bridge=read("supabase-bridge.js"),migration=read("supabase/migrations/20261017223000_admin_product_categories.sql");
+const html=read("index.html"),css=read("styles.css"),ordersSource=read("js/orders-ui.js"),productsSource=read("js/products-ui.js"),bridge=read("supabase-bridge.js"),migration=read("supabase/migrations/20261017205803_admin_product_categories.sql");
 
 for(const id of ["orders-search","orders-status-filter","orders-payment-filter","orders-sort","orders-pagination","add-finished-category","finished-category-modal","finished-category-list"]){
   assert.match(html,new RegExp(`id="${id}"`),`Falta el control ${id}`);
