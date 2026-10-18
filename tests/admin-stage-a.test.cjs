@@ -36,7 +36,7 @@ const productContext={window:{addEventListener:()=>{},location:{href:"https://cu
 productContext.globalThis=productContext;
 vm.createContext(productContext);vm.runInContext(productsSource,productContext);
 const categoryUi=productContext.window.cubicaFinishedCategoryInternals;
-assert.deepEqual(Array.from(categoryUi.finishedCategories({activeOnly:true})),["Figuras","Histórica"],"Las categorías inactivas no deben asignarse a productos nuevos");
+assert.deepEqual(Array.from(categoryUi.finishedCategories({activeOnly:true})),["Figuras"],"Solo las categorías persistidas y activas deben asignarse a productos nuevos");
 assert.equal(categoryUi.normalizedFinishedCategoryName("  Luz   y color  "),"Luz y color");
 
 assert.match(bridge,/from\("product_categories"\)\.select\("name,sort_order,active"\)/,"Debe cargar categorías reales de Supabase");
@@ -45,7 +45,6 @@ assert.match(migration,/not private\.is_admin\(\)/,"La mutación debe exigir adm
 assert.match(migration,/update public\.products set category=v_new_name/,"Renombrar debe reasignar productos en la misma transacción");
 assert.match(migration,/product_categories_normalized_name_uidx/,"Debe impedir duplicados normalizados");
 assert.match(migration,/revoke all on function[\s\S]*from public,anon,service_role/,"La RPC no debe quedar expuesta a roles públicos");
-assert.doesNotMatch(productsSource,/deleteFinishedCategory/,"Etapa A no debe borrar categorías en uso");
+assert.match(productsSource,/openFinishedCategoryDelete/,"La corrección de Etapa A debe ofrecer eliminación protegida");
 
 console.log("admin-stage-a.test.cjs: OK");
-

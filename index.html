@@ -741,6 +741,7 @@
         </label>
         <label>Categoría
           <select id="finished-category" required></select>
+          <small id="finished-category-warning" class="form-warning hidden" role="alert"></small>
         </label>
         <label>Precio de venta
           <input id="finished-price" type="number" min="0" step="1" required>
@@ -915,12 +916,55 @@
       <button class="modal-close" data-close-modal="finished-category-modal">×</button>
       <p class="eyebrow">PRODUCTOS TERMINADOS</p>
       <h2>Administrar categorías</h2>
-      <p class="muted">Creá, renombrá o desactivá categorías sin alterar productos, stock ni recetas.</p>
+      <p class="muted">Creá, renombrá, activá, desactivá o eliminá categorías sin alterar productos, stock ni recetas.</p>
       <form id="finished-category-form" class="finished-category-create">
         <label for="new-finished-category">Nueva categoría</label>
         <div><input id="new-finished-category" maxlength="40" required placeholder="Ej.: Macetas"><button class="btn primary" type="submit">Crear</button></div>
       </form>
       <div id="finished-category-list" class="finished-category-list" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div id="budget-product-conversion-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="budget-product-conversion-title">
+    <div class="modal-card small-modal budget-product-conversion-modal">
+      <button class="modal-close" data-close-modal="budget-product-conversion-modal" aria-label="Cerrar">×</button>
+      <p class="eyebrow">PRESUPUESTO ACEPTADO</p>
+      <h2 id="budget-product-conversion-title">Crear producto oculto</h2>
+      <p class="muted">Elegí la categoría comercial del producto. Solo se muestran categorías activas.</p>
+      <form id="budget-product-conversion-form" class="form-grid single-form">
+        <label>Nombre del producto
+          <input id="budget-product-conversion-name" maxlength="160" required>
+        </label>
+        <label>Categoría
+          <select id="budget-product-conversion-category" required></select>
+          <small id="budget-product-conversion-warning" class="form-warning hidden" role="alert"></small>
+        </label>
+        <p id="budget-product-conversion-summary" class="muted"></p>
+        <div class="category-delete-actions">
+          <button class="btn ghost" type="button" data-close-modal="budget-product-conversion-modal">Cancelar</button>
+          <button id="budget-product-conversion-confirm" class="btn primary" type="submit">Crear producto oculto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="finished-category-delete-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="finished-category-delete-title">
+    <div class="modal-card small-modal finished-category-delete-modal">
+      <button class="modal-close" data-close-modal="finished-category-delete-modal" aria-label="Cerrar">×</button>
+      <p class="eyebrow">PRODUCTOS TERMINADOS</p>
+      <h2 id="finished-category-delete-title">Eliminar categoría</h2>
+      <div class="category-delete-summary">
+        <span>Categoría</span><strong id="finished-category-delete-name"></strong>
+        <span>Productos asociados</span><strong id="finished-category-delete-count">0</strong>
+      </div>
+      <p id="finished-category-delete-explanation" class="muted"></p>
+      <label id="finished-category-delete-destination-wrap" class="hidden">Categoría de destino
+        <select id="finished-category-delete-destination"></select>
+      </label>
+      <div class="category-delete-actions">
+        <button class="btn ghost" type="button" data-close-modal="finished-category-delete-modal">Cancelar</button>
+        <button id="finished-category-delete-confirm" class="btn danger" type="button">Reasignar y eliminar</button>
+      </div>
     </div>
   </div>
 
@@ -930,10 +974,10 @@
   <script src="js/core.js?v=admin-stage-a1"></script>
   <script src="js/ui-shell.js?v=hud-orders1"></script>
   <script src="js/store-ui.js?v=catalog-admin1"></script>
-  <script src="js/products-ui.js?v=admin-stage-a1"></script>
+  <script src="js/products-ui.js?v=admin-stage-a2"></script>
   <script src="js/community-ui.js?v=mfa2"></script>
   <script src="js/inventory-ui.js?v=catalog-admin1"></script>
-  <script src="js/budget-ui.js?v=hud-orders1"></script>
+  <script src="js/budget-ui.js?v=admin-stage-a2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
     <div class="modal-card order-management-card">
       <button class="modal-close" data-close-modal="order-management-modal" aria-label="Cerrar">×</button>
@@ -954,8 +998,8 @@
   <script src="js/analytics-ui.js?v=20261012-lifecycle1"></script>
 
 
-  <script src="js/app-init.js?v=admin-stage-a1"></script>
-  <script src="supabase-bridge.js?v=admin-stage-a1"></script>
+  <script src="js/app-init.js?v=admin-stage-a2"></script>
+  <script src="supabase-bridge.js?v=admin-stage-a2"></script>
   <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=catalog-admin1"></script>
@@ -970,4 +1014,3 @@
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
-

@@ -25,7 +25,7 @@ function finishedCategoryRows(){
   const known=new Set(rows.map(category=>category.name.toLocaleLowerCase("es")));
   for(const name of products.map(product=>String(product.category||"").trim()).filter(Boolean)){
     if(known.has(name.toLocaleLowerCase("es")))continue;
-    rows.push({name,sortOrder:(rows.length+1)*10,active:true,legacy:true});
+    rows.push({name,sortOrder:(rows.length+1)*10,active:false,legacy:true});
     known.add(name.toLocaleLowerCase("es"));
   }
   return rows.sort((a,b)=>a.sortOrder-b.sortOrder||a.name.localeCompare(b.name,"es",{sensitivity:"base"}));
@@ -167,13 +167,27 @@ function renderFinishedStock(){
 function toggleProductPublication(id){const p=products.find(x=>x.id===id);if(!p)return;p.published=!p.published;write(STORAGE.products,products);renderFinishedStock();renderProducts();toast(p.published?"Producto publicado":"Producto ocultado");}
 function updateProduct(id,key,val){const p=products.find(x=>x.id===id);if(!p)return;p[key]=key==="price"||key==="stock"?Number(val):val;write(STORAGE.products,products);renderFinishedStock();renderProducts()}
 function deleteProduct(id){if(!confirm("¿Eliminar este producto?"))return;products=products.filter(p=>p.id!==id);write(STORAGE.products,products);renderFinishedStock();renderProducts()}
-function renderFinishedCategorySelect(selected=""){
+function renderFinishedCategorySelect(selected="",{allowInactiveSelected=false}={}){
   const select=$("finished-category");
   if(!select)return;
   const cats=finishedCategories({activeOnly:true});
-  if(selected&&!cats.includes(selected))cats.push(selected);
-  select.innerHTML=cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  const selectedRow=finishedCategoryRows().find(category=>category.name===selected);
+  if(allowInactiveSelected&&selectedRow&&!selectedRow.active&&!cats.includes(selected))cats.push(selected);
+  select.innerHTML=cats.length
+    ?cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}${!finishedCategoryRows().find(category=>category.name===c)?.active?" (inactiva · categoría actual)":""}</option>`).join("")
+    :'<option value="">No hay categorías activas</option>';
   select.value=cats.includes(selected)?selected:(cats[0]||"");
+  select.disabled=cats.length===0;
+  const warning=$("finished-category-warning");
+  if(warning){
+    warning.textContent=cats.length?"":"Creá o activá una categoría antes de guardar el producto.";
+    warning.classList.toggle("hidden",cats.length>0);
+  }
+}
+function finishedCategoryAssignmentAllowed(category,productId=""){
+  const row=finishedCategoryRows().find(item=>item.name===category);
+  const original=productId?products.find(product=>product.id===productId):null;
+  return Boolean(category&&(row?.active===true||(original&&original.category===category)));
 }
 function renderFinishedCategoryManager(){
   const list=$("finished-category-list");if(!list)return;
@@ -184,6 +198,7 @@ function renderFinishedCategoryManager(){
       <input id="finished-category-name-${index}" value="${escapeHtml(category.name)}" maxlength="40" aria-label="Nombre de la categoría ${escapeHtml(category.name)}">
       <button class="btn secondary" type="button" onclick="renameFinishedCategory('${encoded}',${index})">Renombrar</button>
       <button class="btn ghost" type="button" onclick="toggleFinishedCategory('${encoded}',${category.active?"false":"true"})">${category.active?"Desactivar":"Activar"}</button>
+      <button class="btn danger finished-category-delete" type="button" onclick="openFinishedCategoryDelete('${encoded}')">Eliminar</button>
       <span class="finished-category-meta">${count} producto${count===1?"":"s"} · ${category.active?"Disponible para asignar":"No disponible para productos nuevos"}</span>
     </div>`;
   }).join("")||'<div class="inline-empty">Todavía no hay categorías.</div>';
@@ -205,15 +220,63 @@ async function manageFinishedCategory(action,name,{newName=null,active=null}={})
       products.forEach(product=>{if(product.category===cleanName)product.category=cleanNew;});
     }else if(action==="set_active"){
       const row=productCategories.find(category=>category.name===cleanName);if(row)row.active=active===true;
+    }else if(action==="delete"){
+      const associated=products.filter(product=>product.category===cleanName);
+      if(associated.length){
+        const target=finishedCategoryRows().find(category=>category.name===cleanNew&&category.active&&category.name!==cleanName);
+        if(!target)throw new Error("Seleccioná una categoría de destino activa.");
+        associated.forEach(product=>product.category=target.name);
+      }
+      productCategories=productCategories.filter(category=>category.name!==cleanName);
     }
     writeLocal(STORAGE.productCategories,productCategories);
     renderFinishedCategoryManager();renderFinishedStock();renderFinishedCategorySelect();renderProducts();
-    toast(action==="create"?"Categoría creada.":action==="rename"?"Categoría renombrada.":active?"Categoría activada.":"Categoría desactivada.");
+    toast(action==="create"?"Categoría creada.":action==="rename"?"Categoría renombrada.":action==="delete"?"Categoría eliminada.":active?"Categoría activada.":"Categoría desactivada.");
   }catch(error){console.error("Categorías de terminados",error);toast(error.message||"No se pudo actualizar la categoría.");}
 }
 async function createFinishedCategory(name){return manageFinishedCategory("create",name);}
 async function renameFinishedCategory(encoded,index){const current=decodeURIComponent(encoded),next=$("finished-category-name-"+index)?.value||"";if(normalizedFinishedCategoryName(next)===current)return toast("El nombre no cambió.");return manageFinishedCategory("rename",current,{newName:next});}
 async function toggleFinishedCategory(encoded,active){return manageFinishedCategory("set_active",decodeURIComponent(encoded),{active:active===true});}
+let finishedCategoryDeleteState=null;
+async function openFinishedCategoryDelete(encoded){
+  if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return toast("Verificá tu segundo factor para administrar categorías.");
+  const name=decodeURIComponent(encoded);
+  try{
+    const preview=typeof window.cubicaPreviewProductCategoryDelete==="function"
+      ?await window.cubicaPreviewProductCategoryDelete(name)
+      :{name,product_count:products.filter(product=>product.category===name).length};
+    const count=Number(preview?.product_count)||0;
+    finishedCategoryDeleteState={name:preview?.name||name,count};
+    $("finished-category-delete-name").textContent=finishedCategoryDeleteState.name;
+    $("finished-category-delete-count").textContent=String(count);
+    $("finished-category-delete-confirm").textContent=count>0?"Reasignar y eliminar":"Eliminar categoría";
+    const explanation=$("finished-category-delete-explanation"),destinationWrap=$("finished-category-delete-destination-wrap"),destination=$("finished-category-delete-destination");
+    if(count===0){
+      explanation.textContent=`La categoría “${finishedCategoryDeleteState.name}” no tiene productos asociados. Confirmá para eliminarla.`;
+      destinationWrap.classList.add("hidden");
+      destination.innerHTML="";
+    }else{
+      explanation.textContent=`Esta categoría tiene ${count} producto${count===1?"":"s"} asociado${count===1?"":"s"}. Para eliminarla, primero seleccioná la categoría a la que querés trasladarlo${count===1?"":"s"}.`;
+      const targets=finishedCategoryRows().filter(category=>category.active&&category.name!==finishedCategoryDeleteState.name);
+      destination.innerHTML='<option value="">Seleccionar categoría de destino…</option>'+targets.map(category=>`<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`).join("");
+      destinationWrap.classList.remove("hidden");
+      if(!targets.length)explanation.textContent+=" Primero creá o activá otra categoría de destino.";
+    }
+    openModal("finished-category-delete-modal");
+  }catch(error){console.error("Vista previa de eliminación",error);toast(error.message||"No se pudo comprobar la categoría.");}
+}
+async function confirmFinishedCategoryDelete(){
+  if(!finishedCategoryDeleteState)return;
+  const {name,count}=finishedCategoryDeleteState;
+  const target=count>0?$("finished-category-delete-destination").value:null;
+  if(count>0&&!target)return toast("Seleccioná una categoría de destino activa.");
+  const button=$("finished-category-delete-confirm");if(button)button.disabled=true;
+  try{
+    await manageFinishedCategory("delete",name,{newName:target});
+    finishedCategoryDeleteState=null;
+    closeModal("finished-category-delete-modal");
+  }finally{if(button)button.disabled=false;}
+}
 function renderFinishedColors(){
   const list=$("finished-colors-list"), empty=$("finished-colors-empty");
   list.innerHTML=finishedColors.map((c,i)=>`<div class="color-chip"><span class="color-dot" style="--color-dot:${escapeHtml(c.hex)}"></span><span>${escapeHtml(c.name)}</span><small>${escapeHtml(c.hex)}</small><button type="button" onclick="removeFinishedColor(${i})">×</button></div>`).join("");
@@ -546,7 +609,7 @@ window.addEventListener('cubica:catalog-error',()=>{if(detailPageActive)productP
 
 function resetFinishedProductForm(){
   $("finished-id").value="";$("finished-modal-title").textContent="Nuevo producto terminado";$("finished-submit").textContent="Agregar producto";
-  $("finished-form").reset();renderFinishedCategorySelect("Figuras");
+  $("finished-form").reset();renderFinishedCategorySelect();
   finishedColors=[];finishedRecipe=[];finishedMedia=[];$("finished-multi-color").checked=false;$("finished-active").checked=true;$("finished-published").checked=false;renderFinishedColors();renderFinishedRecipe();renderFinishedMedia();
 }
 function editProduct(id){
@@ -554,7 +617,7 @@ function editProduct(id){
   $("finished-id").value=p.id;$("finished-modal-title").textContent="Editar producto terminado";$("finished-submit").textContent="Guardar cambios";
   $("finished-name").value=p.name;$("finished-price").value=p.price;$("finished-qty").value=p.stock;$("finished-description").value=p.description||"";
   $("finished-active").checked=p.active!==false;$("finished-published").checked=p.published===true;
-  renderFinishedCategorySelect(p.category);finishedColors=p.colors.map(c=>({...c}));$("finished-multi-color").checked=p.colorMode==="multiple";finishedRecipe=p.recipe.map(r=>({...r}));finishedMedia=p.media.map(m=>({...m}));
+  renderFinishedCategorySelect(p.category,{allowInactiveSelected:true});finishedColors=p.colors.map(c=>({...c}));$("finished-multi-color").checked=p.colorMode==="multiple";finishedRecipe=p.recipe.map(r=>({...r}));finishedMedia=p.media.map(m=>({...m}));
   renderFinishedColors();renderFinishedRecipe();renderFinishedMedia();openModal("finished-modal");
 }
 function saveFinishedProduct(e){
@@ -563,6 +626,7 @@ function saveFinishedProduct(e){
   if(!name)return toast("El producto necesita un nombre.");
   const recipe=finishedRecipe.filter(r=>r.supplyId && Number(r.qty)>0).map(r=>({supplyId:r.supplyId,qty:Number(r.qty)}));
   const id=$("finished-id").value;
+  if(!finishedCategoryAssignmentAllowed(category,id))return toast(id?"Elegí una categoría activa o conservá la categoría histórica del producto.":"Creá o activá una categoría antes de guardar el producto.");
   if(id){
     const p=products.find(x=>x.id===id);if(!p)return;Object.assign(p,{name,category,price,stock,description,colorMode,active,published,colors:finishedColors.map(c=>({...c})),recipe,media:finishedMedia.map(m=>({...m}))});toast("Producto actualizado");
   }else{
@@ -584,6 +648,8 @@ window.moveFinishedProduct=moveFinishedProduct;
 window.createFinishedCategory=createFinishedCategory;
 window.renameFinishedCategory=renameFinishedCategory;
 window.toggleFinishedCategory=toggleFinishedCategory;
+window.openFinishedCategoryDelete=openFinishedCategoryDelete;
+window.confirmFinishedCategoryDelete=confirmFinishedCategoryDelete;
 window.renderFinishedCategoryManager=renderFinishedCategoryManager;
 window.openProductDetail=openProductDetail;
 window.setProductMedia=setProductMedia;
@@ -594,6 +660,5 @@ window.setProductQuantity=setProductQuantity;
 window.addDetailToCart=addDetailToCart;
 window.buyProductNow=buyProductNow;
 window.backToProductCatalog=backToProductCatalog;
-window.cubicaFinishedCategoryInternals={finishedCategoryRows,finishedCategories,normalizedFinishedCategoryName};
-
+window.cubicaFinishedCategoryInternals={finishedCategoryRows,finishedCategories,normalizedFinishedCategoryName,renderFinishedCategorySelect,finishedCategoryAssignmentAllowed};
 

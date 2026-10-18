@@ -303,23 +303,22 @@
     }));
   }
 
-  async function ensureProductCategories(list){
-    const names=[...new Set(list.map(p=>String(p.category||"").trim()).filter(Boolean))];
-    if(!names.length) return;
-    const payload=names.map((name,i)=>({name,sort_order:(i+1)*10,active:true}));
-    const {error}=await client.from("product_categories").upsert(payload,{onConflict:"name",ignoreDuplicates:true});
-    if(error) throw error;
-  }
-
   async function manageProductCategory(action,name,{newName=null,active=null}={}){
     if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)throw new Error("Verificá tu segundo factor para administrar categorías.");
-    const {error}=await client.rpc("manage_admin_product_category",{
+    const {data,error}=await client.rpc("manage_admin_product_category",{
       p_action:String(action||""),p_name:String(name||""),p_new_name:newName===null?null:String(newName),p_active:active===null?null:active===true
     });
     if(error)throw error;
     await loadCatalogFromSupabase();
+    return data;
   }
   window.cubicaManageProductCategory=manageProductCategory;
+  window.cubicaPreviewProductCategoryDelete=async function(name){
+    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)throw new Error("Verificá tu segundo factor para administrar categorías.");
+    const {data,error}=await client.rpc("get_admin_product_category_delete_preview",{p_name:String(name||"")});
+    if(error)throw error;
+    return data;
+  };
 
   function isManagedProductMediaPath(path){
     return typeof path==="string" && path.startsWith("products/");
@@ -390,8 +389,6 @@
     if(catalogSyncing) return;
     catalogSyncing=true;
     try{
-      await ensureProductCategories(list);
-
       if(removeMissing){
         const {data:existing,error}=await client.from("products").select("id");
         if(error) throw error;
@@ -673,4 +670,3 @@
     loadCatalogFromSupabase();
   });
 })();
-

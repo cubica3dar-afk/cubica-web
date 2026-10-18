@@ -206,6 +206,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     await createFinishedCategory(input?.value||"");
     if(input)input.value="";
   });
+  $("finished-category-delete-confirm")?.addEventListener("click",confirmFinishedCategoryDelete);
 
   $("budget-form").addEventListener("input",calculateBudget);
   $("budget-form").addEventListener("change",calculateBudget);
@@ -239,4 +240,3 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   initBudgetDefaults();
 });
-
