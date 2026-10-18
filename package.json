@@ -1,1 +1,2 @@
-{"private":true,"type":"module","scripts":{"test":"node tests/budget-system.test.mjs && node tests/experience-ui.test.cjs && node tests/admin-stage-a.test.cjs && node tests/admin-category-correction.test.cjs"}}
+{"private":true,"type":"module","scripts":{"test":"node tests/budget-system.test.mjs && node tests/experience-ui.test.cjs && node tests/admin-stage-a.test.cjs && node tests/admin-category-correction.test.cjs && node tests/community-stage-b.test.cjs"}}
+

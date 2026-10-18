@@ -722,6 +722,42 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 .community-heading,.community-author,.community-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .community-heading{justify-content:space-between}.community-heading>span{font-size:20px;font-weight:700}
 .community-comment,.community-moderation-card{padding:18px 0;border-bottom:1px solid var(--line)}
+.community-admin-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 22px;padding:6px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.community-admin-tabs button{flex:1 1 145px;border:0;border-radius:11px;padding:11px 14px;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.community-admin-tabs button:hover,.community-admin-tabs button.active{background:rgba(255,255,255,.1);color:#fff}
+.community-admin-toolbar{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(150px,1fr));gap:12px;align-items:end;margin:0 0 16px}
+.community-admin-toolbar label,.community-term-form>label{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:700}
+.community-admin-status{min-height:20px;margin:4px 0 8px}
+.community-admin-list{display:grid;gap:12px}
+.community-admin-card{display:grid;gap:10px;padding:17px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.community-admin-card-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.community-admin-card h3,.community-setting-card h3{margin:0;font-size:15px}
+.community-admin-card p{margin:0}.community-admin-card .community-body{white-space:pre-wrap;overflow-wrap:anywhere}
+.community-admin-meta{display:flex;gap:7px 12px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.community-admin-badge{display:inline-flex;align-items:center;width:max-content;padding:4px 8px;border:1px solid var(--line);border-radius:999px;font-size:11px;font-weight:800}
+.community-admin-badge.visible,.community-admin-badge.active{color:#a9efc1;border-color:rgba(101,211,145,.45)}
+.community-admin-badge.hidden,.community-admin-badge.blocked{color:#ffd391;border-color:rgba(241,189,91,.45)}
+.community-admin-badge.deleted{color:#ffb0b8;border-color:rgba(239,107,120,.45)}
+.community-admin-actions,.community-inline-actions{display:flex;gap:8px;flex-wrap:wrap}
+.community-term-form{display:grid;grid-template-columns:minmax(240px,2fr) auto auto;gap:14px;align-items:end;margin-bottom:22px;padding:18px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.community-term-form .community-inline-actions{grid-column:1/-1}
+.community-check{display:flex!important;grid-auto-flow:column;justify-content:start;align-items:center;gap:8px!important;min-height:44px}.community-check input{width:auto}
+.community-setting-card{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:20px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.025)}
+.community-setting-card .btn{grid-column:2}.community-setting-card p{margin:6px 0 0}
+.community-switch{display:flex;align-items:center;gap:9px;font-weight:700}.community-switch input{width:auto}
+.community-action-target{padding:12px;border-left:3px solid rgba(255,255,255,.25);background:rgba(255,255,255,.04);border-radius:0 10px 10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.community-action-modal textarea{width:100%}.community-action-modal[data-danger="true"] #community-admin-action-confirm{border-color:rgba(239,107,120,.55);background:rgba(239,107,120,.13);color:#ffd2d7}
+.community-restricted{padding:13px 15px;border:1px solid rgba(241,189,91,.35);border-radius:13px;background:rgba(241,189,91,.08);color:#ffe4b3}
+@media(max-width:760px){
+  .community-admin-toolbar{grid-template-columns:1fr 1fr}.community-admin-toolbar label:first-child{grid-column:1/-1}
+  .community-term-form{grid-template-columns:1fr}.community-term-form .community-inline-actions{grid-column:auto}
+  .community-setting-card{grid-template-columns:1fr}.community-setting-card .btn{grid-column:auto;width:100%}
+  .community-admin-card-head{display:grid}.community-admin-actions .btn{flex:1 1 140px}
+}
+@media(max-width:430px){
+  .community-admin-tabs{display:grid;grid-template-columns:1fr 1fr}.community-admin-tabs button{min-width:0}
+  .community-admin-toolbar{grid-template-columns:1fr}.community-admin-toolbar label:first-child{grid-column:auto}
+}
 .community-author img{width:32px;height:32px;object-fit:cover;border-radius:50%}
 .community-verified{font-size:11px;color:#a6e8bd;border:1px solid #4a7759;border-radius:20px;padding:3px 8px}
 .community-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
@@ -730,3 +766,4 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 #community-form{margin-top:22px;display:grid;gap:10px}#community-form label{font-weight:600}
 #community-message{color:#ffc475;overflow-wrap:anywhere}#product-performance-table table{min-width:1350px}
 @media(max-width:600px){.community-actions .btn{padding:8px 11px;font-size:12px}.community-replies{padding-left:12px}.community-author{gap:6px}.community-actions label{flex:1;min-width:130px}}
+

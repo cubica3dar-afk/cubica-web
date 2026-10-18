@@ -1,159 +1,131 @@
-/* Community v1: safe RPC projections, desired-state reactions and bounded pagination. */
+/* Community: public participation plus AAL2 administrative moderation. */
 (function(){
   let productId=null,data=null,generation=0,busy=false,replyTo=null,editing=null;
-  let moderationCursor=null,moderationGeneration=0,performanceGeneration=0,performanceRows=[];
-  const pendingKey="cubica_auth_product";
-  let linkProduct=new URLSearchParams(location.search).get("product")||sessionStorage.getItem(pendingKey);
-  const html=escapeHtml;
+  let performanceGeneration=0,performanceRows=[],adminGeneration=0,adminTab="comments",searchTimer=null,modalResolve=null;
+  const pendingKey="cubica_auth_product",html=escapeHtml;
+  const adminState={
+    comments:{page:1,pageSize:25,search:"",status:"all",sort:"recent"},
+    users:{page:1,pageSize:25,search:"",status:"all",sort:"recent"},
+    terms:{page:1,pageSize:25,search:"",status:"all",sort:"recent"},
+    history:{page:1,pageSize:25,search:"",action:"all",sort:"recent"}
+  };
+  const actionLabels={comment_hidden:"Contenido ocultado",comment_restored:"Contenido restaurado",comment_deleted:"Contenido eliminado",user_blocked:"Usuario bloqueado",user_unblocked:"Usuario desbloqueado",term_created:"Regla creada",term_updated:"Regla editada",term_enabled:"Regla activada",term_disabled:"Regla desactivada",term_deleted:"Regla eliminada",links_enabled:"Bloqueo de enlaces activado",links_disabled:"Bloqueo de enlaces desactivado"};
   const count=n=>new Intl.NumberFormat("es-AR").format(Number(n)||0);
   const percent=n=>n===null||n===undefined?"—":new Intl.NumberFormat("es-AR",{maximumFractionDigits:1}).format(Number(n))+" %";
+  const adminAllowed=()=>session?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+  let linkProduct=new URLSearchParams(location.search).get("product")||sessionStorage.getItem(pendingKey);
+
   const previousRedirect=window.cubicaAuthRedirectUrl;
   window.cubicaAuthRedirectUrl=()=>{
-    const url=new URL(previousRedirect?previousRedirect():location.origin+location.pathname);
-    const destination=linkProduct||new URLSearchParams(location.search).get("product");
-    if(destination&&url.searchParams.get("view")!=="orders")url.searchParams.set("product",destination);
-    return url.href;
+    const url=new URL(previousRedirect?previousRedirect():location.origin+location.pathname),destination=linkProduct||new URLSearchParams(location.search).get("product");
+    if(destination&&url.searchParams.get("view")!=="orders")url.searchParams.set("product",destination);return url.href;
   };
   window.cubicaOpenProductLink=()=>{
-    const destination=linkProduct||new URLSearchParams(location.search).get("product");
-    if(new URLSearchParams(location.search).get("view")==="checkout"||new URLSearchParams(location.search).get("view")==="cart")return false;
-    if(!destination||window.cubicaAuthCallbackBlocked||window.cubicaPasswordRecoveryActive||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||new URLSearchParams(location.search).get("view")==="orders"||sessionStorage.getItem("cubica_auth_destination")==="orders")return false;
+    const destination=linkProduct||new URLSearchParams(location.search).get("product"),view=new URLSearchParams(location.search).get("view");
+    if(view==="checkout"||view==="cart")return false;
+    if(!destination||window.cubicaAuthCallbackBlocked||window.cubicaPasswordRecoveryActive||new URLSearchParams(location.hash.slice(1)).get("type")==="recovery"||view==="orders"||sessionStorage.getItem("cubica_auth_destination")==="orders")return false;
     if(sessionStorage.getItem(pendingKey)&&!session)return false;
-    $("welcome-view")?.classList.add("hidden");
-    linkProduct=null;sessionStorage.removeItem(pendingKey);
-    openProductDetail(destination,{history:"none"});return true;
+    $("welcome-view")?.classList.add("hidden");linkProduct=null;sessionStorage.removeItem(pendingKey);openProductDetail(destination,{history:"none"});return true;
   };
   const previousNavigate=window.cubicaNavigateAfterSignIn;
   window.cubicaNavigateAfterSignIn=()=>{if(!window.cubicaOpenProductLink())previousNavigate();};
 
   function authenticated(){
     if(session?.supabaseUserId)return true;
-    linkProduct=productId;sessionStorage.setItem(pendingKey,productId);
-    $("welcome-view")?.classList.add("hidden");showSection("login");
-    window.dispatchEvent(new CustomEvent("cubica:auth-request"));
+    linkProduct=productId;sessionStorage.setItem(pendingKey,productId);$("welcome-view")?.classList.add("hidden");showSection("login");window.dispatchEvent(new CustomEvent("cubica:auth-request"));
     toast("Iniciá sesión para participar. Después volverás a este producto.");return false;
   }
-  async function rpc(name,args){
-    const client=window.cubicaSupabase;if(!client)throw new Error("La comunidad no está disponible en este momento.");
-    const result=await client.rpc(name,args);if(result.error)throw result.error;return result.data;
-  }
+  async function rpc(name,args){const client=window.cubicaSupabase;if(!client)throw new Error("La comunidad no está disponible en este momento.");const result=await client.rpc(name,args);if(result.error)throw result.error;return result.data;}
   function commentHtml(c){
-    return `<article class="community-comment" data-comment-id="${c.id}"><div class="community-author">${c.author?.avatar?`<img src="${html(c.author.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:""}<strong>${html(c.deleted?"Comentario eliminado":c.author?.name||"Cliente de Cúbica")}</strong>${c.verified_purchase?'<span class="community-verified">✓ Compra verificada</span>':""}</div>
-      <small class="muted">${html(formatDate(c.created_at))}${c.edited_at?" · editado":""}</small>
-      <p class="community-body">${html(c.deleted?"El contenido de este comentario fue eliminado.":c.body)}</p>
-      ${c.deleted?"":`<div class="community-actions"><button class="btn ghost ${c.my_like?"selected":""}" data-community-action="comment-like" data-id="${c.id}" aria-pressed="${!!c.my_like}">👍 ${count(c.likes)}</button>${c.parent_id===null?`<button class="btn ghost" data-community-action="reply" data-id="${c.id}">Responder</button>`:""}${c.is_owner?`${c.can_edit?`<button class="btn ghost" data-community-action="edit" data-id="${c.id}">Editar</button>`:""}<button class="btn ghost" data-community-action="delete" data-id="${c.id}">Eliminar</button>`:""}</div>`}
-      ${c.parent_id===null&&c.reply_count?`<button class="community-replies-toggle btn ghost" data-community-action="replies" data-id="${c.id}">Ver respuestas (${count(c.reply_count)})</button><div class="community-replies" data-replies="${c.id}"></div>`:""}</article>`;
+    const restricted=!!data?.participation_restricted;
+    return `<article class="community-comment" data-comment-id="${c.id}"><div class="community-author">${c.author?.avatar?`<img src="${html(c.author.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:""}<strong>${html(c.deleted?"Comentario eliminado":c.author?.name||"Cliente de Cúbica")}</strong>${c.verified_purchase?'<span class="community-verified">✓ Compra verificada</span>':""}</div><small class="muted">${html(formatDate(c.created_at))}${c.edited_at?" · editado":""}</small><p class="community-body">${html(c.deleted?"El contenido de este comentario fue eliminado.":c.body)}</p>${c.deleted?"":`<div class="community-actions"><button class="btn ghost ${c.my_like?"selected":""}" data-community-action="comment-like" data-id="${c.id}" aria-pressed="${!!c.my_like}" ${restricted?"disabled":""}>👍 ${count(c.likes)}</button>${c.parent_id===null?`<button class="btn ghost" data-community-action="reply" data-id="${c.id}" ${restricted?"disabled":""}>Responder</button>`:""}${c.is_owner?`${c.can_edit?`<button class="btn ghost" data-community-action="edit" data-id="${c.id}">Editar</button>`:""}<button class="btn ghost" data-community-action="delete" data-id="${c.id}">Eliminar</button>`:""}</div>`}${c.parent_id===null&&c.reply_count?`<button class="community-replies-toggle btn ghost" data-community-action="replies" data-id="${c.id}">Ver respuestas (${count(c.reply_count)})</button><div class="community-replies" data-replies="${c.id}"></div>`:""}</article>`;
   }
   function render(){
-    const host=$("product-community");if(!host||!data)return;
-    const draft=$("community-body")?.value||"",oldReply=replyTo,oldEdit=editing;
-    host.innerHTML=`<div class="community-heading"><h3>Comunidad</h3><span>👍 ${count(data.product_likes)}</span></div>
-      <div class="community-actions"><button class="btn ghost ${data.my_reaction===1?"selected":""}" data-community-action="product-like" aria-pressed="${data.my_reaction===1}">👍 Me gusta</button><button class="btn ghost ${data.my_reaction===-1?"selected":""}" data-community-action="product-dislike" aria-pressed="${data.my_reaction===-1}">👎 No me gusta</button></div>
-      <h3>Opiniones</h3><div id="community-comments">${data.comments.map(commentHtml).join("")||'<p class="muted">Todavía no hay opiniones. Podés compartir la tuya.</p>'}</div>
-      ${data.has_more?'<button class="btn ghost" data-community-action="more">Ver más opiniones</button>':""}
-      ${session?.supabaseUserId?'<form id="community-form"><label id="community-compose-label" for="community-body">Escribir una opinión</label><textarea id="community-body" maxlength="2000" rows="3" required placeholder="Compartí tu opinión sobre este producto…"></textarea><div class="community-actions"><button class="btn primary" type="submit">Publicar opinión</button><button class="btn ghost hidden" type="button" id="community-compose-cancel">Cancelar</button></div></form>':'<p class="muted">Iniciá sesión para compartir tu opinión.</p><button class="btn primary" data-community-action="login">Iniciar sesión para opinar</button>'}<p id="community-message" role="status" aria-live="polite"></p>`;
-    host.onclick=action;
-    if($("community-form"))$("community-form").onsubmit=submit;
-    if($("community-compose-cancel"))$("community-compose-cancel").onclick=resetComposer;
-    replyTo=oldReply;editing=oldEdit;if($("community-body"))$("community-body").value=draft;
-    if(replyTo||editing){$("community-compose-label").textContent=editing?"Editar opinión":"Responder al comentario";$("community-compose-cancel").classList.remove("hidden");}
+    const host=$("product-community");if(!host||!data)return;const draft=$("community-body")?.value||"",oldReply=replyTo,oldEdit=editing,restricted=!!data.participation_restricted;
+    host.innerHTML=`<div class="community-heading"><h3>Comunidad</h3><span>👍 ${count(data.product_likes)}</span></div><div class="community-actions"><button class="btn ghost ${data.my_reaction===1?"selected":""}" data-community-action="product-like" aria-pressed="${data.my_reaction===1}" ${restricted?"disabled":""}>👍 Me gusta</button><button class="btn ghost ${data.my_reaction===-1?"selected":""}" data-community-action="product-dislike" aria-pressed="${data.my_reaction===-1}" ${restricted?"disabled":""}>👎 No me gusta</button></div><h3>Opiniones</h3><div id="community-comments">${data.comments.map(commentHtml).join("")||'<p class="muted">Todavía no hay opiniones. Podés compartir la tuya.</p>'}</div>${data.has_more?'<button class="btn ghost" data-community-action="more">Ver más opiniones</button>':""}${restricted?'<p class="community-restricted" role="status">Tu participación en Comunidad está restringida. Podés seguir navegando y comprando normalmente.</p>':session?.supabaseUserId?'<form id="community-form"><label id="community-compose-label" for="community-body">Escribir una opinión</label><textarea id="community-body" maxlength="2000" rows="3" required placeholder="Compartí tu opinión sobre este producto…"></textarea><div class="community-actions"><button class="btn primary" type="submit">Publicar opinión</button><button class="btn ghost hidden" type="button" id="community-compose-cancel">Cancelar</button></div></form>':'<p class="muted">Iniciá sesión para compartir tu opinión.</p><button class="btn primary" data-community-action="login">Iniciar sesión para opinar</button>'}<p id="community-message" role="status" aria-live="polite"></p>`;
+    host.onclick=action;if($("community-form"))$("community-form").onsubmit=submit;if($("community-compose-cancel"))$("community-compose-cancel").onclick=resetComposer;
+    replyTo=oldReply;editing=oldEdit;if($("community-body"))$("community-body").value=draft;if((replyTo||editing)&&$("community-compose-label")){$("community-compose-label").textContent=editing?"Editar opinión":"Responder al comentario";$("community-compose-cancel").classList.remove("hidden");}
   }
-  function resetComposer(){replyTo=null;editing=null;$("community-form").reset();$("community-compose-label").textContent="Escribir una opinión";$("community-compose-cancel").classList.add("hidden");}
+  function resetComposer(){replyTo=null;editing=null;$("community-form")?.reset();if($("community-compose-label"))$("community-compose-label").textContent="Escribir una opinión";$("community-compose-cancel")?.classList.add("hidden");}
   function findComment(id){return data.comments.find(c=>String(c.id)===String(id))||Array.from($("product-community").querySelectorAll("[data-replies]")).flatMap(el=>el._comments||[]).find(c=>String(c.id)===String(id));}
-  async function load(id){
-    const version=++generation;productId=id;data=null;replyTo=null;editing=null;
-    $("product-community").innerHTML='<p class="muted" role="status">Cargando comunidad…</p>';
-    try{const result=await rpc("get_product_community",{p_product_id:id});if(version!==generation)return;data=result;render();}
-    catch(error){if(version===generation)$("product-community").textContent=error.message||"No se pudo cargar la comunidad.";}
-  }
-  function lock(value){busy=value;for(const button of $("product-community").querySelectorAll("button,textarea"))button.disabled=value;}
+  async function load(id){const version=++generation;productId=id;data=null;replyTo=null;editing=null;$("product-community").innerHTML='<p class="muted" role="status">Cargando comunidad…</p>';try{const result=await rpc("get_product_community",{p_product_id:id});if(version!==generation)return;data=result;render();}catch(error){if(version===generation)$("product-community").textContent=error.message||"No se pudo cargar la comunidad.";}}
+  function lock(value){busy=value;for(const control of $("product-community").querySelectorAll("button,textarea"))control.disabled=value;}
   async function action(event){
-    const button=event.target.closest("[data-community-action]");if(!button||busy||!data)return;
-    const kind=button.dataset.communityAction,id=button.dataset.id,comment=findComment(id);
-    if(!["more","replies"].includes(kind)&&!authenticated())return;
-    if(kind==="reply"||kind==="edit"){
-      replyTo=kind==="reply"?Number(id):null;editing=kind==="edit"?Number(id):null;
-      $("community-compose-label").textContent=editing?"Editar opinión":"Responder al comentario";
-      $("community-body").value=editing?comment.body:"";$("community-compose-cancel").classList.remove("hidden");$("community-body").focus();return;
-    }
-    if(kind==="delete"&&!confirm("¿Eliminar el contenido de este comentario? Si tiene respuestas, se conservará el hilo."))return;
-    const version=generation;lock(true);
+    const button=event.target.closest("[data-community-action]");if(!button||busy||!data)return;const kind=button.dataset.communityAction,id=button.dataset.id,comment=findComment(id);
+    if(data.participation_restricted&&!['more','replies','delete'].includes(kind)){toast("Tu participación en Comunidad está restringida.");return;}if(!["more","replies"].includes(kind)&&!authenticated())return;
+    if(kind==="reply"||kind==="edit"){replyTo=kind==="reply"?Number(id):null;editing=kind==="edit"?Number(id):null;$("community-compose-label").textContent=editing?"Editar opinión":"Responder al comentario";$("community-body").value=editing?comment.body:"";$("community-compose-cancel").classList.remove("hidden");$("community-body").focus();return;}
+    if(kind==="delete"&&!confirm("¿Eliminar el contenido de este comentario? Si tiene respuestas, se conservará el hilo."))return;const version=generation;lock(true);
     try{
-      if(kind.startsWith("product-")){
-        const value=kind==="product-like"?1:-1;
-        const result=await rpc("set_product_reaction",{p_product_id:productId,p_reaction:data.my_reaction===value?0:value});
-        if(version!==generation)return;Object.assign(data,result);render();
-      }else if(kind==="comment-like"){
-        const result=await rpc("set_comment_like",{p_comment_id:Number(id),p_liked:!comment.my_like});if(version!==generation)return;Object.assign(comment,result);
-        button.textContent=`👍 ${count(comment.likes)}`;button.classList.toggle("selected",comment.my_like);button.setAttribute("aria-pressed",String(comment.my_like));
-      }else if(kind==="delete"){
-        await rpc("delete_community_comment",{p_comment_id:Number(id)});if(version!==generation)return;await load(productId);
-      }else if(kind==="more"){
-        const result=await rpc("get_product_community",{p_product_id:productId,p_before_id:data.next_cursor});if(version!==generation)return;
-        data.comments.push(...result.comments);data.has_more=result.has_more;data.next_cursor=result.next_cursor;render();
-      }else if(kind==="replies"){
-        const container=$("product-community").querySelector(`[data-replies="${id}"]`);
-        const result=await rpc("get_product_community",{p_product_id:productId,p_parent_id:Number(id),p_before_id:container._cursor||null});if(version!==generation)return;
-        container._comments=[...(container._comments||[]),...result.comments];container._cursor=result.next_cursor;
-        container.innerHTML=container._comments.map(commentHtml).join("");button.classList.toggle("hidden",!result.has_more);button.textContent="Ver más respuestas";
-      }
-    }catch(error){if(version===generation)$("community-message").textContent=error.message||"No se pudo guardar.";}
-    finally{lock(false);}
+      if(kind.startsWith("product-")){const value=kind==="product-like"?1:-1,result=await rpc("set_product_reaction",{p_product_id:productId,p_reaction:data.my_reaction===value?0:value});if(version!==generation)return;Object.assign(data,result);render();}
+      else if(kind==="comment-like"){const result=await rpc("set_comment_like",{p_comment_id:Number(id),p_liked:!comment.my_like});if(version!==generation)return;Object.assign(comment,result);button.textContent=`👍 ${count(comment.likes)}`;button.classList.toggle("selected",comment.my_like);button.setAttribute("aria-pressed",String(comment.my_like));}
+      else if(kind==="delete"){await rpc("delete_community_comment",{p_comment_id:Number(id)});if(version!==generation)return;await load(productId);}
+      else if(kind==="more"){const result=await rpc("get_product_community",{p_product_id:productId,p_before_id:data.next_cursor});if(version!==generation)return;data.comments.push(...result.comments);data.has_more=result.has_more;data.next_cursor=result.next_cursor;render();}
+      else if(kind==="replies"){const container=$("product-community").querySelector(`[data-replies="${id}"]`),result=await rpc("get_product_community",{p_product_id:productId,p_parent_id:Number(id),p_before_id:container._cursor||null});if(version!==generation)return;container._comments=[...(container._comments||[]),...result.comments];container._cursor=result.next_cursor;container.innerHTML=container._comments.map(commentHtml).join("");button.classList.toggle("hidden",!result.has_more);button.textContent="Ver más respuestas";}
+    }catch(error){if(version===generation)$("community-message").textContent=error.message||"No se pudo guardar.";}finally{lock(false);}
   }
   async function submit(event){
-    event.preventDefault();if(busy||!authenticated())return;
-    const body=$("community-body").value.trim();if(!body)return;
-    const version=generation;const id=productId;lock(true);
-    const form=event.currentTarget;
-    // Retain request id on retry; change it only when the submitted body/parent changes.
-    const signature=JSON.stringify([id,replyTo,body]);
-    if(form.dataset.signature!==signature){form.dataset.signature=signature;form.dataset.requestId=crypto.randomUUID();}
-    try{
-      if(editing)await rpc("edit_community_comment",{p_comment_id:editing,p_body:body});
-      else await rpc("create_community_comment",{p_product_id:id,p_body:body,p_parent_id:replyTo,p_request_id:form.dataset.requestId});
-      if(version!==generation)return;const wasEditing=!!editing;await load(id);toast(wasEditing?"Opinión actualizada.":"Comentario publicado.");
-    }catch(error){if(version===generation)$("community-message").textContent=error.message||"No se pudo publicar.";}
-    finally{lock(false);}
+    event.preventDefault();if(busy||!authenticated()||data?.participation_restricted)return;const body=$("community-body").value.trim();if(!body)return;const version=generation,id=productId,form=event.currentTarget;lock(true);
+    const signature=JSON.stringify([id,replyTo,body]);if(form.dataset.signature!==signature){form.dataset.signature=signature;form.dataset.requestId=crypto.randomUUID();}
+    try{if(editing)await rpc("edit_community_comment",{p_comment_id:editing,p_body:body});else await rpc("create_community_comment",{p_product_id:id,p_body:body,p_parent_id:replyTo,p_request_id:form.dataset.requestId});if(version!==generation)return;const wasEditing=!!editing;await load(id);toast(wasEditing?"Opinión actualizada.":"Comentario publicado.");}catch(error){if(version===generation)$("community-message").textContent=error.message||"No se pudo publicar.";}finally{lock(false);}
   }
-  window.addEventListener("cubica:product-open",event=>load(event.detail.productId));
-  window.addEventListener("cubica:auth-ready",()=>{
-    if(productId&&window.cubicaProductPageActive?.())load(productId);
-    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true){$("community-moderation-list").textContent="";$("product-performance-table").textContent="";performanceRows=[];moderationGeneration++;performanceGeneration++;}
-  });
 
-  window.loadCommunityModeration=async more=>{
-    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
-    const version=++moderationGeneration;
-    try{
-      const result=await rpc("get_community_moderation",{p_before_id:more?moderationCursor:null});if(version!==moderationGeneration||session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
-      moderationCursor=result.next_cursor;
-      const markup=result.comments.map(c=>`<article class="community-moderation-card"><strong>${html(c.product_name)} · ${html(c.author.name)}</strong><p class="muted">${html(formatDate(c.created_at))} · ${c.parent_id?"Respuesta":"Opinión"} · ${c.status==="hidden"?"Oculto":"Publicado"}${c.deleted_at?" · Eliminado":""}</p><p class="community-body">${html(c.body)}</p><button class="btn ghost" data-moderate-id="${c.id}" data-moderate-status="${c.status==="published"?"hidden":"published"}">${c.status==="published"?"Ocultar":"Restaurar visibilidad"}</button></article>`).join("");
-      const host=$("community-moderation-list");if(more)host.insertAdjacentHTML("beforeend",markup);else host.innerHTML=markup||"<p>Sin comentarios.</p>";
-      $("community-moderation-more").classList.toggle("hidden",!result.has_more);
-    }catch(error){toast(error.message||"No se pudo cargar la moderación.");}
-  };
-  window.loadProductPerformance=async()=>{
-    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
-    const version=++performanceGeneration;$("product-performance-status").textContent="Cargando…";
-    try{
-      const days=$("product-performance-period").value;
-      const result=await rpc("get_product_performance",{p_days:days==="all"?null:Number(days)});if(version!==performanceGeneration||session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
-      performanceRows=result.products;renderPerformance();$("product-performance-status").textContent="";
-    }catch(error){if(version===performanceGeneration)$("product-performance-status").textContent=error.message||"No se pudo cargar el rendimiento.";}
-  };
-  function renderPerformance(){
-    if(session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
-    const metric=$("product-performance-sort").value;
-    const rows=[...performanceRows].sort((a,b)=>metric==="name"?a.name.localeCompare(b.name):(Number(b[metric])||0)-(Number(a[metric])||0));
-    $("product-performance-table").innerHTML=`<table><thead><tr>${["Producto","Vistas","Sesiones","👍","👎 Interno","Comentarios","Carritos","Pedidos","Unidades","Facturación","Vista → carrito","Vista → pedido","Positivas"].map(s=>`<th>${s}</th>`).join("")}</tr></thead><tbody>${rows.map(p=>`<tr><td><strong>${html(p.name)}</strong>${p.active?"":'<small class="muted">Inactivo</small>'}</td>${[p.views,p.view_sessions,p.likes,p.dislikes,p.comments,p.carts,p.orders,p.units].map(n=>`<td>${count(n)}</td>`).join("")}<td>${money(p.revenue)}</td><td>${percent(p.view_to_cart)}</td><td>${percent(p.view_to_order)}</td><td>${percent(p.positive_ratio)}</td></tr>`).join("")||'<tr><td colspan="13">Sin productos.</td></tr>'}</tbody></table>`;
+  function pagination(hostId,result,tab){
+    const host=$(hostId);if(!host)return;const pages=Math.max(1,Number(result.total_pages)||1),page=Math.min(Number(result.page)||1,pages),total=Number(result.total)||0,size=Number(result.page_size)||25;
+    host.classList.toggle("hidden",total<=size);host.dataset.tab=tab;
+    host.innerHTML=`<div class="pagination-summary">${total?`Mostrando <strong>${(page-1)*size+1}–${Math.min(page*size,total)}</strong> de <strong>${total}</strong>`:"0 resultados"}</div><div class="pagination-controls"><button class="pagination-btn" data-community-page="${page-1}" ${page<=1?"disabled":""}>‹</button><span>Página <strong>${page}</strong> de <strong>${pages}</strong></span><button class="pagination-btn" data-community-page="${page+1}" ${page>=pages?"disabled":""}>›</button></div><label class="pagination-size">Por página <select data-community-page-size>${[10,25,50].map(n=>`<option value="${n}" ${size===n?"selected":""}>${n}</option>`).join("")}</select></label>`;
   }
+  function setStatus(tab,text){const node=$(`community-${tab}-status-text`);if(node)node.textContent=text||"";}
+  function adminRequest(tab){const s=adminState[tab];if(tab==="comments")return ["get_admin_community_comments",{p_page:s.page,p_page_size:s.pageSize,p_search:s.search||null,p_status:s.status,p_sort:s.sort}];if(tab==="users")return ["get_admin_community_users",{p_page:s.page,p_page_size:s.pageSize,p_search:s.search||null,p_status:s.status,p_sort:s.sort}];if(tab==="terms")return ["get_admin_community_terms",{p_page:s.page,p_page_size:s.pageSize,p_search:s.search||null,p_status:s.status,p_sort:s.sort}];return ["get_admin_community_history",{p_page:s.page,p_page_size:s.pageSize,p_search:s.search||null,p_action:s.action,p_sort:s.sort}];}
+  function commentState(c){if(c.deletion_kind==="admin")return ["Eliminado por administración","deleted"];if(c.deletion_kind==="user"||c.deleted_at)return ["Eliminado por el usuario","deleted"];return c.status==="published"?["Visible","visible"]:["Oculto","hidden"];}
+  function renderAdminComments(result){
+    $("community-comments-list").innerHTML=result.items.map(c=>{const state=commentState(c),deleted=!!c.deleted_at;return `<article class="community-admin-card"><div class="community-admin-card-head"><div><h3>${html(c.product_name)} · ${html(c.author_name)}</h3><div class="community-admin-meta"><span>${html(formatDate(c.created_at))}</span><span>${c.parent_id?"Respuesta":"Opinión"}</span><span>Usuario ${html(String(c.user_id).slice(0,8))}…</span></div></div><span class="community-admin-badge ${state[1]}">${state[0]}</span></div><p class="community-body">${html(c.body)}</p>${c.deletion_reason?`<p class="muted">Motivo: ${html(c.deletion_reason)}</p>`:""}<div class="community-admin-actions">${!deleted?(c.status==="published"?`<button class="btn ghost" data-admin-comment="hide" data-id="${c.id}" data-target="${html(c.body)}">Ocultar</button>`:`<button class="btn ghost" data-admin-comment="restore" data-id="${c.id}" data-target="${html(c.body)}">Volver a mostrar</button>`)+`<button class="btn danger" data-admin-comment="delete" data-id="${c.id}" data-target="${html(c.body)}">Eliminar</button>`:""}<button class="btn ghost" data-admin-user="${c.author_blocked?"unblock":"block"}" data-user-id="${c.user_id}" data-target="${html(c.author_name)}">${c.author_blocked?"Desbloquear en Comunidad":"Bloquear en Comunidad"}</button></div></article>`;}).join("")||'<p class="muted">No hay comentarios para estos filtros.</p>';pagination("community-comments-pagination",result,"comments");
+  }
+  function renderAdminUsers(result){$("community-users-list").innerHTML=result.items.map(u=>`<article class="community-admin-card"><div class="community-admin-card-head"><div><h3>${html(u.name)}</h3><div class="community-admin-meta"><span>Usuario ${html(String(u.user_id).slice(0,8))}…</span><span>Actualizado ${html(formatDate(u.updated_at))}</span><span>Por ${html(u.actor_name||"Administrador")}</span></div></div><span class="community-admin-badge ${u.is_blocked?"blocked":"visible"}">${u.is_blocked?"Bloqueado":"Habilitado"}</span></div><p>${html(u.reason)}</p><div class="community-admin-actions"><button class="btn ${u.is_blocked?"ghost":"danger"}" data-admin-user="${u.is_blocked?"unblock":"block"}" data-user-id="${u.user_id}" data-target="${html(u.name)}">${u.is_blocked?"Desbloquear en Comunidad":"Bloquear en Comunidad"}</button></div></article>`).join("")||'<p class="muted">No hay usuarios para estos filtros.</p>';pagination("community-users-pagination",result,"users");}
+  function renderAdminTerms(result){$("community-terms-list").innerHTML=result.items.map(t=>`<article class="community-admin-card"><div class="community-admin-card-head"><div><h3>${html(t.expression)}</h3><div class="community-admin-meta"><span>${t.whole_word?"Palabra completa":"Coincidencia parcial"}</span><span>Actualizada ${html(formatDate(t.updated_at))}</span></div></div><span class="community-admin-badge ${t.active?"active":"hidden"}">${t.active?"Activa":"Inactiva"}</span></div><div class="community-admin-actions"><button class="btn ghost" data-admin-term="edit" data-term='${html(JSON.stringify(t))}'>Editar</button><button class="btn ghost" data-admin-term="toggle" data-id="${t.id}" data-active="${!t.active}" data-target="${html(t.expression)}">${t.active?"Desactivar":"Activar"}</button><button class="btn danger" data-admin-term="delete" data-id="${t.id}" data-target="${html(t.expression)}">Eliminar</button></div></article>`).join("")||'<p class="muted">No hay reglas para estos filtros.</p>';pagination("community-terms-pagination",result,"terms");}
+  function renderAdminHistory(result){$("community-history-list").innerHTML=result.items.map(item=>`<article class="community-admin-card"><div class="community-admin-card-head"><div><h3>${html(actionLabels[item.action]||item.action)}</h3><div class="community-admin-meta"><span>${html(formatDate(item.created_at))}</span><span>Por ${html(item.actor_name||"Administrador")}</span>${item.product_name?`<span>${html(item.product_name)}</span>`:""}${item.user_name?`<span>${html(item.user_name)}</span>`:""}</div></div></div>${item.reason?`<p>${html(item.reason)}</p>`:""}</article>`).join("")||'<p class="muted">No hay acciones para estos filtros.</p>';pagination("community-history-pagination",result,"history");}
+  async function loadSettings(){const version=++adminGeneration;setStatus("settings","Cargando…");try{const result=await rpc("get_admin_community_settings",{});if(version!==adminGeneration||!adminAllowed())return;$("community-block-links").checked=!!result.block_links;setStatus("settings",result.updated_at?`Última actualización: ${formatDate(result.updated_at)}`:"");}catch(error){if(version===adminGeneration)setStatus("settings",error.message||"No se pudo cargar la configuración.");}}
+  async function loadAdmin(tab=adminTab){
+    if(!adminAllowed())return;adminTab=tab;if(tab==="settings"){await loadSettings();return;}const version=++adminGeneration,[name,args]=adminRequest(tab);setStatus(tab,"Cargando…");
+    try{const result=await rpc(name,args);if(version!==adminGeneration||!adminAllowed()||tab!==adminTab)return;if(tab==="comments")renderAdminComments(result);if(tab==="users")renderAdminUsers(result);if(tab==="terms")renderAdminTerms(result);if(tab==="history")renderAdminHistory(result);setStatus(tab,`${count(result.total)} resultado${Number(result.total)===1?"":"s"}.`);}catch(error){if(version===adminGeneration)setStatus(tab,error.message||"No se pudo cargar la moderación.");}
+  }
+  function selectAdminTab(tab){
+    if(!["comments","users","terms","settings","history"].includes(tab))return;adminTab=tab;
+    for(const button of document.querySelectorAll("[data-community-admin-tab]")){const active=button.dataset.communityAdminTab===tab;button.classList.toggle("active",active);button.setAttribute("aria-selected",String(active));}
+    for(const panel of document.querySelectorAll(".community-admin-panel"))panel.classList.toggle("hidden",panel.id!==`community-admin-${tab}`);loadAdmin(tab);
+  }
+  function openAdminAction({title,target,warning,confirmText="Confirmar",danger=false}){
+    const modal=$("community-admin-action-modal");if(!modal)return Promise.resolve(null);$("community-admin-action-title").textContent=title;$("community-admin-action-target").textContent=target||"";$("community-admin-action-warning").textContent=warning||"";$("community-admin-action-confirm").textContent=confirmText;$("community-admin-action-reason").value="";$("community-admin-action-error").classList.add("hidden");modal.dataset.danger=String(danger);modal.classList.remove("hidden");$("community-admin-action-reason").focus();return new Promise(resolve=>{modalResolve=resolve;});
+  }
+  function closeAdminAction(value=null){$("community-admin-action-modal")?.classList.add("hidden");if(modalResolve){const resolve=modalResolve;modalResolve=null;resolve(value);}}
+  async function reasonedMutation(options,name,args,afterTab=adminTab){const reason=await openAdminAction(options);if(reason===null)return false;await rpc(name,{...args,p_reason:reason});toast("Cambio guardado y registrado.");await loadAdmin(afterTab);return true;}
+  function resetTermForm(){$("community-term-form")?.reset();if($("community-term-id"))$("community-term-id").value="";if($("community-term-whole-word"))$("community-term-whole-word").checked=true;if($("community-term-active"))$("community-term-active").checked=true;$("community-term-cancel")?.classList.add("hidden");}
+  function debounceAdmin(tab){clearTimeout(searchTimer);searchTimer=setTimeout(()=>{adminState[tab].page=1;loadAdmin(tab);},250);}
+
+  window.loadCommunityModeration=async()=>loadAdmin(adminTab);
+  window.setCommunityAdminPage=(tab,page)=>{if(!adminState[tab])return;adminState[tab].page=Math.max(1,Number(page)||1);loadAdmin(tab);};
+  window.addEventListener("cubica:product-open",event=>load(event.detail.productId));
+  window.addEventListener("cubica:auth-ready",()=>{if(productId&&window.cubicaProductPageActive?.())load(productId);if(!adminAllowed()){adminGeneration++;for(const id of ["community-comments-list","community-users-list","community-terms-list","community-history-list","product-performance-table"]){if($(id))$(id).textContent="";}performanceRows=[];performanceGeneration++;}});
+  window.loadProductPerformance=async()=>{if(!adminAllowed())return;const version=++performanceGeneration;$("product-performance-status").textContent="Cargando…";try{const days=$("product-performance-period").value,result=await rpc("get_product_performance",{p_days:days==="all"?null:Number(days)});if(version!==performanceGeneration||!adminAllowed())return;performanceRows=result.products;renderPerformance();$("product-performance-status").textContent="";}catch(error){if(version===performanceGeneration)$("product-performance-status").textContent=error.message||"No se pudo cargar el rendimiento.";}};
+  function renderPerformance(){if(!adminAllowed())return;const metric=$("product-performance-sort").value,rows=[...performanceRows].sort((a,b)=>metric==="name"?a.name.localeCompare(b.name):(Number(b[metric])||0)-(Number(a[metric])||0));$("product-performance-table").innerHTML=`<table><thead><tr>${["Producto","Vistas","Sesiones","👍","👎 Interno","Comentarios","Carritos","Pedidos","Unidades","Facturación","Vista → carrito","Vista → pedido","Positivas"].map(s=>`<th>${s}</th>`).join("")}</tr></thead><tbody>${rows.map(p=>`<tr><td><strong>${html(p.name)}</strong>${p.active?"":'<small class="muted">Inactivo</small>'}</td>${[p.views,p.view_sessions,p.likes,p.dislikes,p.comments,p.carts,p.orders,p.units].map(n=>`<td>${count(n)}</td>`).join("")}<td>${money(p.revenue)}</td><td>${percent(p.view_to_cart)}</td><td>${percent(p.view_to_order)}</td><td>${percent(p.positive_ratio)}</td></tr>`).join("")||'<tr><td colspan="13">Sin productos.</td></tr>'}</tbody></table>`;}
+
   document.addEventListener("DOMContentLoaded",()=>{
-    $("community-moderation-more").onclick=()=>window.loadCommunityModeration(true);
-    $("community-moderation-list").onclick=async event=>{
-      const button=event.target.closest("[data-moderate-id]");if(!button||session?.role!=="admin"||window.cubicaAdminMfaAccessAllowed?.()!==true)return;
-      button.disabled=true;try{await rpc("moderate_community_comment",{p_comment_id:Number(button.dataset.moderateId),p_status:button.dataset.moderateStatus});await window.loadCommunityModeration(false);}catch(error){toast(error.message);}finally{button.disabled=false;}
-    };
-    $("product-performance-period").onchange=window.loadProductPerformance;
-    $("product-performance-sort").onchange=renderPerformance;
+    $("community-admin-tabs")?.addEventListener("click",event=>{const button=event.target.closest("[data-community-admin-tab]");if(button)selectAdminTab(button.dataset.communityAdminTab);});
+    $("section-community")?.addEventListener("change",event=>{const id=event.target.id,selects={"community-comments-status":["comments","status"],"community-comments-sort":["comments","sort"],"community-users-status":["users","status"],"community-users-sort":["users","sort"],"community-terms-status":["terms","status"],"community-terms-sort":["terms","sort"],"community-history-action":["history","action"],"community-history-sort":["history","sort"]};if(event.target.matches("[data-community-page-size]")){const tab=event.target.closest(".pagination").dataset.tab;adminState[tab].pageSize=Number(event.target.value);adminState[tab].page=1;loadAdmin(tab);return;}if(selects[id]){const [tab,key]=selects[id];adminState[tab][key]=event.target.value;adminState[tab].page=1;loadAdmin(tab);}});
+    $("section-community")?.addEventListener("input",event=>{const inputs={"community-comments-search":"comments","community-users-search":"users","community-terms-search":"terms","community-history-search":"history"},tab=inputs[event.target.id];if(tab){adminState[tab].search=event.target.value.trim();debounceAdmin(tab);}});
+    $("section-community")?.addEventListener("click",async event=>{
+      const page=event.target.closest("[data-community-page]");if(page&&!page.disabled){const tab=page.closest(".pagination").dataset.tab;window.setCommunityAdminPage(tab,page.dataset.communityPage);return;}
+      const comment=event.target.closest("[data-admin-comment]");if(comment){const verb=comment.dataset.adminComment,labels={hide:"Ocultar contenido",restore:"Volver a mostrar contenido",delete:"Eliminar contenido"};try{await reasonedMutation({title:labels[verb],target:comment.dataset.target,warning:verb==="delete"?"La eliminación es lógica, se conserva la auditoría y no podrá restaurarse desde el panel.":"La acción quedará registrada en el historial.",confirmText:labels[verb],danger:verb==="delete"},"admin_moderate_community_comment",{p_comment_id:Number(comment.dataset.id),p_action:verb},"comments");}catch(error){toast(error.message||"No se pudo moderar el contenido.");}return;}
+      const user=event.target.closest("[data-admin-user]");if(user){const blocked=user.dataset.adminUser==="block";try{await reasonedMutation({title:blocked?"Bloquear en Comunidad":"Desbloquear en Comunidad",target:user.dataset.target,warning:blocked?"La persona no podrá comentar, editar ni reaccionar. Su cuenta, compras, perfil y pedidos seguirán funcionando.":"La persona recuperará la participación en Comunidad.",confirmText:blocked?"Bloquear":"Desbloquear",danger:blocked},"admin_set_community_user_block",{p_user_id:user.dataset.userId,p_blocked:blocked},adminTab);}catch(error){toast(error.message||"No se pudo cambiar la restricción.");}return;}
+      const term=event.target.closest("[data-admin-term]");if(term){const verb=term.dataset.adminTerm;if(verb==="edit"){const item=JSON.parse(term.dataset.term);$("community-term-id").value=item.id;$("community-term-expression").value=item.expression;$("community-term-whole-word").checked=!!item.whole_word;$("community-term-active").checked=!!item.active;$("community-term-cancel").classList.remove("hidden");$("community-term-expression").focus();return;}const active=term.dataset.active==="true";try{await reasonedMutation({title:verb==="delete"?"Eliminar regla":active?"Activar regla":"Desactivar regla",target:term.dataset.target,warning:verb==="delete"?"La regla se eliminará, pero el historial conservará la acción.":"Solo afectará publicaciones y ediciones futuras.",confirmText:verb==="delete"?"Eliminar":"Confirmar",danger:verb==="delete"},"admin_manage_community_term",{p_action:verb==="delete"?"delete":"set_active",p_id:Number(term.dataset.id),p_expression:null,p_whole_word:true,p_active:active},"terms");}catch(error){toast(error.message||"No se pudo actualizar la regla.");}}
+    });
+    $("community-term-form")?.addEventListener("submit",async event=>{event.preventDefault();const id=$("community-term-id").value,expression=$("community-term-expression").value.trim();if(!expression)return;try{const saved=await reasonedMutation({title:id?"Guardar cambios en la regla":"Crear regla de contenido",target:expression,warning:"La validación se aplicará a publicaciones y ediciones futuras.",confirmText:id?"Guardar cambios":"Crear regla"},"admin_manage_community_term",{p_action:id?"update":"create",p_id:id?Number(id):null,p_expression:expression,p_whole_word:$("community-term-whole-word").checked,p_active:$("community-term-active").checked},"terms");if(saved)resetTermForm();}catch(error){toast(error.message||"No se pudo guardar la regla.");}});
+    $("community-term-cancel")?.addEventListener("click",resetTermForm);
+    $("community-save-settings")?.addEventListener("click",async()=>{const enabled=$("community-block-links").checked;try{await reasonedMutation({title:"Guardar bloqueo de enlaces",target:enabled?"Los enlaces quedarán bloqueados":"Los enlaces volverán a permitirse",warning:"La regla se aplicará a publicaciones y ediciones futuras.",confirmText:"Guardar configuración"},"admin_set_community_link_blocking",{p_enabled:enabled},"settings");}catch(error){toast(error.message||"No se pudo guardar la configuración.");}});
+    for(const button of document.querySelectorAll("[data-community-modal-cancel]"))button.addEventListener("click",()=>closeAdminAction(null));
+    $("community-admin-action-confirm")?.addEventListener("click",()=>{const reason=$("community-admin-action-reason").value.trim();if(reason.length<3){$("community-admin-action-error").textContent="Indicá un motivo de al menos 3 caracteres.";$("community-admin-action-error").classList.remove("hidden");return;}closeAdminAction(reason);});
+    $("community-admin-action-modal")?.addEventListener("click",event=>{if(event.target.id==="community-admin-action-modal")closeAdminAction(null);});
+    if($("product-performance-period"))$("product-performance-period").onchange=window.loadProductPerformance;if($("product-performance-sort"))$("product-performance-sort").onchange=renderPerformance;
   });
+  window.__cubicaCommunityAdmin={adminState,selectAdminTab,pagination,commentState};
 })();
+

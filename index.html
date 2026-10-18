@@ -457,8 +457,74 @@
       </section>
 
       <section id="section-community" class="page-section hidden admin-only">
-        <div class="section-head"><div><p class="eyebrow">COMUNIDAD</p><h2>Moderación</h2><p class="muted">Ocultá o restaurá la visibilidad. Las opiniones se publican automáticamente.</p></div></div>
-        <div id="community-moderation-list"></div><button id="community-moderation-more" class="btn ghost hidden">Ver más comentarios</button>
+        <div class="section-head"><div><p class="eyebrow">COMUNIDAD</p><h2>Moderación</h2><p class="muted">Gestioná contenido, restricciones y reglas. Todas las acciones quedan auditadas.</p></div></div>
+        <div id="community-admin-tabs" class="community-admin-tabs" role="tablist" aria-label="Herramientas de Comunidad">
+          <button class="active" type="button" role="tab" aria-selected="true" data-community-admin-tab="comments">Comentarios</button>
+          <button type="button" role="tab" aria-selected="false" data-community-admin-tab="users">Usuarios bloqueados</button>
+          <button type="button" role="tab" aria-selected="false" data-community-admin-tab="terms">Palabras prohibidas</button>
+          <button type="button" role="tab" aria-selected="false" data-community-admin-tab="settings">Enlaces</button>
+          <button type="button" role="tab" aria-selected="false" data-community-admin-tab="history">Historial</button>
+        </div>
+
+        <div id="community-admin-comments" class="community-admin-panel" role="tabpanel">
+          <div class="community-admin-toolbar">
+            <label>Buscar<input id="community-comments-search" type="search" maxlength="120" placeholder="Usuario, contenido o producto"></label>
+            <label>Estado<select id="community-comments-status"><option value="all">Todos</option><option value="published">Visibles</option><option value="hidden">Ocultos</option><option value="deleted_admin">Eliminados por administración</option><option value="deleted_user">Eliminados por el usuario</option></select></label>
+            <label>Orden<select id="community-comments-sort"><option value="recent">Más recientes</option><option value="oldest">Más antiguos</option></select></label>
+          </div>
+          <p id="community-comments-status-text" class="muted community-admin-status" role="status"></p>
+          <div id="community-comments-list" class="community-admin-list"></div>
+          <div id="community-comments-pagination" class="pagination hidden" aria-label="Paginación de comentarios"></div>
+        </div>
+
+        <div id="community-admin-users" class="community-admin-panel hidden" role="tabpanel">
+          <div class="community-admin-toolbar">
+            <label>Buscar<input id="community-users-search" type="search" maxlength="120" placeholder="Usuario o motivo"></label>
+            <label>Estado<select id="community-users-status"><option value="all">Todos</option><option value="blocked">Bloqueados</option><option value="unblocked">Desbloqueados</option></select></label>
+            <label>Orden<select id="community-users-sort"><option value="recent">Más recientes</option><option value="oldest">Más antiguos</option></select></label>
+          </div>
+          <p id="community-users-status-text" class="muted community-admin-status" role="status"></p>
+          <div id="community-users-list" class="community-admin-list"></div>
+          <div id="community-users-pagination" class="pagination hidden" aria-label="Paginación de usuarios restringidos"></div>
+        </div>
+
+        <div id="community-admin-terms" class="community-admin-panel hidden" role="tabpanel">
+          <form id="community-term-form" class="community-term-form">
+            <input id="community-term-id" type="hidden">
+            <label>Palabra o expresión<input id="community-term-expression" maxlength="120" required placeholder="Expresión a bloquear"></label>
+            <label class="community-check"><input id="community-term-whole-word" type="checkbox" checked> Coincidencia de palabra completa</label>
+            <label class="community-check"><input id="community-term-active" type="checkbox" checked> Regla activa</label>
+            <div class="community-inline-actions"><button class="btn primary" type="submit">Guardar regla</button><button id="community-term-cancel" class="btn ghost hidden" type="button">Cancelar edición</button></div>
+          </form>
+          <div class="community-admin-toolbar">
+            <label>Buscar<input id="community-terms-search" type="search" maxlength="120" placeholder="Palabra o expresión"></label>
+            <label>Estado<select id="community-terms-status"><option value="all">Todas</option><option value="active">Activas</option><option value="inactive">Inactivas</option></select></label>
+            <label>Orden<select id="community-terms-sort"><option value="recent">Más recientes</option><option value="oldest">Más antiguas</option></select></label>
+          </div>
+          <p id="community-terms-status-text" class="muted community-admin-status" role="status"></p>
+          <div id="community-terms-list" class="community-admin-list"></div>
+          <div id="community-terms-pagination" class="pagination hidden" aria-label="Paginación de expresiones prohibidas"></div>
+        </div>
+
+        <div id="community-admin-settings" class="community-admin-panel hidden" role="tabpanel">
+          <article class="community-setting-card">
+            <div><h3>Bloquear enlaces en Comunidad</h3><p class="muted">Impide publicar direcciones web en opiniones, respuestas y ediciones. La validación se realiza en Supabase.</p></div>
+            <label class="community-switch"><input id="community-block-links" type="checkbox"><span>Bloquear enlaces</span></label>
+            <button id="community-save-settings" class="btn primary" type="button">Guardar configuración</button>
+          </article>
+          <p id="community-settings-status-text" class="muted community-admin-status" role="status"></p>
+        </div>
+
+        <div id="community-admin-history" class="community-admin-panel hidden" role="tabpanel">
+          <div class="community-admin-toolbar">
+            <label>Buscar<input id="community-history-search" type="search" maxlength="120" placeholder="Acción, motivo, usuario o producto"></label>
+            <label>Acción<select id="community-history-action"><option value="all">Todas</option><option value="comment_hidden">Contenido ocultado</option><option value="comment_restored">Contenido restaurado</option><option value="comment_deleted">Contenido eliminado</option><option value="user_blocked">Usuario bloqueado</option><option value="user_unblocked">Usuario desbloqueado</option><option value="term_created">Regla creada</option><option value="term_updated">Regla editada</option><option value="term_enabled">Regla activada</option><option value="term_disabled">Regla desactivada</option><option value="term_deleted">Regla eliminada</option><option value="links_enabled">Enlaces bloqueados</option><option value="links_disabled">Enlaces permitidos</option></select></label>
+            <label>Orden<select id="community-history-sort"><option value="recent">Más recientes</option><option value="oldest">Más antiguos</option></select></label>
+          </div>
+          <p id="community-history-status-text" class="muted community-admin-status" role="status"></p>
+          <div id="community-history-list" class="community-admin-list"></div>
+          <div id="community-history-pagination" class="pagination hidden" aria-label="Paginación del historial de moderación"></div>
+        </div>
       </section>
 
       <section id="section-stock-supplies" class="page-section hidden admin-only">
@@ -968,6 +1034,24 @@
     </div>
   </div>
 
+  <div id="community-admin-action-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="community-admin-action-title">
+    <div class="modal-card small-modal community-action-modal">
+      <button class="modal-close" type="button" data-community-modal-cancel aria-label="Cerrar">×</button>
+      <p class="eyebrow">MODERACIÓN DE COMUNIDAD</p>
+      <h2 id="community-admin-action-title">Confirmar acción</h2>
+      <p id="community-admin-action-target" class="community-action-target"></p>
+      <p id="community-admin-action-warning" class="muted"></p>
+      <label>Motivo
+        <textarea id="community-admin-action-reason" maxlength="500" rows="3" required placeholder="Indicá el motivo (3 a 500 caracteres)"></textarea>
+      </label>
+      <p id="community-admin-action-error" class="form-warning hidden" role="alert"></p>
+      <div class="category-delete-actions">
+        <button class="btn ghost" type="button" data-community-modal-cancel>Cancelar</button>
+        <button id="community-admin-action-confirm" class="btn primary" type="button">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="github-config.js?v=order-protection2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -975,7 +1059,7 @@
   <script src="js/ui-shell.js?v=hud-orders1"></script>
   <script src="js/store-ui.js?v=catalog-admin1"></script>
   <script src="js/products-ui.js?v=admin-stage-a2"></script>
-  <script src="js/community-ui.js?v=mfa2"></script>
+  <script src="js/community-ui.js?v=community-stage-b1"></script>
   <script src="js/inventory-ui.js?v=catalog-admin1"></script>
   <script src="js/budget-ui.js?v=admin-stage-a2"></script>
   <div id="order-management-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-management-title">
@@ -1014,3 +1098,4 @@
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
+
