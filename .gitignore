@@ -1,0 +1,10 @@
+node_modules/
+artifacts/
+outputs/
+tmp/
+.env
+.env.*
+!.env.example
+supabase/.temp/
+*.local
+*.log

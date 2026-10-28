@@ -13,6 +13,11 @@ window.CUBICA_CONFIG = {
   // La Secret Key permanece exclusivamente en Supabase Edge Secrets.
   turnstileSiteKey: "0x4AAAAAAFWyP3cVMucw34_n",
 
+  // Etapa C permanece inactiva hasta que backend, Edge Functions y 7B estén
+  // desplegados y verificados de forma coordinada. Valores permitidos:
+  // "off" (sin RPC), "admin" (solo panel AAL2) y "full" (público + admin).
+  stageCMode: "off",
+
   // Backend opcional y exclusivamente dedicado al slicing (OrcaSlicer).
   // Vacío = visor 3D disponible, slicing real deshabilitado.
   slicerApiBase: ""
@@ -22,4 +27,3 @@ window.cubicaSlicerApiUrl = function(path){
   const base=String(window.CUBICA_CONFIG?.slicerApiBase||"").replace(/\/$/,"");
   return base ? base+path : path;
 };
-
