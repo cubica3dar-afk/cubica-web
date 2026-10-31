@@ -16,7 +16,7 @@ window.CUBICA_CONFIG = {
   // Etapa C permanece inactiva hasta que backend, Edge Functions y 7B estén
   // desplegados y verificados de forma coordinada. Valores permitidos:
   // "off" (sin RPC), "admin" (solo panel AAL2) y "full" (público + admin).
-  stageCMode: "off",
+  stageCMode: "admin",
 
   // Backend opcional y exclusivamente dedicado al slicing (OrcaSlicer).
   // Vacío = visor 3D disponible, slicing real deshabilitado.
