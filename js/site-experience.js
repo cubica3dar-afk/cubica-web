@@ -7,9 +7,13 @@
   const stageCMode=()=>["admin","full"].includes(window.CUBICA_CONFIG?.stageCMode)?window.CUBICA_CONFIG.stageCMode:"off";
   const adminEnabled=()=>["admin","full"].includes(stageCMode());
   const publicEnabled=()=>stageCMode()==="full";
+  const adminAccessAllowed=()=>{
+    const current=typeof session==="undefined"?null:session;
+    return adminEnabled()&&current?.role==="admin"&&window.cubicaAdminMfaAccessAllowed?.()===true;
+  };
   window.cubicaStageCAdminEnabled=adminEnabled;
   window.cubicaStageCPublicEnabled=publicEnabled;
-  const state={experience:null,admin:null,tab:"appearance",preview:"desktop",assetUploadRequestId:null,suggestionWidget:null,suggestionRequestId:null,suggestionSubmitting:false,refreshTimer:null,suggestionPage:1,suggestionLifecycle:"active",campaignPage:1,campaignSize:10,phrasePage:1,phraseSize:10,faqPage:1,faqSize:10,calendarCursor:new Date(new Date().getFullYear(),new Date().getMonth(),1)};
+  const state={experience:null,admin:null,adminLoadSequence:0,tab:"appearance",preview:"desktop",assetUploadRequestId:null,suggestionWidget:null,suggestionRequestId:null,suggestionSubmitting:false,refreshTimer:null,suggestionPage:1,suggestionLifecycle:"active",campaignPage:1,campaignSize:10,phrasePage:1,phraseSize:10,faqPage:1,faqSize:10,calendarCursor:new Date(new Date().getFullYear(),new Date().getMonth(),1)};
   const rpc=async(name,args={})=>{
     const client=window.cubicaSupabase;if(!client)throw new Error("Supabase no está disponible.");
     const {data,error}=await client.rpc(name,args);if(error)throw error;return data;
@@ -132,10 +136,23 @@
     host.querySelectorAll("[data-site-tab]").forEach(button=>button.onclick=()=>{state.tab=button.dataset.siteTab;renderAdmin();if(state.tab==="suggestions")loadSuggestions();});
     if(state.tab==="appearance")bindAppearance();if(state.tab==="campaigns")bindCampaignsV2();if(state.tab==="content")bindContentV2();if(state.tab==="suggestions")bindSuggestions();
   }
+  function clearAdminState(message="La configuración administrativa está protegida."){
+    state.adminLoadSequence+=1;state.admin=null;state.assetUploadRequestId=null;
+    const host=$("site-configuration-app");if(host)host.innerHTML=`<div class="card"><p class="muted">${escapeHtml(message)}</p></div>`;
+  }
   async function loadAdmin(){
-    const host=$("site-configuration-app");if(!host)return;host.innerHTML='<div class="card"><p class="muted">Cargando configuración protegida…</p></div>';
-    if(!adminEnabled()){host.innerHTML='<div class="card"><h3>Configuración no habilitada</h3><p class="muted">La Etapa C permanece cerrada hasta completar su activación coordinada.</p></div>';return false;}
-    try{state.admin=await rpc("admin_get_site_configuration");renderAdmin();}catch(error){host.innerHTML=`<div class="card"><h3>No se pudo abrir Configuración</h3><p class="muted">${escapeHtml(error.message||"Verificá tu sesión y MFA.")}</p></div>`;}
+    const host=$("site-configuration-app");if(!host)return false;
+    if(!adminEnabled()){clearAdminState("La Etapa C permanece cerrada hasta completar su activación coordinada.");return false;}
+    if(!adminAccessAllowed()){clearAdminState("Iniciá sesión como administrador y verificá tu segundo factor para abrir Configuración.");return false;}
+    const request=++state.adminLoadSequence;host.innerHTML='<div class="card"><p class="muted">Cargando configuración protegida…</p></div>';
+    try{
+      const data=await rpc("admin_get_site_configuration");
+      if(request!==state.adminLoadSequence||!adminAccessAllowed())return false;
+      state.admin=data;renderAdmin();return true;
+    }catch(error){
+      if(request!==state.adminLoadSequence||!adminAccessAllowed())return false;
+      host.innerHTML=`<div class="card"><h3>No se pudo abrir Configuración</h3><p class="muted">${escapeHtml(error.message||"Verificá tu sesión y MFA.")}</p></div>`;return false;
+    }
   }
   function collectAppearance(){const value=deepMerge(DEFAULT_APPEARANCE,state.admin.appearance?.config||{});document.querySelectorAll("[data-theme-hex]").forEach(input=>value.colors[input.dataset.themeHex]=input.value.trim());value.hero={title:$("site-hero-title-input").value.trim(),subtitle:$("site-hero-subtitle-input").value.trim()};document.querySelectorAll("[data-theme-asset]").forEach(select=>value.assets[select.dataset.themeAsset]=select.value||null);return value;}
   function updatePreview(){
@@ -214,9 +231,17 @@
   async function openSuggestionDetail(id){const host=$("admin-suggestion-detail");if(!host)return;host.classList.remove("hidden");host.innerHTML='<p class="muted">Cargando detalle…</p>';try{const s=await rpc("admin_get_suggestion",{p_id:id}),history=(s.history||[]).map(h=>`<li><strong>${escapeHtml(h.operation)}</strong> · revisión ${h.previous_revision} → ${h.new_revision} · ${new Date(h.occurred_at).toLocaleString("es-AR")}<span>${h.reason?escapeHtml(h.reason):"Sin motivo adicional"}</span></li>`).join("");host.innerHTML=`<div class="form-block-head"><div><h3>${escapeHtml(s.subject)}</h3><p class="muted">${escapeHtml(s.category)} · revisión ${s.revision}${s.recent_duplicate_count?` · ${s.recent_duplicate_count} duplicado(s) reciente(s)`:""}</p></div><button class="btn ghost" type="button" id="close-suggestion-detail">Cerrar</button></div><p>${escapeHtml(s.description)}</p>${s.contact?`<p><strong>Contacto:</strong> ${escapeHtml(s.contact)}</p>`:""}<div class="form-grid"><label>Estado<select id="suggestion-detail-status">${["new","reviewing","accepted","resolved","dismissed"].map(value=>`<option value="${value}" ${s.status===value?"selected":""}>${value}</option>`).join("")}</select></label><label>Motivo administrativo<input id="suggestion-detail-reason" maxlength="1000" placeholder="Obligatorio para cerrar, archivar, eliminar o restaurar"></label></div><label>Notas privadas<textarea id="suggestion-detail-notes" maxlength="4000" rows="4">${escapeHtml(s.private_notes)}</textarea></label><div class="site-config-actions"><button class="btn secondary" type="button" id="save-suggestion-detail">Guardar cambios</button>${s.deleted_at?'<button class="btn ghost" type="button" data-suggestion-lifecycle="restore">Restaurar</button>':`${s.archived_at?'<button class="btn ghost" type="button" data-suggestion-lifecycle="unarchive">Desarchivar</button>':'<button class="btn ghost" type="button" data-suggestion-lifecycle="archive">Archivar</button>'}<button class="btn ghost" type="button" data-suggestion-lifecycle="soft_delete">Eliminar lógicamente</button>`}</div><h4>Historial (${s.history_total})</h4><ol class="site-version-history">${history||'<li class="muted">Sin cambios administrativos.</li>'}</ol>`;$("close-suggestion-detail").onclick=()=>host.classList.add("hidden");$("save-suggestion-detail").onclick=async()=>{try{const result=await rpc("admin_update_suggestion",{p_id:s.id,p_status:$("suggestion-detail-status").value,p_private_notes:$("suggestion-detail-notes").value,p_expected_revision:s.revision,p_reason:$("suggestion-detail-reason").value});if(result.status==="conflict"){toast("La sugerencia cambió en otra sesión. Recargamos el estado actual.");await openSuggestionDetail(s.id);await loadSuggestions();return;}toast(result.status==="unchanged"?"No había cambios para guardar.":"Sugerencia actualizada.");await openSuggestionDetail(s.id);await loadSuggestions();}catch(error){toast(error.message);}};host.querySelectorAll("[data-suggestion-lifecycle]").forEach(button=>button.onclick=async()=>{try{const result=await rpc("admin_set_suggestion_lifecycle",{p_id:s.id,p_action:button.dataset.suggestionLifecycle,p_expected_revision:s.revision,p_reason:$("suggestion-detail-reason").value});if(result.status==="conflict"){toast("La sugerencia cambió en otra sesión. Recargamos el estado actual.");await openSuggestionDetail(s.id);await loadSuggestions();return;}toast(result.status==="unchanged"?"La sugerencia ya estaba en ese estado.":"Ciclo de vida actualizado.");await openSuggestionDetail(s.id);await loadSuggestions();}catch(error){toast(error.message);}});}catch(error){host.innerHTML=`<p class="muted">${escapeHtml(error.message)}</p>`;}}
 
   function applyStageCSurfaces(){
-    document.querySelectorAll('[data-stage-c="admin"]').forEach(element=>element.classList.toggle("hidden",!adminEnabled()));
+    // La disponibilidad del módulo nunca concede visibilidad administrativa.
+    // renderApp/renderAccountSidebar son quienes pueden quitar .hidden después
+    // de confirmar rol administrador y MFA AAL2.
+    document.querySelectorAll('[data-stage-c="admin"]').forEach(element=>{if(!adminAccessAllowed())element.classList.add("hidden");});
     document.querySelectorAll('[data-stage-c="public"]').forEach(element=>element.classList.toggle("hidden",!publicEnabled()));
   }
+  window.addEventListener("cubica:auth-ready",()=>{
+    const section=$("section-configuration"),reload=adminAccessAllowed()&&section&&!section.classList.contains("hidden");
+    clearAdminState();applyStageCSurfaces();
+    if(reload)loadAdmin();
+  });
   document.addEventListener("DOMContentLoaded",()=>{
     applyStageCSurfaces();
     if(!publicEnabled())return;
@@ -227,5 +252,5 @@
     const page=new URLSearchParams(location.search).get("page");if(["about","contact","terms","community","faq","suggestions"].includes(page)&&!window.cubicaAuthCallbackBlocked&&!window.cubicaPasswordRecoveryActive)openPublicPage(page,{push:false});
     window.addEventListener("popstate",()=>{const current=new URLSearchParams(location.search).get("page");current?openPublicPage(current,{push:false}):showSection("store");});
   });
-  window.cubicaSiteExperience={loadAdmin,loadPublicExperience,openPublicPage,validateAppearance,renderMarkdown,stageCMode,adminEnabled,publicEnabled,applyStageCSurfaces};
+  window.cubicaSiteExperience={loadAdmin,loadPublicExperience,openPublicPage,validateAppearance,renderMarkdown,stageCMode,adminEnabled,publicEnabled,adminAccessAllowed,applyStageCSurfaces};
 })();
