@@ -45,6 +45,7 @@ const WELCOME_MESSAGES = [
   "Lo que hoy ves en pantalla, mañana puede estar en tus manos. Elegí, imaginá y dejá que Cúbica haga el resto.",
   "Cúbica nace de transformar material en objetos con propósito. Ahora queremos transformar tu elección en algo que puedas disfrutar."
 ];
+window.cubicaDefaultWelcomeMessages=[...WELCOME_MESSAGES];
 
 function navItems(){
   // La barra superior queda deliberadamente limpia. La gestión vive en el panel lateral.
@@ -130,7 +131,7 @@ function renderAccountSidebar(){
     if(session?.avatarUrl){img.src=session.avatarUrl;img.classList.remove("hidden");fallback.classList.add("hidden");}
     else{img.removeAttribute("src");img.classList.add("hidden");fallback.classList.remove("hidden");}
   }
-  document.querySelectorAll(".account-sidebar .admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed()));
+  document.querySelectorAll(".account-sidebar .admin-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed()||(el.dataset.stageC==="admin"&&!window.cubicaStageCAdminEnabled?.())));
   document.querySelectorAll(".account-sidebar .customer-only").forEach(el=>el.classList.toggle("hidden",session?.role!=="customer"));
   document.querySelectorAll(".account-sidebar .session-only").forEach(el=>el.classList.toggle("hidden",!session));
   const ordersLabel=$("sidebar-orders-label");
@@ -162,6 +163,10 @@ function toggleProfileMenu(){
 }
 function showSection(id){
   if(window.cubicaAuthCallbackBlocked && id!=="login")id="login";
+  if(id==="configuration"&&!window.cubicaStageCAdminEnabled?.()){
+    toast("Configuración del sitio todavía no está habilitada.");
+    id="store";
+  }
   // Un administrador con MFA obligatorio pendiente solo puede completar el
   // desafío. El cierre de sesión se ofrece dentro de esa misma pantalla.
   if(window.cubicaAdminMfaChallengeRequired?.() && id!=="mfa")id="mfa";
@@ -183,7 +188,7 @@ function showSection(id){
     toast("Iniciá sesión para consultar tus pedidos.");
     id="login";
   }
-  if(["stock-finished","stock-supplies","budget","analytics","community","delivery"].includes(id)){
+  if(["stock-finished","stock-supplies","budget","analytics","community","delivery","configuration"].includes(id)){
     if(session?.role!=="admin"){
       toast("Esta sección es exclusiva del administrador.");
       id="login";
@@ -210,17 +215,19 @@ function showSection(id){
   if(id==="stock-finished") renderFinishedStock(); if(id==="stock-supplies") renderSupplies();
   if(id==="budget") renderBudget(); if(id==="analytics") renderAnalytics();
   if(id==="community")window.loadCommunityModeration?.(false);
+  if(id==="configuration")window.cubicaSiteExperience?.loadAdmin?.();
   if(id==="analytics")window.loadProductPerformance?.();
   if(requested==="store" && typeof window.cubicaTrackEvent==="function") window.cubicaTrackEvent("page_view",null,{section:"store"});
 }
 function renderWelcome(){
   const message=$("welcome-message");
   if(message){
-    let index=Math.floor(Math.random()*WELCOME_MESSAGES.length);
+    const messages=Array.isArray(window.cubicaWelcomeMessages)&&window.cubicaWelcomeMessages.length?window.cubicaWelcomeMessages:WELCOME_MESSAGES;
+    let index=Math.floor(Math.random()*messages.length);
     const previous=Number(sessionStorage.getItem("cubica_welcome_index"));
-    if(WELCOME_MESSAGES.length>1 && index===previous) index=(index+1)%WELCOME_MESSAGES.length;
+    if(messages.length>1 && index===previous) index=(index+1)%messages.length;
     sessionStorage.setItem("cubica_welcome_index",index);
-    message.textContent=WELCOME_MESSAGES[index];
+    message.textContent=messages[index];
   }
 }
 function renderProfile(){
@@ -286,7 +293,7 @@ function renderApp(){
   document.querySelectorAll(".admin-only").forEach(el=>{
     if(el.closest?.("#account-sidebar")) return;
     if(el.classList.contains("page-section")){
-      if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed()) el.classList.add("hidden");
+      if(session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed()||(el.dataset.stageC==="admin"&&!window.cubicaStageCAdminEnabled?.())) el.classList.add("hidden");
     }else{
       el.classList.toggle("hidden",session?.role!=="admin"||!window.cubicaAdminMfaAccessAllowed());
     }

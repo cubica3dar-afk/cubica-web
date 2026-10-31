@@ -1,3 +1,15 @@
 # Autenticación propia entre Cron y el worker. Nunca invocar desde el navegador.
 [functions.order-emails]
 verify_jwt = false
+
+# Solo administradores autenticados. El worker vuelve a validar la sesión y
+# exige autorización administrativa AAL2 antes de usar la clave del servidor.
+[functions.site-assets]
+verify_jwt = true
+entrypoint = "./functions/site-assets/index.ts"
+
+# Ruta pública prevista para invitados y usuarios autenticados. El worker
+# valida origen, Turnstile, sesión opcional, idempotencia y rate limiting.
+[functions.submit-suggestion]
+verify_jwt = false
+entrypoint = "./functions/submit-suggestion/index.ts"

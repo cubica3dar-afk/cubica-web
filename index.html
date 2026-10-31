@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cúbica 3D — Gestión y tienda</title>
   <link rel="icon" href="assets/logo.jpg">
-  <link rel="stylesheet" href="styles.css?v=admin-stage-a1">
+  <link rel="stylesheet" href="styles.css?v=site-stage-c1">
   <link rel="stylesheet" href="styles-product-page.css?v=delivery1">
   <link rel="stylesheet" href="styles-delivery.css?v=delivery1">
   <link rel="stylesheet" href="styles-checkout.css?v=checkout1">
@@ -91,6 +91,7 @@
         <button type="button" data-sidebar-section="analytics" class="admin-only"><span>⌗</span><span>Análisis</span></button>
         <button type="button" data-sidebar-section="delivery" class="admin-only"><span>↗</span><span>Entregas</span></button>
         <button type="button" data-sidebar-section="community" class="admin-only"><span>☏</span><span>Comunidad</span></button>
+        <button type="button" data-sidebar-section="configuration" data-stage-c="admin" class="admin-only hidden"><span>⚙</span><span>Configuración</span></button>
       </nav>
     </aside>
 
@@ -226,11 +227,11 @@
         </div>
       </section>
       <section id="section-store" class="page-section">
-        <div class="hero">
+        <div id="store-hero" class="hero">
           <div>
             <p class="eyebrow">CÚBICA 3D</p>
-            <h1>Objetos hechos para vos.</h1>
-            <p>Explorá los productos disponibles, elegí cantidades y armá tu pedido.</p>
+            <h1 id="site-hero-title">Objetos hechos para vos.</h1>
+            <p id="site-hero-subtitle">Explorá los productos disponibles, elegí cantidades y armá tu pedido.</p>
           </div>
           <a class="instagram" href="https://instagram.com/cubica3d.ar" target="_blank" rel="noopener">@cubica3d.ar ↗</a>
         </div>
@@ -791,7 +792,49 @@
           <div id="budget-detail" class="card budget-detail hidden"></div>
         </section>
       </section>
+
+      <section id="section-configuration" data-stage-c="admin" class="page-section hidden admin-only">
+        <div class="section-head">
+          <div><p class="eyebrow">SITIO Y COMUNICACIÓN</p><h2>Configuración</h2><p class="muted">Prepará cambios, revisalos en una vista aislada y publicalos cuando estén listos.</p></div>
+        </div>
+        <div id="site-configuration-app" class="site-configuration-shell" aria-live="polite">
+          <div class="card"><p class="muted">Cargando configuración protegida…</p></div>
+        </div>
+      </section>
+
+      <section id="section-public-content" data-stage-c="public" class="page-section hidden">
+        <article class="public-content-card card">
+          <p class="eyebrow">CÚBICA 3D</p>
+          <h1 id="public-content-title">Información</h1>
+          <div id="public-content-body" class="public-rich-text"></div>
+          <div id="public-content-contact" class="public-contact-grid"></div>
+        </article>
+      </section>
+
+      <section id="section-faq" data-stage-c="public" class="page-section hidden">
+        <div class="section-head"><div><p class="eyebrow">AYUDA</p><h1>Preguntas frecuentes</h1><p class="muted">Respuestas rápidas sobre Cúbica.</p></div></div>
+        <div id="public-faq-list" class="public-faq-list"></div>
+      </section>
+
+      <section id="section-suggestions" data-stage-c="public" class="page-section hidden">
+        <div class="public-suggestion-layout">
+          <div><p class="eyebrow">TU OPINIÓN</p><h1>Ayudanos a mejorar</h1><p class="muted">Podés enviar una sugerencia sin iniciar sesión. La protección anti-spam es independiente del checkout.</p></div>
+          <form id="public-suggestion-form" class="card form-grid">
+            <label>Categoría<select id="suggestion-category" required><option value="funcionalidad">Sugerencia de funcionalidad</option><option value="visual">Mejora visual</option><option value="error">Reporte de error</option><option value="compra">Experiencia de compra</option><option value="otro">Otro comentario</option></select></label>
+            <label>Asunto<input id="suggestion-subject" minlength="3" maxlength="160" required></label>
+            <label class="full-span">Descripción<textarea id="suggestion-description" minlength="10" maxlength="3000" rows="6" required></textarea></label>
+            <label class="full-span">Contacto, opcional<input id="suggestion-contact" maxlength="320" placeholder="Email o teléfono"></label>
+            <div id="suggestion-turnstile" class="full-span stage-c-turnstile"></div>
+            <p id="suggestion-status" class="muted full-span" role="status"></p>
+            <button class="btn primary full-span" type="submit">Enviar sugerencia</button>
+          </form>
+        </div>
+      </section>
     </main>
+    <footer class="site-footer hidden" data-stage-c="public" aria-label="Información de Cúbica">
+      <strong>Cúbica 3D</strong>
+      <nav><button type="button" data-public-page="about">Sobre Cúbica</button><button type="button" data-public-page="contact">Contacto</button><button type="button" data-public-page="terms">Términos</button><button type="button" data-public-page="community">Normas de Comunidad</button><button type="button" data-public-page="faq">Preguntas frecuentes</button><button type="button" data-public-page="suggestions">Sugerencias</button></nav>
+    </footer>
   </div>
 
   <div id="finished-modal" class="modal hidden">
@@ -1084,6 +1127,7 @@
 
   <script src="js/app-init.js?v=admin-stage-a2"></script>
   <script src="supabase-bridge.js?v=admin-stage-a2"></script>
+  <script src="js/site-experience.js?v=site-stage-c1"></script>
   <script src="js/mfa-ui.js?v=mfa2"></script>
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=catalog-admin1"></script>
@@ -1098,4 +1142,3 @@
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
-

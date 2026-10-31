@@ -1,0 +1,3 @@
+# Las migraciones de Etapa C tienen hashes aprobados sobre bytes exactos.
+# No normalizar finales de línea al agregarlas o extraerlas.
+supabase/migrations/*stage_c*.sql -text
