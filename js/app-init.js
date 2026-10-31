@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   $("enter-store-btn").onclick=()=>{
     $("welcome-view").classList.add("hidden");
+    $("welcome-view").setAttribute("aria-hidden","true");
     showSection("store");
     window.scrollTo({top:0,behavior:"smooth"});
   };

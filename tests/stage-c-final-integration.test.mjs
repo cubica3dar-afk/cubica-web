@@ -51,7 +51,7 @@ function uploadRequest(){const form=new FormData();form.set("request_id",REQUEST
   const admin=makeElement(),publicSurface=makeElement(),host=makeElement(false),section=makeElement();
   let rpcCalls=0,rpcMode="error",resolvePending;
   const document={documentElement:{style:{setProperty(){}}},body:{style:{setProperty(){}}},head:{appendChild(){}},getElementById:id=>id==="site-configuration-app"?host:id==="section-configuration"?section:null,querySelectorAll:selector=>selector==='[data-stage-c="admin"]'?[admin,section]:selector==='[data-stage-c="public"]'?[publicSurface]:[],querySelector:()=>null,addEventListener:(name,callback)=>{documentListeners[name]=callback;},createElement:()=>makeElement()};
-  const window={CUBICA_CONFIG:{stageCMode:"off"},cubicaSupabase:{rpc:async()=>{rpcCalls++;if(rpcMode==="pending")return new Promise(resolve=>{resolvePending=resolve;});return {data:null,error:{message:"rechazo simulado"}};}},addEventListener(name,callback){windowListeners[name]=callback;}};window.window=window;
+  const window={CUBICA_CONFIG:{stageCMode:"off"},cubicaSupabase:{rpc:async(name)=>{rpcCalls++;if(name==="get_welcome_screen_preference")return {data:false,error:null};if(name==="admin_get_welcome_screen_preference")return {data:{enabled:false,version:1},error:null};if(name==="admin_get_site_configuration"&&rpcMode==="pending")return new Promise(resolve=>{resolvePending=resolve;});return {data:null,error:{message:"rechazo simulado"}};}},addEventListener(name,callback){windowListeners[name]=callback;}};window.window=window;
   const context={window,document,session:null,console,crypto,URL,URLSearchParams,location:{href:"https://cubica3d.ar/",search:""},history:{pushState(){}},clearTimeout,setTimeout,clearInterval,setInterval,FormData,confirm:()=>false};
   window.cubicaAdminMfaAccessAllowed=()=>context.session?.role!=="admin"||context.session?.adminMfaAccessAllowed===true;
   vm.runInNewContext(source,context,{filename:"site-experience.js"});documentListeners.DOMContentLoaded();
@@ -74,11 +74,11 @@ function uploadRequest(){const form=new FormData();form.set("request_id",REQUEST
   admin.classList.remove("hidden");
   assert.equal(window.cubicaSiteExperience.adminAccessAllowed(),true);
   await window.cubicaSiteExperience.loadAdmin();
-  assert.equal(rpcCalls,1,"el administrador AAL2 puede iniciar la carga protegida");
+  assert.equal(rpcCalls,3,"la carga AAL2 consulta configuración y la preferencia global, además del lector público mínimo");
   assert.equal(publicSurface.classList.hidden,true,"admin no habilita superficies públicas");
 
   rpcMode="pending";section.classList.remove("hidden");const staleLoad=window.cubicaSiteExperience.loadAdmin();
-  assert.equal(rpcCalls,2);context.session={role:"admin",supabaseUserId:"admin-1",adminMfaAccessAllowed:false};windowListeners["cubica:auth-ready"]({detail:{role:"admin",mfa:{accessAllowed:false}}});
+  assert.equal(rpcCalls,5);context.session={role:"admin",supabaseUserId:"admin-1",adminMfaAccessAllowed:false};windowListeners["cubica:auth-ready"]({detail:{role:"admin",mfa:{accessAllowed:false}}});
   assert.equal(admin.classList.hidden,true);assert.equal(section.classList.hidden,true);assert.match(host.innerHTML,/protegida/);
   resolvePending({data:{private_marker:"no debe mostrarse"},error:null});assert.equal(await staleLoad,false);assert.doesNotMatch(host.innerHTML,/private_marker|no debe mostrarse/);
 
@@ -90,7 +90,7 @@ function uploadRequest(){const form=new FormData();form.set("request_id",REQUEST
 }
 
 const config=fs.readFileSync(path.join(root,"github-config.js"),"utf8");
-assert.match(config,/stageCMode:\s*"off"/);
+assert.match(config,/stageCMode:\s*"admin"/);
 const functionConfig=fs.readFileSync(path.join(root,"supabase/config.toml"),"utf8");
 assert.match(functionConfig,/\[functions\.site-assets\][\s\S]*?verify_jwt\s*=\s*true[\s\S]*?entrypoint\s*=\s*"\.\/functions\/site-assets\/index\.ts"/);
 assert.match(functionConfig,/\[functions\.submit-suggestion\][\s\S]*?verify_jwt\s*=\s*false[\s\S]*?entrypoint\s*=\s*"\.\/functions\/submit-suggestion\/index\.ts"/);
