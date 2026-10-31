@@ -13,7 +13,7 @@
   };
   window.cubicaStageCAdminEnabled=adminEnabled;
   window.cubicaStageCPublicEnabled=publicEnabled;
-  const state={experience:null,admin:null,adminLoadSequence:0,tab:"appearance",preview:"desktop",assetUploadRequestId:null,suggestionWidget:null,suggestionRequestId:null,suggestionSubmitting:false,refreshTimer:null,suggestionPage:1,suggestionLifecycle:"active",campaignPage:1,campaignSize:10,phrasePage:1,phraseSize:10,faqPage:1,faqSize:10,calendarCursor:new Date(new Date().getFullYear(),new Date().getMonth(),1)};
+  const state={experience:null,admin:null,welcomePreference:{enabled:false,version:1},adminLoadSequence:0,welcomeLoadSequence:0,tab:"appearance",preview:"desktop",assetUploadRequestId:null,suggestionWidget:null,suggestionRequestId:null,suggestionSubmitting:false,refreshTimer:null,suggestionPage:1,suggestionLifecycle:"active",campaignPage:1,campaignSize:10,phrasePage:1,phraseSize:10,faqPage:1,faqSize:10,calendarCursor:new Date(new Date().getFullYear(),new Date().getMonth(),1)};
   const rpc=async(name,args={})=>{
     const client=window.cubicaSupabase;if(!client)throw new Error("Supabase no está disponible.");
     const {data,error}=await client.rpc(name,args);if(error)throw error;return data;
@@ -43,6 +43,37 @@
     if(hero){hero.style.setProperty("--site-hero-image",urls.banner?`url("${urls.banner}")`:"none");hero.classList.toggle("has-site-banner",Boolean(urls.banner));}
     document.body.style.setProperty("--site-background-image",urls.background?`url("${urls.background}")`:"none");
     document.querySelectorAll('.brand img,.welcome-logo,.auth-logo').forEach(img=>{img.src=urls.logo||"assets/logo.jpg";});
+  }
+  function shouldBypassWelcome(){
+    if(window.cubicaAuthCallbackBlocked||window.cubicaPasswordRecoveryActive)return true;
+    const query=new URLSearchParams(location.search||""),hash=new URLSearchParams((location.hash||"").replace(/^#/,""));
+    if(query.has("product")||query.has("view")||query.has("page")||query.has("code"))return true;
+    if(["recovery","signup","magiclink","invite"].includes(hash.get("type"))||hash.has("error")||hash.has("access_token")||hash.has("refresh_token")||hash.has("code"))return true;
+    const active=document.querySelector?.(".page-section:not(.hidden)");
+    return Boolean(active&&active.id!=="section-store");
+  }
+  function setWelcomeVisible(visible){
+    const welcome=$("welcome-view");if(!welcome)return;
+    welcome.classList.toggle("hidden",!visible);
+    welcome.setAttribute?.("aria-hidden",visible?"false":"true");
+    if(visible)window.renderWelcome?.();
+  }
+  async function resolveWelcomePreference(){
+    const request=++state.welcomeLoadSequence;
+    setWelcomeVisible(false);
+    if(!adminEnabled())return false;
+    if(shouldBypassWelcome())return false;
+    try{
+      const enabled=await rpc("get_welcome_screen_preference");
+      if(request!==state.welcomeLoadSequence||shouldBypassWelcome())return false;
+      state.welcomePreference={...state.welcomePreference,enabled:enabled===true};
+      setWelcomeVisible(enabled===true);
+      return enabled===true;
+    }catch(error){
+      if(request===state.welcomeLoadSequence)setWelcomeVisible(false);
+      console.warn("No se pudo leer la preferencia de bienvenida; se abre la tienda directamente.",error);
+      return false;
+    }
   }
   async function loadPublicExperience(){
     if(!publicEnabled())return false;
@@ -107,7 +138,8 @@
   function appearanceForm(){
     const draft=deepMerge(DEFAULT_APPEARANCE,state.admin?.appearance?.config||{}),colors=draft.colors,assets=state.admin?.assets||[];
     const assetOptions=kind=>`<option value="">Usar recurso predeterminado</option>${assets.filter(a=>a.kind===kind&&!a.retired_at).map(a=>`<option value="${a.id}" ${draft.assets[kind]===a.id?"selected":""}>${escapeHtml(a.label)} · ${a.width}×${a.height}</option>`).join("")}`;
-    return `<div class="site-config-grid"><form id="site-appearance-form" class="card site-config-form"><h3>Borrador visual</h3><p class="muted">Los cambios quedan en borrador hasta que elijas Publicar.</p><div class="site-color-grid">${[["background","Fondo"],["panel","Panel"],["panelAlt","Panel alternativo"],["text","Texto"],["muted","Texto secundario"],["accent","Acento"]].map(([key,label])=>`<label>${label}<span class="color-field"><input type="color" data-theme-color="${key}" value="${colors[key]}"><input value="${colors[key]}" maxlength="7" data-theme-hex="${key}"></span></label>`).join("")}</div><label>Título principal<input id="site-hero-title-input" maxlength="120" value="${escapeHtml(draft.hero.title)}"></label><label>Subtítulo<textarea id="site-hero-subtitle-input" maxlength="300" rows="3">${escapeHtml(draft.hero.subtitle)}</textarea></label>${[["logo","Logo"],["banner","Banner"],["background","Fondo fotográfico"]].map(([kind,label])=>`<label>${label}<select data-theme-asset="${kind}">${assetOptions(kind)}</select></label>`).join("")}<div id="site-contrast-status" class="site-contrast-status"></div><div class="site-config-actions"><button class="btn secondary" type="submit">Guardar borrador</button><button id="site-reset-appearance" class="btn ghost" type="button">Cancelar cambios</button><button id="site-original-appearance" class="btn ghost" type="button">Valores originales</button><button id="site-publish-appearance" class="btn primary" type="button">Publicar versión</button></div><p id="site-appearance-status" class="muted" role="status"></p></form><aside class="site-preview-wrap"><div class="site-preview-toolbar"><strong>Vista previa</strong><span><button type="button" data-preview-size="desktop" class="${state.preview==="desktop"?"active":""}">Escritorio</button><button type="button" data-preview-size="mobile" class="${state.preview==="mobile"?"active":""}">Móvil</button></span></div><div id="site-preview" class="site-preview ${state.preview}"><div class="site-preview-top"><span class="site-preview-logo">C</span><b>Cúbica</b></div><div class="site-preview-hero"><small>CÚBICA 3D</small><h2></h2><p></p></div><div class="site-preview-products"><i></i><i></i><i></i></div></div></aside></div><section class="card site-assets-panel"><div><h3>Biblioteca visual privada</h3><p class="muted">JPEG, PNG o WebP, hasta 8 MB. Los borradores no son públicos.</p></div><form id="site-asset-upload" class="site-asset-upload"><select id="site-asset-kind"><option value="logo">Logo</option><option value="banner">Banner</option><option value="background">Fondo</option><option value="campaign">Campaña</option></select><input id="site-asset-label" maxlength="120" placeholder="Nombre del recurso" required><input id="site-asset-file" type="file" accept="image/jpeg,image/png,image/webp" required><button class="btn secondary">Subir recurso</button></form><div class="site-asset-list">${assets.length?assets.map(a=>`<article><div><strong>${escapeHtml(a.label)}</strong><span>${a.kind} · ${a.width}×${a.height} · ${Math.ceil(a.byte_size/1024)} KB</span></div><div><em class="${a.retired_at?"muted":"good"}">${a.retired_at?"Retirado":a.public_since?"Publicado":"Privado"}</em>${!a.retired_at?`<button class="btn ghost" type="button" data-retire-asset="${a.id}">Retirar</button>`:""}</div></article>`).join(""):'<p class="muted">No hay recursos cargados.</p>'}</div></section>`;
+    const welcomeEnabled=state.welcomePreference?.enabled===true;
+    return `<section class="card site-welcome-setting"><div><p class="eyebrow">INGRESO A LA WEB</p><h3>Mostrar pantalla de bienvenida</h3><p class="muted">Si está desactivada, visitantes y usuarios ingresan directamente al catálogo. Este ajuste no publica el borrador visual.</p></div><label class="site-switch-row" for="site-welcome-enabled"><input id="site-welcome-enabled" type="checkbox" role="switch" ${welcomeEnabled?"checked":""}><span class="site-switch-control" aria-hidden="true"></span><span><strong id="site-welcome-state">${welcomeEnabled?"Activada":"Desactivada"}</strong><small>Estado global actual</small></span></label><div class="site-config-actions"><button id="site-save-welcome" class="btn secondary" type="button">Guardar preferencia</button></div><p id="site-welcome-status" class="muted" role="status"></p></section><div class="site-config-grid"><form id="site-appearance-form" class="card site-config-form"><h3>Borrador visual</h3><p class="muted">Los cambios quedan en borrador hasta que elijas Publicar.</p><div class="site-color-grid">${[["background","Fondo"],["panel","Panel"],["panelAlt","Panel alternativo"],["text","Texto"],["muted","Texto secundario"],["accent","Acento"]].map(([key,label])=>`<label>${label}<span class="color-field"><input type="color" data-theme-color="${key}" value="${colors[key]}"><input value="${colors[key]}" maxlength="7" data-theme-hex="${key}"></span></label>`).join("")}</div><label>Título principal<input id="site-hero-title-input" maxlength="120" value="${escapeHtml(draft.hero.title)}"></label><label>Subtítulo<textarea id="site-hero-subtitle-input" maxlength="300" rows="3">${escapeHtml(draft.hero.subtitle)}</textarea></label>${[["logo","Logo"],["banner","Banner"],["background","Fondo fotográfico"]].map(([kind,label])=>`<label>${label}<select data-theme-asset="${kind}">${assetOptions(kind)}</select></label>`).join("")}<div id="site-contrast-status" class="site-contrast-status"></div><div class="site-config-actions"><button class="btn secondary" type="submit">Guardar borrador</button><button id="site-reset-appearance" class="btn ghost" type="button">Cancelar cambios</button><button id="site-original-appearance" class="btn ghost" type="button">Valores originales</button><button id="site-publish-appearance" class="btn primary" type="button">Publicar versión</button></div><p id="site-appearance-status" class="muted" role="status"></p></form><aside class="site-preview-wrap"><div class="site-preview-toolbar"><strong>Vista previa</strong><span><button type="button" data-preview-size="desktop" class="${state.preview==="desktop"?"active":""}">Escritorio</button><button type="button" data-preview-size="mobile" class="${state.preview==="mobile"?"active":""}">Móvil</button></span></div><div id="site-preview" class="site-preview ${state.preview}"><div class="site-preview-top"><span class="site-preview-logo">C</span><b>Cúbica</b></div><div class="site-preview-hero"><small>CÚBICA 3D</small><h2></h2><p></p></div><div class="site-preview-products"><i></i><i></i><i></i></div></div></aside></div><section class="card site-assets-panel"><div><h3>Biblioteca visual privada</h3><p class="muted">JPEG, PNG o WebP, hasta 8 MB. Los borradores no son públicos.</p></div><form id="site-asset-upload" class="site-asset-upload"><select id="site-asset-kind"><option value="logo">Logo</option><option value="banner">Banner</option><option value="background">Fondo</option><option value="campaign">Campaña</option></select><input id="site-asset-label" maxlength="120" placeholder="Nombre del recurso" required><input id="site-asset-file" type="file" accept="image/jpeg,image/png,image/webp" required><button class="btn secondary">Subir recurso</button></form><div class="site-asset-list">${assets.length?assets.map(a=>`<article><div><strong>${escapeHtml(a.label)}</strong><span>${a.kind} · ${a.width}×${a.height} · ${Math.ceil(a.byte_size/1024)} KB</span></div><div><em class="${a.retired_at?"muted":"good"}">${a.retired_at?"Retirado":a.public_since?"Publicado":"Privado"}</em>${!a.retired_at?`<button class="btn ghost" type="button" data-retire-asset="${a.id}">Retirar</button>`:""}</div></article>`).join(""):'<p class="muted">No hay recursos cargados.</p>'}</div></section>`;
   }
   function monthCalendar(campaigns){
     const now=new Date(),year=now.getFullYear(),month=now.getMonth(),first=new Date(year,month,1),days=new Date(year,month+1,0).getDate(),offset=(first.getDay()+6)%7;let cells="";
@@ -146,9 +178,12 @@
     if(!adminAccessAllowed()){clearAdminState("Iniciá sesión como administrador y verificá tu segundo factor para abrir Configuración.");return false;}
     const request=++state.adminLoadSequence;host.innerHTML='<div class="card"><p class="muted">Cargando configuración protegida…</p></div>';
     try{
-      const data=await rpc("admin_get_site_configuration");
+      const [data,welcomePreference]=await Promise.all([
+        rpc("admin_get_site_configuration"),
+        rpc("admin_get_welcome_screen_preference")
+      ]);
       if(request!==state.adminLoadSequence||!adminAccessAllowed())return false;
-      state.admin=data;renderAdmin();return true;
+      state.admin=data;state.welcomePreference=welcomePreference;renderAdmin();return true;
     }catch(error){
       if(request!==state.adminLoadSequence||!adminAccessAllowed())return false;
       host.innerHTML=`<div class="card"><h3>No se pudo abrir Configuración</h3><p class="muted">${escapeHtml(error.message||"Verificá tu sesión y MFA.")}</p></div>`;return false;
@@ -162,6 +197,10 @@
     document.querySelectorAll("[data-theme-color]").forEach(color=>color.oninput=()=>{const hex=document.querySelector(`[data-theme-hex="${color.dataset.themeColor}"]`);hex.value=color.value;updatePreview();});document.querySelectorAll("[data-theme-hex],[data-theme-asset],#site-hero-title-input,#site-hero-subtitle-input").forEach(input=>input.oninput=updatePreview);
     document.querySelectorAll("[data-preview-size]").forEach(button=>button.onclick=()=>{state.preview=button.dataset.previewSize;renderAdmin();});updatePreview();
     $("site-appearance-form").onsubmit=async event=>{event.preventDefault();const status=$("site-appearance-status");try{const config=collectAppearance();validateAppearance(config);status.textContent="Guardando…";state.admin.appearance=await rpc("admin_save_site_appearance_draft",{p_config:config,p_expected_version:state.admin.appearance?.version||1});status.textContent="Borrador guardado. La tienda pública no cambió.";}catch(error){status.textContent=error.message;}};
+    const welcomeToggle=$("site-welcome-enabled"),welcomeState=$("site-welcome-state"),welcomeStatus=$("site-welcome-status"),welcomeSave=$("site-save-welcome");
+    const renderWelcomeToggleState=()=>{const saved=state.welcomePreference?.enabled===true,pending=welcomeToggle.checked!==saved;welcomeState.textContent=`${welcomeToggle.checked?"Activada":"Desactivada"}${pending?" · sin guardar":""}`;};
+    welcomeToggle.onchange=renderWelcomeToggleState;
+    welcomeSave.onclick=async()=>{if(!adminAccessAllowed()){clearAdminState("Volvé a verificar MFA para cambiar la bienvenida.");return;}welcomeSave.disabled=true;welcomeStatus.textContent="Guardando…";try{const saved=await rpc("admin_set_welcome_screen_preference",{p_enabled:welcomeToggle.checked,p_expected_version:state.welcomePreference?.version||1});if(!adminAccessAllowed()){clearAdminState();return;}state.welcomePreference=saved;renderWelcomeToggleState();welcomeStatus.textContent=`Preferencia guardada. La bienvenida quedó ${saved.enabled?"activada":"desactivada"}.`;}catch(error){welcomeStatus.textContent=error.message||"No se pudo guardar la preferencia.";}finally{welcomeSave.disabled=false;}};
     $("site-publish-appearance").onclick=async()=>{const status=$("site-appearance-status");try{status.textContent="Publicando…";await rpc("admin_publish_site_appearance",{p_expected_version:state.admin.appearance.version});status.textContent="Versión publicada.";await loadPublicExperience();await loadAdmin();}catch(error){status.textContent=error.message;}};
     $("site-reset-appearance").onclick=async()=>{try{state.admin.appearance=await rpc("admin_reset_site_appearance_draft",{p_expected_version:state.admin.appearance.version});renderAdmin();}catch(error){$("site-appearance-status").textContent=error.message;}};
     $("site-original-appearance").onclick=async()=>{if(!confirm("¿Restaurar los valores visuales originales en el borrador? La tienda pública no cambiará hasta publicar."))return;try{state.admin.appearance=await rpc("admin_restore_original_appearance_draft",{p_expected_version:state.admin.appearance.version});renderAdmin();}catch(error){$("site-appearance-status").textContent=error.message;}};
@@ -244,6 +283,7 @@
   });
   document.addEventListener("DOMContentLoaded",()=>{
     applyStageCSurfaces();
+    resolveWelcomePreference();
     if(!publicEnabled())return;
     loadPublicExperience();
     document.querySelectorAll("[data-public-page]").forEach(button=>button.addEventListener("click",()=>openPublicPage(button.dataset.publicPage)));
@@ -252,5 +292,5 @@
     const page=new URLSearchParams(location.search).get("page");if(["about","contact","terms","community","faq","suggestions"].includes(page)&&!window.cubicaAuthCallbackBlocked&&!window.cubicaPasswordRecoveryActive)openPublicPage(page,{push:false});
     window.addEventListener("popstate",()=>{const current=new URLSearchParams(location.search).get("page");current?openPublicPage(current,{push:false}):showSection("store");});
   });
-  window.cubicaSiteExperience={loadAdmin,loadPublicExperience,openPublicPage,validateAppearance,renderMarkdown,stageCMode,adminEnabled,publicEnabled,adminAccessAllowed,applyStageCSurfaces};
+  window.cubicaSiteExperience={loadAdmin,loadPublicExperience,openPublicPage,validateAppearance,renderMarkdown,stageCMode,adminEnabled,publicEnabled,adminAccessAllowed,applyStageCSurfaces,resolveWelcomePreference,shouldBypassWelcome};
 })();

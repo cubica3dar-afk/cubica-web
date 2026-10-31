@@ -146,6 +146,17 @@ td input,td select{padding:8px;border-radius:8px;min-width:80px}
 .welcome-subtitle{max-width:600px;margin:0 auto;color:var(--muted);line-height:1.75;font-size:15px}
 .welcome-btn{margin-top:30px;min-width:230px;padding:14px 20px;font-size:14px}
 .welcome-btn span{margin-left:8px;font-size:18px}
+.site-welcome-setting{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px 28px;align-items:center;margin-bottom:18px}
+.site-welcome-setting .site-config-actions,.site-welcome-setting>p{grid-column:1/-1;margin:0}
+.site-switch-row{display:flex;align-items:center;gap:12px;cursor:pointer;min-width:210px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.site-switch-row input{position:absolute;opacity:0;pointer-events:none}
+.site-switch-control{position:relative;width:48px;height:26px;flex:0 0 auto;border-radius:999px;background:#55586f;box-shadow:inset 0 0 0 1px rgba(255,255,255,.13);transition:.2s ease}
+.site-switch-control::after{content:"";position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(0,0,0,.28);transition:.2s ease}
+.site-switch-row input:checked+.site-switch-control{background:#4f9f72}
+.site-switch-row input:checked+.site-switch-control::after{transform:translateX(22px)}
+.site-switch-row input:focus-visible+.site-switch-control{outline:3px solid rgba(255,255,255,.35);outline-offset:3px}
+.site-switch-row strong,.site-switch-row small{display:block}
+.site-switch-row small{margin-top:2px;color:var(--muted);font-size:12px}
 .login-page-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,430px);gap:40px;align-items:center;min-height:650px}
 .login-intro h1{font-size:clamp(42px,6vw,68px);line-height:.98;margin:0 0 18px;letter-spacing:-1.5px}
 .login-intro>p:not(.eyebrow){max-width:620px;color:var(--muted);line-height:1.8;font-size:16px}
@@ -155,6 +166,7 @@ td input,td select{padding:8px;border-radius:8px;min-width:80px}
 .login-card{width:100%;box-sizing:border-box}
 @keyframes welcomeIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
 @media(max-width:800px){.login-page-layout{grid-template-columns:1fr;min-height:auto;padding:25px 0 45px}.login-intro h1{font-size:44px}.welcome-card{padding:36px 23px}.welcome-logo{width:105px;height:105px}.welcome-card blockquote{font-size:29px}}
+@media(max-width:600px){.site-welcome-setting{grid-template-columns:1fr}.site-switch-row{width:100%;min-width:0}.site-welcome-setting .site-config-actions,.site-welcome-setting>p{grid-column:1}}
 
 /* Producto terminado: colores, receta y capacidad de producción */
 .finished-product-modal{width:min(820px,100%)}
