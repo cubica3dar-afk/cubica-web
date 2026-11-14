@@ -13,7 +13,7 @@
   };
   window.cubicaStageCAdminEnabled=adminEnabled;
   window.cubicaStageCPublicEnabled=publicEnabled;
-  const state={experience:null,admin:null,welcomePreference:{enabled:false,version:1},adminLoadSequence:0,welcomeLoadSequence:0,tab:"appearance",preview:"desktop",assetUploadRequestId:null,suggestionWidget:null,suggestionRequestId:null,suggestionSubmitting:false,refreshTimer:null,suggestionPage:1,suggestionLifecycle:"active",campaignPage:1,campaignSize:10,phrasePage:1,phraseSize:10,faqPage:1,faqSize:10,calendarCursor:new Date(new Date().getFullYear(),new Date().getMonth(),1)};
+  const state={experience:null,admin:null,welcomePreference:{enabled:false,version:1},adminLoadSequence:0,welcomeLoadSequence:0,tab:"appearance",preview:"desktop",assetUploadRequestId:null,suggestionWidget:null,suggestionRequestId:null,suggestionSubmitting:false,refreshTimer:null,suggestionPage:1,suggestionLifecycle:"active",campaignPage:1,campaignSize:10,phrasePage:1,phraseSize:10,faqPage:1,faqSize:10,calendarCursor:null,campaignDraft:null,campaignOriginal:null,campaignCreateKey:null,campaignAttempt:null,campaignBusy:false,campaignEpoch:0,campaignActionKeys:{},campaignPreviewSequence:0,campaignMessage:""};
   const rpc=async(name,args={})=>{
     const client=window.cubicaSupabase;if(!client)throw new Error("Supabase no está disponible.");
     const {data,error}=await client.rpc(name,args);if(error)throw error;return data;
@@ -142,42 +142,113 @@
     const welcomeEnabled=state.welcomePreference?.enabled===true;
     return `<section class="card site-welcome-setting"><div><p class="eyebrow">INGRESO A LA WEB</p><h3>Mostrar pantalla de bienvenida</h3><p class="muted">Si está desactivada, visitantes y usuarios ingresan directamente al catálogo. Este ajuste no publica el borrador visual.</p></div><label class="site-switch-row" for="site-welcome-enabled"><input id="site-welcome-enabled" type="checkbox" role="switch" ${welcomeEnabled?"checked":""}><span class="site-switch-control" aria-hidden="true"></span><span><strong id="site-welcome-state">${welcomeEnabled?"Activada":"Desactivada"}</strong><small>Estado global actual</small></span></label><div class="site-config-actions"><button id="site-save-welcome" class="btn secondary" type="button">Guardar preferencia</button></div><p id="site-welcome-status" class="muted" role="status"></p></section><div class="site-config-grid"><form id="site-appearance-form" class="card site-config-form"><h3>Borrador visual</h3><p class="muted">Los cambios quedan en borrador hasta que elijas Publicar.</p><div class="site-color-grid">${[["background","Fondo"],["panel","Panel"],["panelAlt","Panel alternativo"],["text","Texto"],["muted","Texto secundario"],["accent","Acento"]].map(([key,label])=>`<label>${label}<span class="color-field"><input type="color" data-theme-color="${key}" value="${colors[key]}"><input value="${colors[key]}" maxlength="7" data-theme-hex="${key}"></span></label>`).join("")}</div><label>Título principal<input id="site-hero-title-input" maxlength="120" value="${escapeHtml(draft.hero.title)}"></label><label>Subtítulo<textarea id="site-hero-subtitle-input" maxlength="300" rows="3">${escapeHtml(draft.hero.subtitle)}</textarea></label>${[["logo","Logo"],["banner","Banner"],["background","Fondo fotográfico"]].map(([kind,label])=>`<label>${label}<select data-theme-asset="${kind}">${assetOptions(kind)}</select></label>`).join("")}<div id="site-contrast-status" class="site-contrast-status"></div><div class="site-config-actions"><button class="btn secondary" type="submit">Guardar borrador</button><button id="site-reset-appearance" class="btn ghost" type="button">Cancelar cambios</button><button id="site-original-appearance" class="btn ghost" type="button">Valores originales</button><button id="site-publish-appearance" class="btn primary" type="button">Publicar versión</button></div><p id="site-appearance-status" class="muted" role="status"></p></form><aside class="site-preview-wrap"><div class="site-preview-toolbar"><strong>Vista previa</strong><span><button type="button" data-preview-size="desktop" class="${state.preview==="desktop"?"active":""}">Escritorio</button><button type="button" data-preview-size="mobile" class="${state.preview==="mobile"?"active":""}">Móvil</button></span></div><div id="site-preview" class="site-preview ${state.preview}"><div class="site-preview-top"><span class="site-preview-logo">C</span><b>Cúbica</b></div><div class="site-preview-hero"><small>CÚBICA 3D</small><h2></h2><p></p></div><div class="site-preview-products"><i></i><i></i><i></i></div></div></aside></div><section class="card site-assets-panel"><div><h3>Biblioteca visual privada</h3><p class="muted">JPEG, PNG o WebP, hasta 8 MB. Los borradores no son públicos.</p></div><form id="site-asset-upload" class="site-asset-upload"><select id="site-asset-kind"><option value="logo">Logo</option><option value="banner">Banner</option><option value="background">Fondo</option><option value="campaign">Campaña</option></select><input id="site-asset-label" maxlength="120" placeholder="Nombre del recurso" required><input id="site-asset-file" type="file" accept="image/jpeg,image/png,image/webp" required><button class="btn secondary">Subir recurso</button></form><div class="site-asset-list">${assets.length?assets.map(a=>`<article><div><strong>${escapeHtml(a.label)}</strong><span>${a.kind} · ${a.width}×${a.height} · ${Math.ceil(a.byte_size/1024)} KB</span></div><div><em class="${a.retired_at?"muted":"good"}">${a.retired_at?"Retirado":a.public_since?"Publicado":"Privado"}</em>${!a.retired_at?`<button class="btn ghost" type="button" data-retire-asset="${a.id}">Retirar</button>`:""}</div></article>`).join(""):'<p class="muted">No hay recursos cargados.</p>'}</div></section>`;
   }
-  function monthCalendar(campaigns){
-    const now=new Date(),year=now.getFullYear(),month=now.getMonth(),first=new Date(year,month,1),days=new Date(year,month+1,0).getDate(),offset=(first.getDay()+6)%7;let cells="";
-    for(let i=0;i<offset;i++)cells+="<span></span>";for(let day=1;day<=days;day++){const date=new Date(year,month,day),active=campaigns.filter(c=>c.recurrence_mode==="none"&&new Date(c.starts_at)<=date&&new Date(c.ends_at)>date);cells+=`<span class="${active.length?"has-campaign":""}"><b>${day}</b>${active.slice(0,2).map(c=>`<small>${escapeHtml(c.name)}</small>`).join("")}</span>`;}return `<div class="campaign-calendar"><header><strong>${first.toLocaleDateString("es-AR",{month:"long",year:"numeric",timeZone:"America/Argentina/Buenos_Aires"})}</strong><small>Horario de Buenos Aires</small></header><div class="calendar-week"><b>L</b><b>M</b><b>X</b><b>J</b><b>V</b><b>S</b><b>D</b></div><div class="calendar-days">${cells}</div></div>`;
-  }
-  function campaignsForm(){const list=state.admin?.campaigns||[];return `<div class="site-config-grid"><form id="site-campaign-form" class="card site-config-form"><input id="campaign-id" type="hidden"><input id="campaign-version" type="hidden" value="0"><h3>Nueva campaña</h3><label>Nombre<input id="campaign-name" maxlength="120" required></label><label>Descripción<textarea id="campaign-description" maxlength="1000" rows="2"></textarea></label><div class="form-grid"><label>Prioridad<input id="campaign-priority" type="number" min="-1000" max="1000" value="0"></label><label>Repetición<select id="campaign-recurrence"><option value="none">Una vez</option><option value="annual">Anual</option><option value="custom">Fechas especiales</option></select></label><label>Inicio<input id="campaign-start" type="datetime-local"></label><label>Fin<input id="campaign-end" type="datetime-local"></label></div><label>Color de acento<input id="campaign-accent" type="color" value="#ffffff"></label><div class="site-config-actions"><button class="btn secondary">Guardar borrador</button><button class="btn ghost" type="reset">Limpiar</button></div><p class="muted">Las fechas se interpretan en America/Argentina/Buenos_Aires. La opción de aplicar tema a emails queda reservada y desactivada.</p></form>${monthCalendar(list)}</div><section class="card"><h3>Campañas</h3><div class="site-admin-list">${list.length?list.map(c=>`<article><div><strong>${escapeHtml(c.name)}</strong><span>${c.state} · prioridad ${c.priority} · ${c.recurrence_mode}</span></div><div><button class="btn ghost" data-edit-campaign="${c.id}">Editar</button><button class="btn ${c.state==="published"?"ghost":"primary"}" data-campaign-state="${c.id}" data-next-state="${c.state==="published"?"disabled":"published"}">${c.state==="published"?"Desactivar":"Publicar"}</button></div></article>`).join(""):'<p class="muted">No hay campañas.</p>'}</div></section>`;}
   function campaignStatus(c){const now=Date.now();if(c.state==="draft")return "Borrador";if(c.state==="disabled")return "Desactivada";if(c.recurrence_mode==="none"){if(new Date(c.starts_at).getTime()>now)return "Programada";if(new Date(c.ends_at).getTime()<=now)return "Finalizada";return "Activa";}return "Programada / recurrente";}
+  // Civil dates in Buenos Aires, independent of the browser time zone.
+  const CAMPAIGN_ZONE="America/Argentina/Buenos_Aires";
+  const campaignDateFormat=new Intl.DateTimeFormat("sv-SE",{timeZone:CAMPAIGN_ZONE,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+  const padCampaign=value=>String(value).padStart(2,"0");
+  function campaignLocal(value){
+    if(value===null||value===undefined||value==="")return "";
+    const p=Object.fromEntries(campaignDateFormat.formatToParts(new Date(value)).map(p=>[p.type,p.value]));
+    return p.year+"-"+p.month+"-"+p.day+"T"+p.hour+":"+p.minute+":"+p.second;
+  }
+  function campaignCivil(value){
+    const match=String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(\.\d{1,3})?)?$/);
+    if(!match)throw new Error("Usá una fecha válida con formato AAAA-MM-DDTHH:mm.");
+    const [,y,m,d,h,n,s="0",fraction=""]=match,stamp=Date.UTC(+y,+m-1,+d,+h,+n,+s,Number(fraction)*1000),date=new Date(stamp);
+    if(+y<1000||date.getUTCFullYear()!==+y||date.getUTCMonth()!==+m-1||date.getUTCDate()!==+d||+h>23||+n>59||+s>59)throw new Error("La fecha u hora no existe.");
+    return {stamp,year:+y,month:+m,day:+d,time:h+":"+n+":"+s.padStart(2,"0")+fraction};
+  }
+  function localToIso(value){
+    if(!value)return null;
+    const {stamp}=campaignCivil(value);
+    // Resolve the IANA offset (including historical DST), never the host offset.
+    const milliseconds=((stamp%1000)+1000)%1000,whole=stamp-milliseconds;
+    let instant=whole;
+    for(let i=0;i<4;i++){
+      const delta=whole-campaignCivil(campaignLocal(instant)).stamp;
+      if(delta===0)return new Date(instant+milliseconds).toISOString();
+      instant+=delta;
+    }
+    throw new Error("La hora no existe en Buenos Aires.");
+  }
+  function campaignMonth(){
+    const [year,month]=(state.calendarCursor||campaignLocal(Date.now()).slice(0,7)).split("-").map(Number);
+    return {year,month,first:year+"-"+padCampaign(month)+"-01",days:new Date(Date.UTC(year,month,0)).getUTCDate(),offset:(new Date(Date.UTC(year,month-1,1)).getUTCDay()+6)%7};
+  }
+  function moveCampaignMonth(amount){
+    const {year,month}=campaignMonth(),next=new Date(Date.UTC(year,month-1+amount,1));
+    state.calendarCursor=next.getUTCFullYear()+"-"+padCampaign(next.getUTCMonth()+1);
+  }
+  function nextCampaignDay(day){
+    const date=new Date(day+"T12:00:00Z");date.setUTCDate(date.getUTCDate()+1);return date.toISOString().slice(0,10);
+  }
+  function campaignMonthRange(){
+    const {year,month,first}=campaignMonth(),next=new Date(Date.UTC(year,month,1)).toISOString().slice(0,10);
+    return [Date.parse(localToIso(first+"T00:00")),Date.parse(localToIso(next+"T00:00"))];
+  }
+  function campaignIntervals(c,from,to,occurrences=state.admin?.occurrences||[]){
+    if(c.deleted_at)return [];
+    let ranges=[];
+    if(c.recurrence_mode==="none")ranges=[[Date.parse(c.starts_at),Date.parse(c.ends_at)]];
+    if(c.recurrence_mode==="custom")ranges=occurrences.filter(o=>o.campaign_id===c.id).map(o=>[Date.parse(o.starts_at),Date.parse(o.ends_at)]);
+    if(c.recurrence_mode==="annual"){
+      const startKey=padCampaign(c.annual_start_month)+"-"+padCampaign(c.annual_start_day)+"T"+String(c.annual_start_time).replace(/(\.\d{3})\d+$/,"$1");
+      const endKey=padCampaign(c.annual_end_month)+"-"+padCampaign(c.annual_end_day)+"T"+String(c.annual_end_time).replace(/(\.\d{3})\d+$/,"$1");
+      const crossesYear=campaignCivil("2000-"+startKey).stamp>=campaignCivil("2000-"+endKey).stamp;
+      // Mirror stage_c_active_campaign v3: previous/current-year seeds, >= crosses a year.
+      for(let year=Number(campaignLocal(from).slice(0,4))-1;year<=Number(campaignLocal(to).slice(0,4));year++){
+        try{ranges.push([Date.parse(localToIso(year+"-"+startKey)),Date.parse(localToIso((year+(crossesYear?1:0))+"-"+endKey))]);}
+        catch{/* Invalid 29 February at either endpoint omits the entire occurrence. */}
+      }
+    }
+    return ranges.filter(([start,end])=>Number.isFinite(start)&&start<end&&start<to&&end>from);
+  }
   function monthCalendarV2(campaigns){
-    const first=new Date(state.calendarCursor),year=first.getFullYear(),month=first.getMonth(),days=new Date(year,month+1,0).getDate(),offset=(first.getDay()+6)%7;let cells="";
-    for(let i=0;i<offset;i++)cells+="<span></span>";
-    for(let day=1;day<=days;day++){const start=new Date(year,month,day),end=new Date(year,month,day+1),active=campaigns.filter(c=>c.recurrence_mode==="none"&&new Date(c.starts_at)<end&&new Date(c.ends_at)>start);const iso=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;cells+=`<button type="button" class="${active.length?"has-campaign":""}" data-calendar-date="${iso}"><b>${day}</b>${active.slice(0,2).map(c=>`<small>${escapeHtml(c.name)}</small>`).join("")}</button>`;}
-    return `<div class="campaign-calendar"><header><button class="btn ghost" type="button" data-calendar-move="-1">←</button><div><strong>${first.toLocaleDateString("es-AR",{month:"long",year:"numeric",timeZone:"America/Argentina/Buenos_Aires"})}</strong><small>Horario de Buenos Aires</small></div><button class="btn ghost" type="button" data-calendar-move="1">→</button></header><div class="calendar-week"><b>L</b><b>M</b><b>X</b><b>J</b><b>V</b><b>S</b><b>D</b></div><div class="calendar-days">${cells}</div></div>`;
+    const {year,month,first,days,offset}=campaignMonth(),[from,to]=campaignMonthRange();
+    const entries=campaigns.filter(c=>!c.deleted_at).map(c=>({c,ranges:campaignIntervals(c,from,to)}));
+    let cells="<span></span>".repeat(offset);
+    for(let day=1;day<=days;day++){
+      const iso=year+"-"+padCampaign(month)+"-"+padCampaign(day),start=Date.parse(localToIso(iso+"T00:00")),end=Date.parse(localToIso(nextCampaignDay(iso)+"T00:00"));
+      const active=entries.filter(({ranges})=>ranges.some(([a,b])=>a<end&&b>start)).sort((a,b)=>b.c.priority-a.c.priority||a.c.id.localeCompare(b.c.id));
+      const label=active.map(({c})=>c.name+" ("+campaignStatus(c)+")").join(", ");
+      cells+='<button type="button" class="'+(active.length?"has-campaign":"")+'" data-calendar-date="'+iso+'" aria-label="'+escapeHtml(iso+(label?": "+label:""))+'" title="'+escapeHtml(label)+'"><b>'+day+"</b>"+active.slice(0,2).map(({c})=>"<small>"+escapeHtml(c.name)+" · "+campaignStatus(c)+"</small>").join("")+(active.length>2?"<small>+"+(active.length-2)+"</small>":"")+"</button>";
+    }
+    const title=new Date(first+"T12:00:00Z").toLocaleDateString("es-AR",{month:"long",year:"numeric",timeZone:CAMPAIGN_ZONE});
+    return '<div class="campaign-calendar"><header><button class="btn ghost" type="button" aria-label="Mes anterior" data-calendar-move="-1">←</button><div><strong>'+title+'</strong><small>Horario de Buenos Aires · incluye borradores</small></div><button class="btn ghost" type="button" aria-label="Mes siguiente" data-calendar-move="1">→</button></header><div class="calendar-week"><b>L</b><b>M</b><b>X</b><b>J</b><b>V</b><b>S</b><b>D</b></div><div class="calendar-days">'+cells+"</div></div>";
+  }
+  function campaignList(){
+    const list=(state.admin?.campaigns||[]).filter(c=>!c.deleted_at),pages=Math.max(1,Math.ceil(list.length/state.campaignSize));
+    state.campaignPage=Math.max(1,Math.min(state.campaignPage,pages));
+    const start=(state.campaignPage-1)*state.campaignSize,pageItems=list.slice(start,start+state.campaignSize);
+    return `<section class="card"><div class="form-block-head"><div><h3>Campañas</h3><p class="muted">Una sola campaña publicada gana por prioridad; ante empate se usa el inicio efectivo, publicación más reciente e ID.</p></div><select id="campaign-page-size"><option ${state.campaignSize===10?"selected":""}>10</option><option ${state.campaignSize===25?"selected":""}>25</option><option ${state.campaignSize===50?"selected":""}>50</option></select></div><div class="site-admin-list">${pageItems.length?pageItems.map(c=>`<article><div><strong>${escapeHtml(c.name)}</strong><span>${campaignStatus(c)} · prioridad ${c.priority} · ${c.recurrence_mode} · v${c.version}</span></div><div><button class="btn ghost" data-edit-campaign="${c.id}" ${c.state==="published"?'disabled title="Duplicá o desactivá antes de editar"':""}>Editar</button><button class="btn ghost" data-duplicate-campaign="${c.id}">Duplicar</button><button class="btn ${c.state==="published"?"ghost":"primary"}" data-campaign-state="${c.id}" data-next-state="${c.state==="published"?"disabled":"published"}">${c.state==="published"?"Desactivar":"Publicar / programar"}</button><button class="btn ghost" data-delete-campaign="${c.id}" ${c.state==="published"?"disabled":""}>Retirar</button></div></article>`).join(""):'<p class="muted">No hay campañas.</p>'}</div><div class="pagination"><button class="btn ghost" data-campaign-page="${state.campaignPage-1}" ${state.campaignPage<=1?"disabled":""}>Anterior</button><span>${state.campaignPage} / ${pages}</span><button class="btn ghost" data-campaign-page="${state.campaignPage+1}" ${state.campaignPage>=pages?"disabled":""}>Siguiente</button></div></section>`;
   }
   function campaignsFormV2(){
-    const list=state.admin?.campaigns||[],assets=state.admin?.assets?.filter(a=>!a.retired_at)||[],start=(state.campaignPage-1)*state.campaignSize,pageItems=list.slice(start,start+state.campaignSize),pages=Math.max(1,Math.ceil(list.length/state.campaignSize));
+    const list=state.admin?.campaigns||[],assets=state.admin?.assets?.filter(a=>!a.retired_at)||[];
     const assetOptions=kind=>`<option value="">Heredar diseño permanente</option>${assets.filter(a=>a.kind===kind||a.kind==="campaign").map(a=>`<option value="${a.id}">${escapeHtml(a.label)}</option>`).join("")}`;
-    const overlaps=list.flatMap((a,i)=>list.slice(i+1).filter(b=>a.recurrence_mode==="none"&&b.recurrence_mode==="none"&&new Date(a.starts_at)<new Date(b.ends_at)&&new Date(b.starts_at)<new Date(a.ends_at)).map(b=>`${a.name} / ${b.name}`));
-    return `<div class="site-config-grid"><form id="site-campaign-form" class="card site-config-form"><input id="campaign-id" type="hidden"><input id="campaign-version" type="hidden" value="0"><h3>Campaña</h3><label>Nombre<input id="campaign-name" maxlength="120" required></label><label>Descripción interna<textarea id="campaign-description" maxlength="1000" rows="2"></textarea></label><div class="form-grid"><label>Prioridad<input id="campaign-priority" type="number" min="-1000" max="1000" value="0"></label><label>Repetición<select id="campaign-recurrence"><option value="none">Evento único</option><option value="annual">Repetición anual</option><option value="custom">Fechas específicas por año</option></select></label><label>Inicio<input id="campaign-start" type="datetime-local" required></label><label>Fin<input id="campaign-end" type="datetime-local" required></label></div><p id="campaign-leap-warning" class="site-contrast-status hidden" role="status">Esta campaña usa el 29 de febrero. Solo se ejecutará en años bisiestos; en los demás años se omitirá esa ocurrencia.</p><label id="campaign-occurrences-wrap" class="hidden">Fechas específicas (una por línea: inicio | fin)<textarea id="campaign-occurrences" rows="4" placeholder="2027-10-16T00:00 | 2027-10-18T23:59"></textarea></label><div class="form-grid"><label>Acento<input id="campaign-accent" type="color" value="#ffffff"></label><label>Fondo especial<input id="campaign-background" type="color" value="#17172b"></label><label>Logo especial<select id="campaign-logo">${assetOptions("logo")}</select></label><label>Banner especial<select id="campaign-banner">${assetOptions("banner")}</select></label><label>Imagen de fondo<select id="campaign-background-asset">${assetOptions("background")}</select></label></div><div id="campaign-theme-preview" class="campaign-theme-preview"><small>VISTA PREVIA DE CAMPAÑA</small><strong>Cúbica 3D</strong><span>Los valores vacíos heredan el diseño permanente.</span></div><div id="campaign-overlap" class="site-contrast-status ${overlaps.length?"danger":"good"}">${overlaps.length?`Hay ${overlaps.length} superposición(es): ${escapeHtml(overlaps.slice(0,3).join(", "))}`:"No se detectan superposiciones entre eventos únicos."}</div><div class="site-config-actions"><button class="btn secondary">Guardar borrador</button><button class="btn ghost" type="reset">Limpiar</button></div><p class="muted">Las fechas se interpretan en America/Argentina/Buenos_Aires. Los emails permanecen desactivados en esta etapa.</p></form>${monthCalendarV2(list)}</div><section class="card"><div class="form-block-head"><div><h3>Campañas</h3><p class="muted">Una sola campaña gana por prioridad; ante empate se usa el inicio y publicación más recientes.</p></div><select id="campaign-page-size"><option ${state.campaignSize===10?"selected":""}>10</option><option ${state.campaignSize===25?"selected":""}>25</option><option ${state.campaignSize===50?"selected":""}>50</option></select></div><div class="site-admin-list">${pageItems.length?pageItems.map(c=>`<article><div><strong>${escapeHtml(c.name)}</strong><span>${campaignStatus(c)} · prioridad ${c.priority} · ${c.recurrence_mode}</span></div><div><button class="btn ghost" data-edit-campaign="${c.id}">Editar</button><button class="btn ghost" data-duplicate-campaign="${c.id}">Duplicar</button><button class="btn ${c.state==="published"?"ghost":"primary"}" data-campaign-state="${c.id}" data-next-state="${c.state==="published"?"disabled":"published"}">${c.state==="published"?"Desactivar":"Publicar / programar"}</button><button class="btn ghost" data-delete-campaign="${c.id}">Retirar</button></div></article>`).join(""):'<p class="muted">No hay campañas.</p>'}</div><div class="pagination"><button class="btn ghost" data-campaign-page="${state.campaignPage-1}" ${state.campaignPage<=1?"disabled":""}>Anterior</button><span>${state.campaignPage} / ${pages}</span><button class="btn ghost" data-campaign-page="${state.campaignPage+1}" ${state.campaignPage>=pages?"disabled":""}>Siguiente</button></div></section>`;
+    return `<div class="site-config-grid"><form id="site-campaign-form" class="card site-config-form"><input id="campaign-id" type="hidden"><input id="campaign-version" type="hidden" value="0"><h3>Campaña</h3><label>Nombre<input id="campaign-name" maxlength="120" required></label><label>Descripción interna<textarea id="campaign-description" maxlength="1000" rows="2"></textarea></label><div class="form-grid"><label>Prioridad<input id="campaign-priority" type="number" min="-1000" max="1000" step="1" value="0" required></label><label>Repetición<select id="campaign-recurrence"><option value="none">Evento único</option><option value="annual">Repetición anual</option><option value="custom">Fechas específicas por año</option></select></label><label>Inicio<input id="campaign-start" type="datetime-local" step="any" required></label><label>Fin exclusivo<input id="campaign-end" type="datetime-local" step="any" required></label></div><p id="campaign-leap-warning" class="site-contrast-status hidden" role="status">Esta campaña usa el 29 de febrero. Solo se ejecutará en años bisiestos; en los demás años se omitirá esa ocurrencia.</p><p id="campaign-annual-help" class="muted hidden">En repetición anual se usan mes, día y hora. Si el fin es anterior o igual al inicio, corresponde al año siguiente.</p><label id="campaign-occurrences-wrap" class="hidden">Fechas específicas (una por línea: inicio | fin exclusivo)<textarea id="campaign-occurrences" rows="4" placeholder="2027-10-16T00:00 | 2027-10-19T00:00"></textarea></label><div class="form-grid"><label>Acento<input id="campaign-accent" type="color" value="#ffffff"></label><label>Fondo especial<input id="campaign-background" type="color" value="#17172b"></label><label>Logo especial<select id="campaign-logo">${assetOptions("logo")}</select></label><label>Banner especial<select id="campaign-banner">${assetOptions("banner")}</select></label><label>Imagen de fondo<select id="campaign-background-asset">${assetOptions("background")}</select></label></div><div id="campaign-theme-preview" class="campaign-theme-preview"><img data-campaign-preview-logo alt="Logo seleccionado" hidden><img data-campaign-preview-banner alt="Banner seleccionado" hidden><small>VISTA PREVIA DE CAMPAÑA</small><strong>Cúbica 3D</strong><span>Los valores vacíos heredan el diseño permanente.</span></div><div id="campaign-overlap" class="site-contrast-status" role="status"></div><div class="site-config-actions"><button id="campaign-save" class="btn secondary" type="submit">Guardar borrador</button><button id="campaign-new" class="btn ghost" type="reset">Nueva campaña / limpiar</button></div><p id="campaign-save-status" class="muted" role="status"></p><p class="muted">Las fechas se interpretan en America/Argentina/Buenos_Aires. Los emails permanecen desactivados en esta etapa.</p></form><div id="campaign-calendar-host">${monthCalendarV2(list)}</div></div><div id="campaign-list-host">${campaignList()}</div>`;
   }
   function contentForm(){const pages=state.admin?.pages||[],faqs=state.admin?.faqs||[],phrases=state.admin?.phrases||[];return `<div class="site-config-grid"><form id="site-page-form" class="card site-config-form"><h3>Páginas públicas</h3><label>Página<select id="site-page-slug">${pages.map(p=>`<option value="${p.slug}">${escapeHtml(p.label)}</option>`).join("")}</select></label><label>Título<input id="site-page-title" maxlength="140"></label><label>Contenido<textarea id="site-page-body" maxlength="20000" rows="10" placeholder="Markdown simple; el HTML se rechaza"></textarea></label><input id="site-page-version" type="hidden" value="0"><div id="site-contact-fields" class="form-grid"></div><div class="site-config-actions"><button class="btn secondary">Guardar borrador</button><button id="site-publish-page" class="btn primary" type="button">Publicar página</button></div><p class="muted">Los textos legales quedan como borradores hasta que los publiques expresamente.</p></form><aside><div class="card"><h3>Vista previa privada</h3><div id="site-page-preview" class="public-rich-text"></div></div><div id="site-page-history" class="card site-version-history"></div></aside></div><section class="card"><div class="form-block-head"><div><h3>Preguntas frecuentes</h3><p class="muted">Buscá, ordená y administrá su visibilidad.</p></div><div class="site-list-tools"><input id="faq-search" type="search" placeholder="Buscar"><select id="faq-page-size"><option>10</option><option>25</option><option>50</option></select></div></div><form id="site-faq-form" class="site-inline-form"><input id="faq-id" type="hidden"><input id="faq-version" type="hidden" value="0"><input id="faq-question" maxlength="240" placeholder="Pregunta" required><textarea id="faq-answer" maxlength="3000" rows="2" placeholder="Respuesta" required></textarea><input id="faq-order" type="number" value="0" aria-label="Orden"><label class="checkbox-row"><input id="faq-active" type="checkbox" checked><span>Visible</span></label><button class="btn secondary">Guardar</button></form><div id="faq-admin-list" class="site-admin-list compact"></div><div id="faq-pagination" class="pagination"></div></section><section class="card"><div class="form-block-head"><div><h3>Frases de bienvenida</h3><p class="muted">Globales o asociadas a una campaña. Se conserva la selección aleatoria.</p></div><div class="site-list-tools"><input id="phrase-search" type="search" placeholder="Buscar"><select id="phrase-page-size"><option>10</option><option>25</option><option>50</option></select></div></div><form id="site-phrase-form" class="site-inline-form"><input id="phrase-id" type="hidden"><input id="phrase-version" type="hidden" value="0"><select id="phrase-campaign"><option value="">Global</option>${(state.admin?.campaigns||[]).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}</select><input id="phrase-text" maxlength="500" placeholder="Nueva frase" required><input id="phrase-order" type="number" value="0" aria-label="Orden"><label class="checkbox-row"><input id="phrase-active" type="checkbox" checked><span>Activa</span></label><button class="btn secondary">Guardar</button></form><div id="phrase-admin-list" class="site-admin-list compact"></div><div id="phrase-pagination" class="pagination"></div></section>`;}
   function suggestionsAdmin(){return `<section class="card"><div class="site-suggestion-toolbar"><input id="admin-suggestion-search" type="search" placeholder="Buscar asunto o descripción"><select id="admin-suggestion-status"><option value="all">Todos</option><option value="new">Nuevos</option><option value="reviewing">En revisión</option><option value="resolved">Resueltos</option><option value="dismissed">Descartados</option></select><select id="admin-suggestion-size"><option>10</option><option selected>25</option><option>50</option></select><button id="admin-suggestion-load" class="btn secondary">Buscar</button></div><div id="admin-suggestion-list" class="site-admin-list"><p class="muted">Cargando sugerencias…</p></div><div id="admin-suggestion-pagination" class="pagination"></div></section>`;}
   function suggestionsAdminV2(){return `<section class="card"><div class="site-suggestion-toolbar"><input id="admin-suggestion-search" type="search" maxlength="120" placeholder="Buscar asunto o descripción"><select id="admin-suggestion-status"><option value="all">Todos los estados</option><option value="new">Nuevas</option><option value="reviewing">En revisión</option><option value="accepted">Aceptadas</option><option value="resolved">Resueltas</option><option value="dismissed">Descartadas</option></select><select id="admin-suggestion-category"><option value="all">Todos los tipos</option><option value="funcionalidad">Funcionalidad</option><option value="visual">Mejora visual</option><option value="error">Error</option><option value="compra">Experiencia de compra</option><option value="otro">Otro</option></select><select id="admin-suggestion-lifecycle"><option value="active">Activas</option><option value="archived">Archivadas</option><option value="deleted">Eliminadas</option><option value="all">Todas</option></select><select id="admin-suggestion-sort"><option value="recent">Más recientes</option><option value="oldest">Más antiguas</option><option value="updated">Actualizadas recientemente</option></select><select id="admin-suggestion-size"><option>10</option><option selected>25</option><option>50</option></select><button id="admin-suggestion-load" class="btn secondary">Buscar</button></div><div id="admin-suggestion-list" class="site-admin-list"><p class="muted">Cargando sugerencias…</p></div><div id="admin-suggestion-pagination" class="pagination"></div></section><section id="admin-suggestion-detail" class="card hidden"></section>`;}
   function emailPlaceholder(){return `<section class="card site-email-placeholder"><span aria-hidden="true">✉</span><div><p class="eyebrow">PREPARADO PARA EL FUTURO</p><h3>Temas de correos automáticos</h3><p class="muted">La estructura de campañas reserva esta integración, pero permanece desactivada. Esta etapa no modifica Resend, plantillas ni destinatarios.</p></div><button class="btn ghost" disabled>No disponible en Etapa C</button></section>`;}
   function renderAdmin(){
+    captureCampaignForm();
     const host=$("site-configuration-app");if(!host)return;host.innerHTML=tabs()+`<div class="site-tab-panel">${state.tab==="appearance"?appearanceForm():state.tab==="campaigns"?campaignsFormV2():state.tab==="content"?contentForm():state.tab==="suggestions"?suggestionsAdminV2():emailPlaceholder()}</div>`;
     host.querySelectorAll("[data-site-tab]").forEach(button=>button.onclick=()=>{state.tab=button.dataset.siteTab;renderAdmin();if(state.tab==="suggestions")loadSuggestions();});
     if(state.tab==="appearance")bindAppearance();if(state.tab==="campaigns")bindCampaignsV2();if(state.tab==="content")bindContentV2();if(state.tab==="suggestions")bindSuggestions();
   }
   function clearAdminState(message="La configuración administrativa está protegida."){
     state.adminLoadSequence+=1;state.admin=null;state.assetUploadRequestId=null;
+    state.campaignOwner=null;
+    state.campaignEpoch++;state.campaignDraft=null;state.campaignOriginal=null;state.campaignCreateKey=null;state.campaignAttempt=null;state.campaignBusy=false;state.campaignActionKeys={};state.campaignMessage="";
     const host=$("site-configuration-app");if(host)host.innerHTML=`<div class="card"><p class="muted">${escapeHtml(message)}</p></div>`;
   }
   async function loadAdmin(){
     const host=$("site-configuration-app");if(!host)return false;
     if(!adminEnabled()){clearAdminState("La Etapa C permanece cerrada hasta completar su activación coordinada.");return false;}
     if(!adminAccessAllowed()){clearAdminState("Iniciá sesión como administrador y verificá tu segundo factor para abrir Configuración.");return false;}
-    const request=++state.adminLoadSequence;host.innerHTML='<div class="card"><p class="muted">Cargando configuración protegida…</p></div>';
+    captureCampaignForm();const request=++state.adminLoadSequence;host.innerHTML='<div class="card"><p class="muted">Cargando configuración protegida…</p></div>';
     try{
       const [data,welcomePreference]=await Promise.all([
         rpc("admin_get_site_configuration"),
@@ -221,29 +292,207 @@
     $("site-asset-upload").onsubmit=async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{state.assetUploadRequestId ||= operationId();const form=new FormData();form.set("request_id",state.assetUploadRequestId);form.set("kind",$("site-asset-kind").value);form.set("label",$("site-asset-label").value.trim());form.set("file",$("site-asset-file").files[0]);const {data,error}=await window.cubicaSupabase.functions.invoke("site-assets",{body:form});if(error||!data?.asset)throw new Error(data?.error==="registration_pending"?"La subida quedó pendiente de conciliación. Volvé a intentar sin cambiar el formulario.":"No se pudo subir el recurso.");state.assetUploadRequestId=null;await loadAdmin();}catch(error){$("site-appearance-status").textContent=error.message;}finally{button.disabled=false;}};
     $("site-asset-upload").addEventListener("input",()=>{state.assetUploadRequestId=null;});
   }
-  function localToIso(value){if(!value)return null;return new Date(`${value}:00-03:00`).toISOString();}
-  function bindCampaigns(){
-    $("site-campaign-form").onsubmit=async event=>{event.preventDefault();const mode=$("campaign-recurrence").value,start=$("campaign-start").value,end=$("campaign-end").value,theme={colors:{accent:$("campaign-accent").value},hero:{},assets:{}};try{await rpc("admin_upsert_site_campaign",{p_id:$("campaign-id").value||null,p_name:$("campaign-name").value,p_description:$("campaign-description").value,p_priority:Number($("campaign-priority").value),p_recurrence_mode:mode,p_starts_at:mode==="none"?localToIso(start):null,p_ends_at:mode==="none"?localToIso(end):null,p_annual_start_month:mode==="annual"?new Date(`${start}:00-03:00`).getMonth()+1:null,p_annual_start_day:mode==="annual"?new Date(`${start}:00-03:00`).getDate():null,p_annual_start_time:mode==="annual"?start.slice(11)+":00":null,p_annual_end_month:mode==="annual"?new Date(`${end}:00-03:00`).getMonth()+1:null,p_annual_end_day:mode==="annual"?new Date(`${end}:00-03:00`).getDate():null,p_annual_end_time:mode==="annual"?end.slice(11)+":00":null,p_theme:theme,p_occurrences:mode==="custom"?[{starts_at:localToIso(start),ends_at:localToIso(end)}]:[],p_expected_version:Number($("campaign-version").value)||0,p_request_id:operationId()});await loadAdmin();}catch(error){toast(error.message||"No se pudo guardar la campaña.");}};
-    document.querySelectorAll("[data-edit-campaign]").forEach(button=>button.onclick=()=>{const c=state.admin.campaigns.find(x=>x.id===button.dataset.editCampaign);$("campaign-id").value=c.id;$("campaign-version").value=c.version;$("campaign-name").value=c.name;$("campaign-description").value=c.description;$("campaign-priority").value=c.priority;$("campaign-recurrence").value=c.recurrence_mode;if(c.starts_at)$("campaign-start").value=new Date(c.starts_at).toLocaleString("sv-SE",{timeZone:"America/Argentina/Buenos_Aires"}).slice(0,16);if(c.ends_at)$("campaign-end").value=new Date(c.ends_at).toLocaleString("sv-SE",{timeZone:"America/Argentina/Buenos_Aires"}).slice(0,16);$("campaign-accent").value=c.theme?.colors?.accent||"#ffffff";$("campaign-name").focus();});
-    document.querySelectorAll("[data-campaign-state]").forEach(button=>button.onclick=async()=>{const c=state.admin.campaigns.find(x=>x.id===button.dataset.campaignState);try{await rpc("admin_set_site_campaign_state",{p_id:c.id,p_state:button.dataset.nextState,p_expected_version:c.version,p_request_id:operationId()});await loadAdmin();}catch(error){toast(error.message);}});
+  const campaignFields=["id","version","name","description","priority","recurrence","start","end","occurrences","accent","background","logo","banner","background-asset"];
+  function captureCampaignForm(){
+    if(!$("site-campaign-form"))return;
+    state.campaignDraft=Object.fromEntries(campaignFields.map(key=>[key,$("campaign-"+key).value]));
   }
-  function parseOccurrences(text,start,end){
-    const lines=String(text||"").split("\n").map(x=>x.trim()).filter(Boolean);if(!lines.length&&start&&end)return [{starts_at:localToIso(start),ends_at:localToIso(end)}];
-    return lines.map(line=>{const parts=line.split("|").map(x=>x.trim());if(parts.length!==2||!parts[0]||!parts[1])throw new Error("Cada fecha específica debe tener inicio | fin.");return {starts_at:localToIso(parts[0]),ends_at:localToIso(parts[1])};});
+  function fillCampaignForm(values){
+    if(!values||!$("site-campaign-form"))return;
+    campaignFields.forEach(key=>{$("campaign-"+key).value=values[key]??"";});
+  }
+  function campaignFormValues(c){
+    const annual=side=>"2028-"+padCampaign(c["annual_"+side+"_month"])+"-"+padCampaign(c["annual_"+side+"_day"])+"T"+String(c["annual_"+side+"_time"]).replace(/(\.\d{3})\d+$/,"$1");
+    return {id:c.id,version:String(c.version),name:c.name,description:c.description||"",priority:String(c.priority),recurrence:c.recurrence_mode,
+      start:c.recurrence_mode==="annual"?annual("start"):campaignLocal(c.starts_at),
+      end:c.recurrence_mode==="annual"?annual("end"):campaignLocal(c.ends_at),
+      occurrences:(state.admin.occurrences||[]).filter(o=>o.campaign_id===c.id).map(o=>campaignLocal(o.starts_at)+" | "+campaignLocal(o.ends_at)).join("\n"),
+      accent:c.theme?.colors?.accent||"#ffffff",background:c.theme?.colors?.background||"#17172b",
+      logo:c.theme?.assets?.logo||"",banner:c.theme?.assets?.banner||"","background-asset":c.theme?.assets?.background||""};
+  }
+  function parseOccurrences(text){
+    const lines=String(text||"").split("\n").map(x=>x.trim()).filter(Boolean);
+    if(!lines.length)throw new Error("Agregá al menos una fecha específica.");
+    const seen=new Set();
+    return lines.map(line=>{
+      const parts=line.split("|").map(x=>x.trim());
+      if(parts.length!==2||!parts[0]||!parts[1])throw new Error("Cada fecha específica debe tener inicio | fin.");
+      const starts_at=localToIso(parts[0]),ends_at=localToIso(parts[1]);
+      if(starts_at>=ends_at)throw new Error("El fin debe ser posterior al inicio.");
+      const key=starts_at+"|"+ends_at;if(seen.has(key))throw new Error("Hay una fecha específica duplicada.");seen.add(key);
+      return {starts_at,ends_at};
+    });
+  }
+  function campaignPayload(f,original=state.campaignOriginal){
+    const mode=f.recurrence,priority=Number(f.priority);
+    if(!f.name.trim()||f.name.length>120||f.description.length>1000)throw new Error("Completá el nombre (hasta 120 caracteres) y revisá la descripción (hasta 1000).");
+    if(!String(f.priority).trim()||!Number.isInteger(priority)||Math.abs(priority)>1000||!["none","annual","custom"].includes(mode))throw new Error("Revisá la prioridad y la repetición.");
+    if(!validHex(f.accent)||!validHex(f.background))throw new Error("Revisá los colores de la campaña.");
+    if(f.id&&(!original||original.id!==f.id||original.state==="published"||state.admin?.campaigns?.find(c=>c.id===f.id)?.state==="published"))throw new Error("Duplicá o desactivá la campaña publicada antes de editarla.");
+    if(!Number.isInteger(Number(f.version))||Number(f.version)<(f.id?1:0))throw new Error("Versión de campaña inválida.");
+    let start=null,end=null,occurrences=[];
+    if(mode!=="custom"){start=campaignCivil(f.start);end=campaignCivil(f.end);}
+    if(mode==="none"&&start.stamp>=end.stamp)throw new Error("El fin debe ser posterior al inicio.");
+    if(mode==="custom"){
+      // Preserve full timestamp precision when an existing occurrence was not edited.
+      const originalText=original?campaignFormValues(original).occurrences:null;
+      occurrences=original&&f.occurrences===originalText?(state.admin.occurrences||[]).filter(o=>o.campaign_id===original.id).map(o=>({starts_at:o.starts_at,ends_at:o.ends_at})):parseOccurrences(f.occurrences);
+      if(!occurrences.length)throw new Error("Agregá al menos una fecha específica.");
+    }
+    const theme=deepMerge({colors:{},hero:{},assets:{}},original?.theme||{});
+    theme.colors={...theme.colors,accent:f.accent,background:f.background};
+    theme.assets={...theme.assets,logo:f.logo||null,banner:f.banner||null,background:f["background-asset"]||null};
+    // datetime-local normalizes :00 seconds away; compare civil values, not raw strings.
+    const sameLocal=(a,b)=>Boolean(a&&b)&&campaignCivil(a).stamp===campaignCivil(b).stamp;
+    const exactDate=(field,value)=>original&&sameLocal(value,campaignLocal(original[field]))?original[field]:localToIso(value);
+    const exactTime=(side,value)=>original?.recurrence_mode==="annual"&&sameLocal(value,campaignFormValues(original)[side])?original["annual_"+side+"_time"]:campaignCivil(value).time;
+    return {p_id:f.id||null,p_name:f.name,p_description:f.description,p_priority:priority,p_recurrence_mode:mode,
+      p_starts_at:mode==="none"?exactDate("starts_at",f.start):null,p_ends_at:mode==="none"?exactDate("ends_at",f.end):null,
+      p_annual_start_month:mode==="annual"?start.month:null,p_annual_start_day:mode==="annual"?start.day:null,p_annual_start_time:mode==="annual"?exactTime("start",f.start):null,
+      p_annual_end_month:mode==="annual"?end.month:null,p_annual_end_day:mode==="annual"?end.day:null,p_annual_end_time:mode==="annual"?exactTime("end",f.end):null,
+      p_theme:theme,p_occurrences:occurrences,p_expected_version:Number(f.version),p_request_id:null};
+  }
+  function updateCampaignFormState(){
+    if(!$("site-campaign-form"))return;
+    const custom=$("campaign-recurrence").value==="custom",annual=$("campaign-recurrence").value==="annual";
+    $("campaign-occurrences-wrap").classList.toggle("hidden",!custom);
+    $("campaign-occurrences").required=custom;$("campaign-occurrences").disabled=!custom||state.campaignBusy||Boolean(state.campaignAttempt);
+    ["start","end"].forEach(key=>{const input=$("campaign-"+key);input.required=!custom;input.disabled=custom||state.campaignBusy||Boolean(state.campaignAttempt);});
+    $("campaign-leap-warning").classList.toggle("hidden",!annual||!["start","end"].some(key=>$("campaign-"+key).value.slice(5,10)==="02-29"));
+    $("campaign-annual-help").classList.toggle("hidden",!annual);
+    campaignFields.filter(key=>!["start","end","occurrences"].includes(key)).forEach(key=>{$("campaign-"+key).disabled=state.campaignBusy||Boolean(state.campaignAttempt);});
+    $("campaign-save").disabled=state.campaignBusy;
+    $("campaign-new").disabled=state.campaignBusy||Boolean(state.campaignAttempt);
+    $("campaign-save").textContent=state.campaignAttempt?"Reintentar el mismo guardado":"Guardar borrador";
+    $("campaign-save-status").textContent=state.campaignBusy?"Procesando…":state.campaignAttempt?"Resultado sin confirmar. Reintentá el mismo guardado; se conserva su clave. No cierres ni recargues esta página.":state.campaignMessage||"";
+  }
+  function campaignOverlapNames(payload){
+    const candidate=Object.fromEntries(Object.entries(payload).map(([key,value])=>[key.slice(2),value]));
+    candidate.id=payload.p_id||"local";
+    const [from,to]=campaignMonthRange(),ranges=campaignIntervals(candidate,from,to,payload.p_occurrences.map(o=>({...o,campaign_id:candidate.id})));
+    return (state.admin?.campaigns||[]).filter(c=>c.id!==candidate.id&&c.state==="published"&&!c.deleted_at&&campaignIntervals(c,from,to).some(([a,b])=>ranges.some(([x,y])=>a<y&&b>x))).map(c=>c.name);
+  }
+  async function updateCampaignPreview(){
+    const preview=$("campaign-theme-preview");if(!preview||!adminAccessAllowed())return;
+    captureCampaignForm();const f=state.campaignDraft;
+    preview.style.backgroundColor=f.background;preview.style.color=f.accent;preview.querySelector("strong").textContent=f.name||"Cúbica 3D";
+    const overlap=$("campaign-overlap");
+    try{const names=campaignOverlapNames(campaignPayload(f));overlap.textContent=(names.length?"Coincide con campañas publicadas: "+names.join(", "):"No se detectan coincidencias con campañas publicadas")+" (solo mes visible).";overlap.className="site-contrast-status "+(names.length?"danger":"good");}
+    catch{overlap.textContent="Completá las fechas y el nombre para comparar el formulario con campañas publicadas en el mes visible.";overlap.className="site-contrast-status";}
+    const selected={logo:f.logo,banner:f.banner,background:f["background-asset"]},key=JSON.stringify(selected);
+    if(preview.dataset.assetKey===key)return;preview.dataset.assetKey=key;
+    const sequence=++state.campaignPreviewSequence,epoch=state.campaignEpoch;
+    preview.style.backgroundImage="none";
+    ["logo","banner"].forEach(kind=>{const image=preview.querySelector("[data-campaign-preview-"+kind+"]");image.hidden=true;image.removeAttribute("src");});
+    try{
+      const urls=await signedAssetUrls(Object.fromEntries(Object.entries(selected).map(([kind,id])=>[kind,assetById(id)?.storage_path||null])));
+      if(epoch!==state.campaignEpoch||sequence!==state.campaignPreviewSequence||!adminAccessAllowed()||$("campaign-theme-preview")!==preview)return;
+      ["logo","banner"].forEach(kind=>{const image=preview.querySelector("[data-campaign-preview-"+kind+"]");if(urls[kind]){image.src=urls[kind];image.hidden=false;}});
+      preview.style.backgroundImage=urls.background?'url('+JSON.stringify(urls.background)+')':"none";
+      preview.querySelector("span").textContent=Object.entries(selected).some(([kind,id])=>id&&!urls[kind])?"No se pudo cargar algún recurso seleccionado.":"Vista privada de los recursos seleccionados; los vacíos heredan el diseño permanente.";
+    }catch{if(sequence===state.campaignPreviewSequence&&$("campaign-theme-preview")===preview)preview.querySelector("span").textContent="No se pudieron cargar los recursos; reabrí la vista para reintentar.";}
+  }
+  function refreshCampaignNavigation(){
+    if(!$("campaign-calendar-host"))return;
+    $("campaign-calendar-host").innerHTML=monthCalendarV2(state.admin?.campaigns||[]);
+    $("campaign-list-host").innerHTML=campaignList();
+    bindCampaignNavigation();updateCampaignPreview();
+  }
+  function installCampaignResult(c,payload){
+    if(!c?.id||!Number.isInteger(c.version)||!["draft","disabled","published"].includes(c.state))throw new Error("Respuesta de guardado sin confirmar.");
+    state.admin.campaigns=[c,...(state.admin.campaigns||[]).filter(item=>item.id!==c.id)];
+    if(payload)state.admin.occurrences=[...(state.admin.occurrences||[]).filter(o=>o.campaign_id!==c.id),...payload.p_occurrences.map(o=>({...o,campaign_id:c.id}))];
+  }
+  async function saveCampaign(event){
+    event.preventDefault();if(!adminAccessAllowed()||state.campaignBusy)return;
+    const epoch=state.campaignEpoch;
+    try{
+      captureCampaignForm();
+      let payload;
+      if(state.campaignAttempt)payload=state.campaignAttempt;
+      else{
+        payload=campaignPayload(state.campaignDraft);
+        if(!payload.p_id){state.campaignCreateKey ||= operationId();payload.p_request_id=state.campaignCreateKey;}
+        state.campaignAttempt=payload;
+      }
+      state.campaignBusy=true;updateCampaignFormState();
+      const c=await rpc("admin_upsert_site_campaign",payload);
+      if(epoch!==state.campaignEpoch||!adminAccessAllowed())return;
+      installCampaignResult(c,payload);
+      state.campaignAttempt=null;state.campaignCreateKey=null;state.campaignOriginal=c;
+      state.campaignDraft=campaignFormValues(c);fillCampaignForm(state.campaignDraft);
+      state.campaignMessage="Borrador guardado · versión "+c.version+".";
+      refreshCampaignNavigation();
+    }catch(error){
+      if(epoch!==state.campaignEpoch||!adminAccessAllowed())return;
+      // Known transactional rejection permits correction, but never advances expected_version.
+      // Ambiguous network/server outcomes keep the immutable request and its UUID.
+      if(/^(22|23|42501|40001|P0001)/.test(error.code||"")&&!/idempotencia/i.test(error.message||""))state.campaignAttempt=null;
+      state.campaignMessage=error.message||"No se pudo confirmar el guardado.";toast(state.campaignMessage);
+    }finally{if(epoch===state.campaignEpoch){state.campaignBusy=false;updateCampaignFormState();}}
+  }
+  function startCampaignEdit(c){
+    if(!adminAccessAllowed()||state.campaignBusy||state.campaignAttempt||!c)return;
+    if(c.state==="published"){toast("Duplicá o desactivá la campaña antes de editarla.");return;}
+    if(state.campaignDraft?.name&&!confirm("¿Reemplazar el formulario con esta campaña? Se descartarán las ediciones locales."))return;
+    state.campaignOriginal=c;state.campaignCreateKey=null;state.campaignMessage="";
+    state.campaignDraft=campaignFormValues(c);fillCampaignForm(state.campaignDraft);updateCampaignFormState();updateCampaignPreview();$("campaign-name").focus();
+  }
+  async function campaignAction(kind,c,next){
+    if(!adminAccessAllowed()||state.campaignBusy||state.campaignAttempt||!c)return;
+    if(kind==="state"&&next==="published"&&!confirm("¿Publicar / programar esta campaña? Podría ser accesible públicamente mediante las RPC públicas, incluso mientras la Etapa C permanece en modo admin."))return;
+    if(kind==="duplicate"&&!confirm("¿Crear una copia de esta campaña como un nuevo borrador?"))return;
+    if(kind==="delete"&&(c.state==="published"||!confirm("¿Retirar la campaña “"+c.name+"”? Se conservará su auditoría y sus imágenes.")))return;
+    const epoch=state.campaignEpoch,key=kind+":"+c.id+":"+c.version+":"+(next||"");
+    const args={p_id:c.id,p_expected_version:c.version};
+    if(kind!=="delete"){state.campaignActionKeys[key] ||= operationId();args.p_request_id=state.campaignActionKeys[key];}
+    if(kind==="state")args.p_state=next;
+    state.campaignBusy=true;updateCampaignFormState();
+    try{
+      const result=await rpc(kind==="state"?"admin_set_site_campaign_state":kind==="duplicate"?"admin_duplicate_site_campaign":"admin_delete_site_campaign",args);
+      if(epoch!==state.campaignEpoch||!adminAccessAllowed())return;
+      if(kind==="delete")state.admin.campaigns=state.admin.campaigns.filter(x=>x.id!==c.id);
+      else installCampaignResult(result);
+      // Fetch occurrences for a duplicated custom campaign; preserve the local editor on reload.
+      delete state.campaignActionKeys[key];
+      if(kind==="duplicate")await loadAdmin();else refreshCampaignNavigation();
+    }catch(error){if(epoch===state.campaignEpoch&&adminAccessAllowed())toast(error.message);}
+    finally{if(epoch===state.campaignEpoch){state.campaignBusy=false;updateCampaignFormState();}}
+  }
+  function bindCampaignNavigation(){
+    document.querySelectorAll("[data-edit-campaign]").forEach(button=>button.onclick=()=>startCampaignEdit(state.admin.campaigns.find(c=>c.id===button.dataset.editCampaign)));
+    document.querySelectorAll("[data-campaign-state]").forEach(button=>button.onclick=()=>campaignAction("state",state.admin.campaigns.find(c=>c.id===button.dataset.campaignState),button.dataset.nextState));
+    document.querySelectorAll("[data-duplicate-campaign]").forEach(button=>button.onclick=()=>campaignAction("duplicate",state.admin.campaigns.find(c=>c.id===button.dataset.duplicateCampaign)));
+    document.querySelectorAll("[data-delete-campaign]").forEach(button=>button.onclick=()=>campaignAction("delete",state.admin.campaigns.find(c=>c.id===button.dataset.deleteCampaign)));
+    document.querySelectorAll("[data-calendar-move]").forEach(button=>button.onclick=()=>{moveCampaignMonth(Number(button.dataset.calendarMove));refreshCampaignNavigation();});
+    document.querySelectorAll("[data-calendar-date]").forEach(button=>button.onclick=()=>{
+      if(state.campaignBusy||state.campaignAttempt)return;
+      const day=button.dataset.calendarDate,custom=$("campaign-recurrence").value==="custom";
+      if(custom)$("campaign-occurrences").value+=($("campaign-occurrences").value?"\n":"")+day+"T00:00 | "+nextCampaignDay(day)+"T00:00";
+      else{
+        if(($("campaign-start").value||$("campaign-end").value)&&!confirm("¿Reemplazar las fechas del formulario por el día seleccionado?"))return;
+        $("campaign-start").value=day+"T00:00";$("campaign-end").value=nextCampaignDay(day)+"T00:00";
+      }
+      updateCampaignFormState();updateCampaignPreview();
+    });
+    $("campaign-page-size").onchange=event=>{state.campaignSize=Number(event.target.value);state.campaignPage=1;refreshCampaignNavigation();};
+    document.querySelectorAll("[data-campaign-page]").forEach(button=>button.onclick=()=>{if(button.disabled)return;state.campaignPage=Number(button.dataset.campaignPage);refreshCampaignNavigation();});
   }
   function bindCampaignsV2(){
-    const recurrence=$("campaign-recurrence"),occurrenceWrap=$("campaign-occurrences-wrap"),leapWarning=$("campaign-leap-warning");
-    const updateLeapWarning=()=>{const leapDate=value=>String(value||"").slice(5,10)==="02-29";leapWarning.classList.toggle("hidden",recurrence.value!=="annual"||(!leapDate($("campaign-start").value)&&!leapDate($("campaign-end").value)));};
-    const toggleRecurrence=()=>{occurrenceWrap.classList.toggle("hidden",recurrence.value!=="custom");updateLeapWarning();};recurrence.onchange=toggleRecurrence;["campaign-start","campaign-end"].forEach(id=>$(id).addEventListener("input",updateLeapWarning));toggleRecurrence();
-    const updateCampaignPreview=()=>{const preview=$("campaign-theme-preview");preview.style.background=$("campaign-background").value;preview.style.color=$("campaign-accent").value;preview.querySelector("strong").textContent=$("campaign-name").value||"Cúbica 3D";};["campaign-name","campaign-accent","campaign-background"].forEach(id=>$(id).addEventListener("input",updateCampaignPreview));updateCampaignPreview();
-    $("site-campaign-form").onsubmit=async event=>{event.preventDefault();const mode=recurrence.value,start=$("campaign-start").value,end=$("campaign-end").value,theme={colors:{accent:$("campaign-accent").value,background:$("campaign-background").value},hero:{},assets:{logo:$("campaign-logo").value||null,banner:$("campaign-banner").value||null,background:$("campaign-background-asset").value||null}};try{await rpc("admin_upsert_site_campaign",{p_id:$("campaign-id").value||null,p_name:$("campaign-name").value,p_description:$("campaign-description").value,p_priority:Number($("campaign-priority").value),p_recurrence_mode:mode,p_starts_at:mode==="none"?localToIso(start):null,p_ends_at:mode==="none"?localToIso(end):null,p_annual_start_month:mode==="annual"?Number(start.slice(5,7)):null,p_annual_start_day:mode==="annual"?Number(start.slice(8,10)):null,p_annual_start_time:mode==="annual"?start.slice(11)+":00":null,p_annual_end_month:mode==="annual"?Number(end.slice(5,7)):null,p_annual_end_day:mode==="annual"?Number(end.slice(8,10)):null,p_annual_end_time:mode==="annual"?end.slice(11)+":00":null,p_theme:theme,p_occurrences:mode==="custom"?parseOccurrences($("campaign-occurrences").value,start,end):[],p_expected_version:Number($("campaign-version").value)||0,p_request_id:operationId()});await loadAdmin();}catch(error){toast(error.message||"No se pudo guardar la campaña.");}};
-    document.querySelectorAll("[data-edit-campaign]").forEach(button=>button.onclick=()=>{const c=state.admin.campaigns.find(x=>x.id===button.dataset.editCampaign),local=value=>value?new Date(value).toLocaleString("sv-SE",{timeZone:"America/Argentina/Buenos_Aires"}).slice(0,16):"";$("campaign-id").value=c.id;$("campaign-version").value=c.version;$("campaign-name").value=c.name;$("campaign-description").value=c.description;$("campaign-priority").value=c.priority;recurrence.value=c.recurrence_mode;$("campaign-start").value=c.recurrence_mode==="annual"?`2028-${String(c.annual_start_month).padStart(2,"0")}-${String(c.annual_start_day).padStart(2,"0")}T${String(c.annual_start_time).slice(0,5)}`:local(c.starts_at);$("campaign-end").value=c.recurrence_mode==="annual"?`2028-${String(c.annual_end_month).padStart(2,"0")}-${String(c.annual_end_day).padStart(2,"0")}T${String(c.annual_end_time).slice(0,5)}`:local(c.ends_at);const occurrences=(state.admin.occurrences||[]).filter(o=>o.campaign_id===c.id);$("campaign-occurrences").value=occurrences.map(o=>`${local(o.starts_at)} | ${local(o.ends_at)}`).join("\n");$("campaign-accent").value=c.theme?.colors?.accent||"#ffffff";$("campaign-background").value=c.theme?.colors?.background||"#17172b";$("campaign-logo").value=c.theme?.assets?.logo||"";$("campaign-banner").value=c.theme?.assets?.banner||"";$("campaign-background-asset").value=c.theme?.assets?.background||"";toggleRecurrence();updateCampaignPreview();$("campaign-name").focus();});
-    document.querySelectorAll("[data-campaign-state]").forEach(button=>button.onclick=async()=>{const c=state.admin.campaigns.find(x=>x.id===button.dataset.campaignState);try{await rpc("admin_set_site_campaign_state",{p_id:c.id,p_state:button.dataset.nextState,p_expected_version:c.version,p_request_id:operationId()});await loadAdmin();}catch(error){toast(error.message);}});
-    document.querySelectorAll("[data-duplicate-campaign]").forEach(button=>button.onclick=async()=>{const c=state.admin.campaigns.find(x=>x.id===button.dataset.duplicateCampaign);try{await rpc("admin_duplicate_site_campaign",{p_id:c.id,p_expected_version:c.version,p_request_id:operationId()});await loadAdmin();}catch(error){toast(error.message);}});
-    document.querySelectorAll("[data-delete-campaign]").forEach(button=>button.onclick=async()=>{const c=state.admin.campaigns.find(x=>x.id===button.dataset.deleteCampaign);if(!confirm(`¿Retirar la campaña “${c.name}”? Se conservará su auditoría y sus imágenes.`))return;try{await rpc("admin_delete_site_campaign",{p_id:c.id,p_expected_version:c.version});await loadAdmin();}catch(error){toast(error.message);}});
-    document.querySelectorAll("[data-calendar-move]").forEach(button=>button.onclick=()=>{state.calendarCursor=new Date(state.calendarCursor.getFullYear(),state.calendarCursor.getMonth()+Number(button.dataset.calendarMove),1);renderAdmin();});
-    document.querySelectorAll("[data-calendar-date]").forEach(button=>button.onclick=()=>{const date=button.dataset.calendarDate;$("campaign-start").value=`${date}T00:00`;$("campaign-end").value=`${date}T23:59`;$("campaign-name").focus();});
-    $("campaign-page-size").onchange=event=>{state.campaignSize=Number(event.target.value);state.campaignPage=1;renderAdmin();};document.querySelectorAll("[data-campaign-page]").forEach(button=>button.onclick=()=>{if(button.disabled)return;state.campaignPage=Number(button.dataset.campaignPage);renderAdmin();});
+    state.campaignOwner=typeof session!=="undefined"?session?.supabaseUserId:null;
+    fillCampaignForm(state.campaignDraft);
+    const form=$("site-campaign-form");
+    form.onsubmit=saveCampaign;
+    form.onreset=event=>{
+      event.preventDefault();if(!adminAccessAllowed()||state.campaignBusy||state.campaignAttempt)return;
+      if(state.campaignDraft?.name&&!confirm("¿Iniciar una nueva campaña? Se descartarán los cambios locales del formulario."))return;
+      state.campaignOriginal=null;state.campaignCreateKey=null;state.campaignMessage="";
+      state.campaignDraft={id:"",version:"0",name:"",description:"",priority:"0",recurrence:"none",start:"",end:"",occurrences:"",accent:"#ffffff",background:"#17172b",logo:"",banner:"","background-asset":""};
+      fillCampaignForm(state.campaignDraft);updateCampaignFormState();updateCampaignPreview();
+    };
+    form.oninput=()=>{updateCampaignFormState();updateCampaignPreview();};
+    form.onchange=form.oninput;
+    updateCampaignFormState();updateCampaignPreview();bindCampaignNavigation();
   }
   function loadSelectedPage(){const page=state.admin.pages.find(p=>p.slug===$("site-page-slug").value),draft=page?.draft;$("site-page-title").value=draft?.title||"";$("site-page-body").value=draft?.content?.body||"";$("site-page-version").value=draft?.version||0;const contact=$("site-contact-fields");contact.innerHTML=page?.slug==="contact"?[["email","Email"],["phone","Teléfono"],["instagram","Instagram HTTPS"],["address","Dirección"]].map(([key,label])=>`<label>${label}<input data-contact-field="${key}" maxlength="500" value="${escapeHtml(draft?.content?.[key]||"")}"></label>`).join(""):"";}
   function bindContent(){
@@ -291,9 +540,13 @@
   }
   window.addEventListener("cubica:auth-ready",()=>{
     const section=$("section-configuration"),reload=adminAccessAllowed()&&section&&!section.classList.contains("hidden");
+    // AAL2 token renewal for the same administrator must not discard an unresolved creation.
+    const owner=typeof session!=="undefined"?session?.supabaseUserId:null;
+    if(adminAccessAllowed()&&owner&&owner===state.campaignOwner&&state.campaignDraft){captureCampaignForm();applyStageCSurfaces();return;}
     clearAdminState();applyStageCSurfaces();
     if(reload)loadAdmin();
   });
+  window.addEventListener("beforeunload",event=>{if(state.campaignAttempt){event.preventDefault();event.returnValue="";}});
   document.addEventListener("DOMContentLoaded",()=>{
     applyStageCSurfaces();
     resolveWelcomePreference();
@@ -306,5 +559,5 @@
     window.addEventListener("popstate",()=>{const current=new URLSearchParams(location.search).get("page");current?openPublicPage(current,{push:false}):showSection("store");});
   });
   window.cubicaSiteExperience={loadAdmin,loadPublicExperience,openPublicPage,validateAppearance,renderMarkdown,stageCMode,adminEnabled,publicEnabled,adminAccessAllowed,applyStageCSurfaces,resolveWelcomePreference,shouldBypassWelcome};
-  if(window.__CUBICA_TEST__===true)window.cubicaSiteExperienceInternals={defaultAppearance:deepMerge(DEFAULT_APPEARANCE,{}),validHex,contrast,collectAppearance,fillAppearanceForm,updatePreview};
+  if(window.__CUBICA_TEST__===true)window.cubicaSiteExperienceInternals={state,renderAdmin,clearAdminState,campaignPayload,campaignIntervals,campaignLocal,localToIso,campaignMonthRange,monthCalendarV2,moveCampaignMonth,campaignOverlapNames,bindCampaignsV2,saveCampaign,campaignAction,startCampaignEdit,captureCampaignForm,defaultAppearance:deepMerge(DEFAULT_APPEARANCE,{}),validHex,contrast,collectAppearance,fillAppearanceForm,updatePreview};
 })();
