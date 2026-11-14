@@ -16,7 +16,7 @@ assert.match(source,/site-original-appearance"\)\.onclick=\(\)=>fillAppearanceFo
 assert.match(source,/confirm\("\u00bfPublicar este borrador visual\?/);
 assert.match(source,/rpc\("admin_save_site_appearance_draft"/);
 assert.match(source,/rpc\("admin_publish_site_appearance"/);
-assert.match(html,/js\/site-experience\.js\?v=site-stage-c3/);
+assert.match(html,/js\/site-experience\.js\?v=site-stage-c4/);
 assert.match(config,/stageCMode:\s*"admin"/);
 
 const colors=["background","panel","panelAlt","text","muted","accent"];
