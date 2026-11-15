@@ -1,5 +1,18 @@
 # Contenidos, FAQ y Frases: correcciones locales
 
+## Corrección adicional del PR #6 — 15/11/2026
+
+Commit padre publicado: eb75194780300f2e98d31f9fccdbce0312577bbf. Se prepara un commit adicional, sin reescribir historia ni hacer push.
+
+- Línea base independiente del borrador local para FAQ y Frases. Compara todos los campos editables, ID y versión; conserva diferencias de texto sin recortarlas. Se actualiza al seleccionar un registro, comenzar uno nuevo y recibir un guardado/conciliación confirmado; no se renueva al navegar o recargar la información administrativa. Se limpia al invalidar la sesión.
+- Nuevo formulario intacto y registro existente intacto: sin confirmación de descarte. Cualquier campo cambiado: confirmación antes de limpiar o seleccionar otro registro. Cancelar conserva todos los valores.
+- Activar, desactivar o eliminar desde la lista el registro en edición requiere confirmar el descarte si está modificado. La confirmación de exposición pública sigue siendo independiente. No se reemplaza el editor hasta recibir éxito: cancelar cualquiera de las confirmaciones o recibir un error no descarta sus cambios.
+- Las acciones sobre otro registro conservan el formulario actual. Sin parámetros RPC nuevos ni cambios de autorización backend, versiones esperadas, SQL o publicaciones.
+
+Validación: tests/content-local-controls.test.mjs incorpora 17 grupos adicionales para campos secundarios, identidad/versión, formularios intactos, reemplazos, las seis combinaciones de acciones FAQ/Frases, cancelación de descarte y exposición sin RPC, estado posterior al éxito, otro registro y AAL1. También verifica línea base posterior a guardado y conciliación. Todos aprobados. pnpm test: 23 scripts aprobados (outputs/content-discard-final-suite.log); después se añadieron dos aserciones de línea base al test focalizado y se verificaron nuevamente. Sintaxis JS y git diff --check aprobados.
+
+No se repitió PostgreSQL multisesión: no cambia contrato SQL ni garantías de bloqueo/versiones. Las limitaciones previas de autenticación simulada y recuperación en memoria permanecen. Pendiente una comprobación manual acotada de las nuevas confirmaciones; no se declara ejecutada. Sin cambios a producción, PR remoto o datos reales.
+
 Actualización final 15/11/2026: QA manual funcional y responsive aprobada por el usuario, incluida recuperación histórica. Regresión final de 23 scripts aprobada. Concurrencia real ejecutada por separado: ver STAGE_C_CONTENT_CONCURRENCY_20261115.md. Las menciones de pendientes en el informe inicial de abajo describen el estado anterior a esta actualización.
 
 Base: main 9006abbaf3b3cf5a088b2951d5b0b2fffc8e5392.

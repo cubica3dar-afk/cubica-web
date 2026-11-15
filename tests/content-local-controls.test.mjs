@@ -8,11 +8,67 @@ const setup=()=>{
 const args=(kind,extra={})=>kind==='faq'?{p_id:null,p_question:'Pregunta',p_answer:'Respuesta',p_active:false,p_sort_order:0,p_expected_version:0,p_delete:false,...extra}:{p_id:null,p_campaign_id:null,p_phrase:'Frase',p_active:false,p_sort_order:0,p_expected_version:0,p_delete:false,...extra};
 const rpcName=k=>k==='faq'?'admin_upsert_faq':'admin_upsert_welcome_phrase';
 const result=(k,p)=>({id:30,version:p.p_expected_version+1,active:p.p_active,sort_order:p.p_sort_order,...(k==='faq'?{question:p.p_question,answer:p.p_answer}:{phrase:p.p_phrase,campaign_id:p.p_campaign_id})});
+const formSnapshot=(h,kind)=>Object.fromEntries((kind==='faq'?['id','version','question','answer','order','active']:['id','version','text','campaign','order','active']).map(key=>[key,key==='active'?h.get(kind+'-'+key).checked===true:h.get(kind+'-'+key).value]));
+const withRecords=kind=>{
+ const h=setup(),plural=kind==='faq'?'faqs':'phrases';
+ h.i.state.admin[plural]=[result(kind,args(kind)),{...result(kind,args(kind)),id:31}];
+ h.i.renderAdmin();
+ h.rpc=async(name,p)=>{
+  if(name==='admin_get_site_configuration')return {data:clone(h.i.state.admin)};
+  if(name==='admin_get_welcome_screen_preference')return {data:{enabled:false,version:3}};
+  assert.equal(name,rpcName(kind));const row={...result(kind,p),id:p.p_id||30};
+  h.i.state.admin[plural]=p.p_delete?h.i.state.admin[plural].filter(x=>x.id!==p.p_id):h.i.state.admin[plural].map(x=>x.id===p.p_id?row:x);
+  return {data:row};
+ };
+ return h;
+};
+const answers=(h,values)=>Object.defineProperty(h,'confirm',{configurable:true,get(){assert.ok(values.length,'Unexpected extra confirmation');return values.shift();}});
+for(const [kind,field,value] of [['faq','answer','Respuesta sin pregunta'],['faq','order','7'],['faq','active',true],['phrase','campaign','campaign-qa'],['phrase','order','8'],['phrase','active',true],['faq','id','99'],['phrase','version','7']]){
+ const h=withRecords(kind),input=h.get(kind+'-'+field);if(field==='active')input.checked=value;else input.value=value;
+ const before=formSnapshot(h,kind);h.confirm=false;h.get('site-'+kind+'-form').onreset(event);
+ assert.deepEqual(formSnapshot(h,kind),before);assert.equal(h.confirmations.length,1);assert.equal(h.calls.length,0);
+ h.all('[data-edit-'+kind+']')[0].onclick();assert.deepEqual(formSnapshot(h,kind),before);assert.equal(h.confirmations.length,2);
+ h.confirm=true;h.all('[data-edit-'+kind+']')[0].onclick();assert.equal(h.get(kind+'-id').value,'30');assert.equal(h.i.contentFormDirty(kind),false);
+ console.log('PASS full discard detection, cancellation and replacement: '+kind+'/'+field);
+}
+for(const kind of ['faq','phrase']){
+ const h=withRecords(kind);h.confirm=false;
+ h.get('site-'+kind+'-form').onreset(event);h.all('[data-edit-'+kind+']')[0].onclick();
+ h.all('[data-edit-'+kind+']')[1].onclick();h.get('site-'+kind+'-form').onreset(event);
+ assert.equal(h.confirmations.length,0);assert.equal(h.calls.length,0);assert.equal(h.get(kind+'-active').checked,false);
+ console.log('PASS pristine new and existing forms need no discard confirmation: '+kind);
+}
+for(const kind of ['faq','phrase'])for(const action of ['activate','deactivate','delete']){
+ const h=withRecords(kind),plural=kind==='faq'?'faqs':'phrases',field=kind==='faq'?'answer':'text';
+ if(action==='deactivate')h.i.state.admin[plural][0].active=true;
+ h.i.renderAdmin();h.all('[data-edit-'+kind+']')[0].onclick();h.get(kind+'-'+field).value='Edición pendiente';
+ const before=formSnapshot(h,kind),selector='[data-'+(action==='delete'?'delete':'toggle')+'-'+kind+']';
+ answers(h,action==='delete'?[true,false]:[false]);await h.all(selector)[0].onclick();
+ assert.deepEqual(formSnapshot(h,kind),before);assert.equal(h.calls.length,0);assert.equal(h.i.contentFormDirty(kind),true);
+ if(action==='activate'){
+  answers(h,[true,false]);await h.all(selector)[0].onclick();assert.deepEqual(formSnapshot(h,kind),before);assert.equal(h.calls.length,0);
+  assert.match(h.confirmations.at(-2),/Descartar/);assert.match(h.confirmations.at(-1),/RPC públicas/);
+ }
+ answers(h,action==='delete'||action==='activate'?[true,true]:[true]);await h.all(selector)[0].onclick();
+ assert.equal(h.calls.filter(c=>c.name===rpcName(kind)).length,1);assert.equal(h.i.contentFormDirty(kind),false);
+ assert.equal(h.get(kind+'-version').value,action==='delete'?'0':'2');
+ assert.equal(h.get(kind+'-active').checked,action==='activate');
+ if(action!=='delete')assert.notEqual(h.get(kind+'-'+field).value,'Edición pendiente');
+ console.log('PASS list action: discard, public cancellation, success and new baseline: '+kind+'/'+action);
+}
+{
+ const h=withRecords('faq');h.all('[data-edit-faq]')[0].onclick();h.get('faq-answer').value='Local';const before=formSnapshot(h,'faq');
+ h.confirm=true;await h.all('[data-toggle-faq]')[1].onclick();assert.deepEqual(formSnapshot(h,'faq'),before);assert.equal(h.confirmations.length,1);
+ h.context.session={role:'admin',aal:'aal1'};const count=h.calls.length;h.get('site-faq-form').onreset(event);h.all('[data-edit-faq]')[1].onclick();await h.all('[data-toggle-faq]')[0].onclick();
+ assert.deepEqual(formSnapshot(h,'faq'),before);assert.equal(h.calls.length,count);
+ console.log('PASS actions on another record preserve local edits; AAL1 cannot discard or write');
+}
 for(const kind of ['faq','phrase']){
  const h=setup();h.rpc=async(name,p)=>name==='admin_get_site_configuration'?{data:h.i.state.admin}:name==='admin_get_welcome_screen_preference'?{data:{enabled:false,version:3}}:{data:result(kind,p)};
  if(kind==='faq'){h.get('faq-question').value='Pregunta';h.get('faq-answer').value='Respuesta';}else h.get('phrase-text').value='Frase';
  await h.get('site-'+kind+'-form').onsubmit(event);
  assert.equal(h.calls[0].args.p_active,false);assert.equal(h.confirmations.length,0);
+ assert.equal(h.i.contentFormDirty(kind),false,'Confirmed save refreshes the baseline');
  h.confirm=false;await assert.rejects(()=>h.i.contentRpc(rpcName(kind),args(kind,{p_id:30,p_expected_version:1,p_active:true})),/cancelada/);
  assert.equal(h.calls.filter(c=>c.name===rpcName(kind)).length,1);
  h.confirm=true;await h.i.contentRpc(rpcName(kind),args(kind,{p_id:30,p_expected_version:1,p_active:true}));
@@ -27,6 +83,7 @@ for(const kind of ['faq','phrase']){
  assert.equal(h.get('phrase-text').disabled,true);
  h.rpc=async()=>({data:{phrases:[result('phrase',p)]}});await h.i.contentRpc(rpcName('phrase'),p);
  assert.equal(h.get('phrase-id').value,'30');assert.equal(h.get('phrase-version').value,'1');assert.equal(h.get('phrase-active').checked,false);assert.equal(h.get('phrase-text').disabled,false);
+ assert.equal(h.i.contentFormDirty('phrase'),false,'Reconciliation refreshes identity and baseline');
  h.rpc=async()=>({error:{code:'23505',message:'Duplicado'}});await assert.rejects(()=>h.i.contentRpc(rpcName('phrase'),p),e=>e.code==='23505');assert.equal(h.i.contentControls.pending,null);
  console.log('PASS phrase reconciliation adopts identity; duplicate rejection is not an ambiguous write');
 }
