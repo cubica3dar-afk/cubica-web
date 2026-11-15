@@ -807,3 +807,11 @@ body.account-sidebar-pinned .container{width:min(1240px,calc(100% - 300px));marg
 .campaign-calendar header>div{min-width:0}.campaign-calendar header small{display:block;font-size:11px}
 @media(max-width:900px){.site-suggestion-toolbar{grid-template-columns:1fr 1fr 1fr}.site-inline-form{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.site-inline-form,.site-suggestion-toolbar{grid-template-columns:1fr}.calendar-days>button{min-height:48px}.site-list-tools{width:100%;display:grid;grid-template-columns:1fr 90px}.site-list-tools input{min-width:0}}
+/* FAQ y Frases: reservar una fila completa para búsqueda y cantidad en móvil. */
+@media(max-width:600px){
+  #site-configuration-app .form-block-head:has(#faq-search),
+  #site-configuration-app .form-block-head:has(#phrase-search){flex-direction:column;align-items:stretch}
+  #site-configuration-app .site-list-tools:has(#faq-search),
+  #site-configuration-app .site-list-tools:has(#phrase-search){grid-template-columns:minmax(0,1fr) 90px;min-width:0}
+  #faq-search,#phrase-search,#faq-page-size,#phrase-page-size{width:100%;min-width:0;box-sizing:border-box}
+}
