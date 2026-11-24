@@ -5,7 +5,6 @@
   const client=window.cubicaSupabase;
   if(!client) return;
 
-  let orderSubmitting=false;
   let salesLoading=false;
   let salesReady=false;
 
@@ -61,71 +60,25 @@
     return {orderRows:orderRows||[]};
   }
 
-  async function migrateLocalOrders(localOrders,remoteRows){
-    if(!Array.isArray(localOrders)||!localOrders.length) return 0;
-    const remoteClientIds=new Set((remoteRows||[]).map(r=>String(r.client_order_id||"")).filter(Boolean));
-    const remoteOrderIds=new Set((remoteRows||[]).map(r=>String(r.id)));
-    let migrated=0;
-
-    for(const o of localOrders){
-      if(o.serverSaved||remoteOrderIds.has(String(o.id)))continue;
-      const clientId=String(o.clientOrderId||o.id||"");
-      if(clientId && remoteClientIds.has(clientId)) continue;
-      if(!Array.isArray(o.items)||!o.items.length) continue;
-
-      const payload={
-        client_order_id:clientId||null,
-        created_at:o.date||new Date().toISOString(),
-        customer_name:String(o.customerName||"Cliente"),
-        customer_email:String(o.customerEmail||"sin-email@local.invalid"),
-        phone:String(o.phone||""),
-        payment:String(o.payment||""),
-        notes:String(o.notes||""),
-        total:Number(o.total)||0,
-        status:["Pendiente","Preparado","Entregado","Cancelado"].includes(o.status)?o.status:"Pendiente",
-        username:String(o.username||"guest"),
-        supply_plan:o.supplyPlan||{products:[],supplies:[]},
-        internal_email_sent:!!o.internalEmailSent,
-        customer_email_sent:!!o.customerEmailSent,
-        email_errors:Array.isArray(o.emailErrors)?o.emailErrors:[]
-      };
-
-      const {data:created,error}=await client.from("orders").insert(payload).select("id,order_number").single();
-      if(error) throw error;
-
-      const itemRows=o.items.map(i=>({
-        order_id:created.id,
-        product_id:i.productId||null,
-        name:String(i.name||"Producto"),
-        color:String(i.color||""),
-        qty:Math.max(1,Math.trunc(Number(i.qty)||1)),
-        unit_price:Number(i.price)||0
-      }));
-      const {error:itemErr}=await client.from("order_items").insert(itemRows);
-      if(itemErr){
-        await client.from("orders").delete().eq("id",created.id);
-        throw itemErr;
-      }
-      if(clientId) remoteClientIds.add(clientId);
-      migrated++;
-    }
-    return migrated;
+  // Preserve historical browser records for explicit review; never import them.
+  function preserveLegacyOrders(){
+    const local=read(STORAGE.orders,[]);
+    const pending=Array.isArray(local)?local.filter(o=>!o.serverSaved):[];
+    if(!pending.length)return;
+    const key=STORAGE.orders+".legacy-unreviewed", archived=read(key,[]);
+    if(!Array.isArray(archived))throw new Error("Revisá el archivo local de pedidos antes de continuar.");
+    const seen=new Set(archived.map(o=>JSON.stringify(o)));
+    writeLocal(key,[...archived,...pending.filter(o=>!seen.has(JSON.stringify(o)))]);
   }
 
-  async function loadSalesFromSupabase({migrateLocal=true}={}){
+  async function loadSalesFromSupabase(){
     if(!adminAccessAllowed() || salesLoading) return;
     salesLoading=true;
     try{
       setBadge("Datos: Supabase…","pending");
 
-      const localOrders=read(STORAGE.orders,[]);
-      let remote=await fetchRemoteSales();
-
-      let migratedOrders=0;
-      if(migrateLocal){
-        migratedOrders=await migrateLocalOrders(localOrders,remote.orderRows);
-        if(migratedOrders) remote=await fetchRemoteSales();
-      }
+      preserveLegacyOrders();
+      const remote=await fetchRemoteSales();
 
       orders=remote.orderRows.map(remoteOrderToLocal);
       writeLocal(STORAGE.orders,orders);
@@ -137,9 +90,6 @@
       }
       setBadge("Datos: Supabase","ok");
 
-      if(migratedOrders){
-        toast(`Supabase: migrados ${migratedOrders} pedido(s).`);
-      }
     }catch(err){
       console.error("Ventas/presupuestos Supabase",err);
       setBadge("Supabase: ventas sin sincronizar","error");
@@ -153,6 +103,7 @@
     if(session?.role!=="customer" || salesLoading) return;
     salesLoading=true;
     try{
+      preserveLegacyOrders();
       const {data,error}=await client.rpc("get_customer_orders");
       if(error) throw error;
 
@@ -179,131 +130,20 @@
   }
   window.markOrder=markOrderSupabase;
 
-  function localFallbackOrder(draftOrder,items){
-    const order={...draftOrder,id:draftOrder.id,orderNumber:"LOCAL-"+Date.now(),serverSaved:false};
-    items.forEach(i=>{
-      const p=products.find(x=>x.id===i.productId);
-      if(p) p.stock=Math.max(0,(Number(p.stock)||0)-i.qty);
-    });
-    orders.push(order);
-    writeLocal(STORAGE.orders,orders);
-    writeLocal(STORAGE.products,products);
-    return order;
-  }
-
   async function submitOrderSupabase(e){
     e.preventDefault();
-    if(orderSubmitting)return;
-    if(!cart.length) return toast("El carrito está vacío.");
-
-    orderSubmitting=true;
-    const form=e.target;
-    const submitBtn=e.submitter||e.target.querySelector('button[type="submit"]');
-    const originalText=submitBtn?.textContent||"Confirmar pedido";
-    if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Enviando pedido…";if(submitBtn.dataset)submitBtn.dataset.submitting="true";}
-
-    try{
-      if(!window.cubicaDelivery)throw new Error("No se pudo cargar la selección de entrega. Recargá la página.");
-      window.cubicaValidateCheckout?.();
-      await window.cubicaDelivery.validate();
-      const delivery=window.cubicaDelivery.payload();
-      const name=window.cubicaCheckoutBuyerName?.()||$("customer-name").value.trim();
-      const email=$("customer-email").value.trim();
-      const phone=$("customer-phone").value.trim();
-      if(!name||!email) throw new Error("Completá nombre y email.");
-
-      let total=0;
-      const items=[];
-      const rpcItems=[];
-      for(const c of cart){
-        const p=products.find(x=>x.id===c.productId&&x.active!==false&&x.published!==false);
-        if(!p) throw new Error("Uno de los productos ya no está disponible.");
-        const qty=Math.max(1,Math.trunc(Number(c.qty)||1));
-        items.push({productId:p.id,name:p.name,qty,price:p.price,color:c.color||""});
-        rpcItems.push({product_id:p.id,qty,color:c.color||""});
-        total+=p.price*qty;
-      }
-
-      const draftOrder={
-        id:delivery.request_id,
-        date:new Date().toISOString(),
-        customerName:name,
-        customerEmail:email,
-        phone,
-        payment:$("payment-method").value,
-        notes:$("customer-notes").value,
-        items,
-        total,
-        status:"Pendiente",
-        username:"guest",
-        supplyPlan:calculateOrderSupplyPlan(items)
-      };
-
-      const orderPayload={
-        client_order_id:draftOrder.id,customer_name:name,customer_email:email,
-        phone,payment:draftOrder.payment,notes:draftOrder.notes,items:rpcItems,delivery
-      };
-      if(!window.cubicaTurnstile?.enabled()){
-        const protectionError=new Error("La verificación de seguridad no está disponible temporalmente. Tus datos y el carrito siguen guardados; reintentá en unos minutos.");
-        protectionError.code="order_protection_not_configured";
-        throw protectionError;
-      }
-      orderPayload.turnstile_token=await window.cubicaTurnstile.requireToken();
-      const data=await window.cubicaTurnstile.createOrder(orderPayload);
-
-      const result=data||{};
-      const order={
-        ...draftOrder,
-        id:String(result.order_id||draftOrder.id),
-        clientOrderId:draftOrder.id,
-        orderNumber:result.order_number||"",
-        total:Number(result.total ?? total),
-        serverSaved:true
-      };
-      orders.push(order);
-      writeLocal(STORAGE.orders,orders);
-      cart=[];writeLocal(STORAGE.cart,cart);
-      
-      renderCart();
-
-      if(typeof window.loadCubicaCatalogFromSupabase==="function"){
-        await window.loadCubicaCatalogFromSupabase();
-      }else{
-        renderProducts();
-      }
-      if(session?.role==="admin") await loadSalesFromSupabase({migrateLocal:false});
-      else if(session?.role==="customer") await loadCustomerOrdersFromSupabase();
-
-      if(typeof window.cubicaTrackEvent==="function"){
-        window.cubicaTrackEvent("purchase",null,{
-          order_number:order.orderNumber||"",
-          total:Number(order.total)||0,
-          units:items.reduce((sum,item)=>sum+(Number(item.qty)||0),0)
-        });
-      }
-      toast(`${order.orderNumber||"Pedido registrado"}: pedido guardado en Cúbica.`);
-      window.cubicaTurnstile?.complete();
-      await window.cubicaDelivery?.afterOrderSaved();
-      form.reset();
-      window.cubicaCheckoutComplete?.(order);
-    }catch(err){
-      console.error("Pedido Supabase",err);
-      window.cubicaTurnstile?.handleFailure(err);
-      toast(err.message||"No se pudo registrar el pedido.");
-    }finally{
-      orderSubmitting=false;
-      if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=originalText;if(submitBtn.dataset)delete submitBtn.dataset.submitting;}
-      window.cubicaCheckout?.renderSummary?.();
-    }
+    if(window.cubicaCommercial)return window.cubicaCommercial.submit(e);
+    toast("No se pudo cargar el checkout. Recargá la página antes de confirmar.");
   }
 
   window.addEventListener("cubica:auth-ready",async(e)=>{
-    if(e.detail?.role==="admin"&&e.detail?.mfa?.accessAllowed===true) await loadSalesFromSupabase({migrateLocal:true});
+    if(e.detail?.role==="admin"&&e.detail?.mfa?.accessAllowed===true) await loadSalesFromSupabase();
     if(e.detail?.role==="customer"){
       if(typeof window.cubicaClaimCustomerGuestOrders==="function")await window.cubicaClaimCustomerGuestOrders();
       await loadCustomerOrdersFromSupabase();
     }
     if(!e.detail?.role){
+      preserveLegacyOrders();
       orders=[];
       writeLocal(STORAGE.orders,orders);
     }

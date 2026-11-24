@@ -29,10 +29,11 @@ function renderOrderPaymentOptions(list){
 function setOrderPage(page){orderPage=Math.max(1,Math.trunc(Number(page)||1));renderOrders();$("orders-admin-toolbar")?.scrollIntoView({behavior:"smooth",block:"start"});}
 function setOrderPageSize(size){const next=Number(size);if(![10,25,50].includes(next))return;orderPageSize=next;orderPage=1;globalThis.localStorage?.setItem("cubica_order_page_size",String(next));renderOrders();}
 function customerOrderStage(order){
-  const status=String(order?.status||"Pendiente"),shipping=order?.delivery?.mode==="shipping";
+  const status=String(order?.status||"Pendiente"),shipping=["shipping","uber"].includes(order?.delivery?.mode);
   const preparedLabel=shipping?"Preparado para envío":"Listo para entregar";
   if(status==="Cancelado")return {status,index:-1,label:"Cancelado",description:"Este pedido fue cancelado.",preparedLabel,cancelled:true};
   if(status==="Entregado")return {status,index:3,label:"Entregado",description:"El pedido fue entregado.",preparedLabel};
+  if(["Preparado","Listo para entregar"].includes(status)&&order?.delivery?.mode==="uber")return {status,index:2,label:"Producto preparado",description:"Coordiná la entrega Uber con Cúbica: requiere aprobación y acreditación del traslado.",preparedLabel:"Producto preparado"};
   if(["Preparado","Listo para entregar"].includes(status))return {status,index:2,label:preparedLabel,description:shipping?"Tu pedido está preparado para el envío.":"Tu pedido está listo. Nos comunicaremos con vos para coordinar el retiro.",preparedLabel};
   if(status==="En producción")return {status,index:1,label:"Preparando",description:"Tu pedido está actualmente en producción.",preparedLabel};
   if(status==="Confirmado")return {status,index:0,label:"Pedido confirmado",description:"Confirmamos tu pedido. Todavía está pendiente de producción.",preparedLabel,confirmed:true};
@@ -66,7 +67,7 @@ function customerOrderCard(order){
   return `<article class="customer-order-card">
     <header class="customer-order-head"><div><span class="eyebrow">PEDIDO</span><strong>${escapeHtml(number)}</strong><time datetime="${escapeHtml(order.date)}">${formatDate(order.date)}</time></div><span class="customer-order-status ${stage.cancelled?"cancelled":""}">${escapeHtml(stage.label)}</span></header>
     <div class="customer-order-products">${items.map(item=>{const image=orderProductImage(item);return `<div class="customer-order-product">${image?`<img src="${escapeHtml(image)}" alt="" loading="lazy">`:'<span class="customer-order-product-placeholder" aria-hidden="true">◇</span>'}<div><strong>${escapeHtml(item.name)}</strong><span>${item.color?`${escapeHtml(item.color)} · `:""}Cantidad: ${Number(item.qty)||0}</span></div></div>`;}).join("")}</div>
-    <footer class="customer-order-footer"><strong>${money(order.total)}</strong><details><summary class="btn secondary">Ver seguimiento</summary><div class="customer-order-detail">${orderTimelineHtml(order)}${window.cubicaDelivery?.customerHtml(order.delivery)||""}</div></details></footer>
+    <footer class="customer-order-footer"><strong>${money(order.total)}</strong><details><summary class="btn secondary">Ver seguimiento</summary><div class="customer-order-detail">${orderTimelineHtml(order)}${window.cubicaDelivery?.customerHtml(order.delivery)||""}${order.delivery?.commercial_checkout?`<button type="button" class="btn secondary" data-receipt="${escapeHtml(order.id)}" onclick="window.cubicaCommercial?.openReceipt(this.dataset.receipt)">Ver comprobante de pago y entrega</button>`:""}</div></details></footer>
   </article>`;
 }
 

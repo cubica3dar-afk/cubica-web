@@ -35,7 +35,7 @@ export function normalizeOrderRequest(body){
   const delivery=body.delivery;
   if(!delivery||typeof delivery!=="object"||Array.isArray(delivery))throw new OrderError("invalid_delivery");
   const requestId=text(delivery.request_id,40),clientId=text(body.client_order_id,160),mode=delivery.mode;
-  if(!UUID.test(requestId)||clientId!==requestId||!["pickup","shipping"].includes(mode)||!GUEST_TOKEN.test(delivery.quote_token||""))throw new OrderError("invalid_request");
+  if(!UUID.test(requestId)||clientId!==requestId||!["pickup","uber","shipping"].includes(mode)||!GUEST_TOKEN.test(delivery.quote_token||""))throw new OrderError("invalid_request");
   if(!Array.isArray(body.items)||body.items.length<1||body.items.length>50)throw new OrderError("invalid_items");
   const items=body.items.map(item=>{
     const product=text(item?.product_id,100),color=text(item?.color,120),qty=Number(item?.qty);
@@ -43,10 +43,11 @@ export function normalizeOrderRequest(body){
     return {product_id:product,qty,color};
   });
   const normalizedDelivery={mode,request_id:requestId,quote_token:delivery.quote_token};
-  if(mode==="shipping"){
-    if(!UUID.test(delivery.quote_id||"")||!delivery.address||typeof delivery.address!=="object"||Array.isArray(delivery.address))throw new OrderError("invalid_delivery");
-    const fields=["recipient","phone","street","number","floor","apartment","city","province","postal_code","instructions"];
-    normalizedDelivery.quote_id=delivery.quote_id;
+  if(mode==="pickup"&&delivery.pickup_id!=null)normalizedDelivery.pickup_id=text(delivery.pickup_id,40);
+  if(mode==="uber"||mode==="shipping"){
+    if((mode==="shipping"&&!UUID.test(delivery.quote_id||""))||!delivery.address||typeof delivery.address!=="object"||Array.isArray(delivery.address))throw new OrderError("invalid_delivery");
+    const fields=["recipient","phone","street","number","floor","apartment","city","province","postal_code","instructions",...(mode==="uber"?["neighborhood"]:[])];
+    if(mode==="shipping")normalizedDelivery.quote_id=delivery.quote_id;
     normalizedDelivery.address=Object.fromEntries(fields.map(field=>[field,text(delivery.address[field],field==="instructions"?500:200)]));
   }
   const token=text(body.turnstile_token,2048);

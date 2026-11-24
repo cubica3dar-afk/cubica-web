@@ -86,6 +86,7 @@ test('Supabase and checkout enforce publication beyond the UI',()=>{
   assert.match(migration,/private\.is_admin\(\)/);
   assert.match(bridge,/published:p\.published===true/);
   assert.match(checkout,/p\.published!==false/);
-  assert.match(sales,/x\.published!==false/);
+  assert.match(sales,/cubicaCommercial\.submit/);
+  assert.match(read('js/checkout-commercial.js'),/cubicaValidateCheckout\(\)/);
 });
 
