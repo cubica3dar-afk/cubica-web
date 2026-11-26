@@ -99,10 +99,16 @@ Datos: un producto ficticio con totales seleccionables $19.999/$20.000/$20.001; 
 
 ## Pendientes antes del lanzamiento
 
-- QA manual del checkout y de las decisiones administrativas, todavía no aprobada por el usuario.
+- QA manual del checkout aprobada por el usuario el 26/11/2026 sobre `63bd43c0fa5394d81e804b69f3b80f81a96fab08`: retiro coordinado, transferencia bancaria, comprobante persistente, solicitud Uber hasta $20.000, rechazo por superar el límite y cotización posterior. Esta aprobación corresponde al entorno aislado; no amplía la evidencia a servicios productivos ni a otros escenarios administrativos no informados.
 - Ensayo integral Auth/PostgREST/Turnstile y verificación del gateway invitado; validación del esquema productivo real previa a migrar. El ensayo de dependencias no es una copia exacta de Supabase.
 - Datos bancarios, titularidad, contacto y puntos reales revisados por Cúbica. Nunca copiar fixtures QA a configuración productiva.
 - Autorizaciones independientes de push/PR, migración/despliegue, configuración comercial, pedido de prueba y eventual habilitación Uber.
 - Sin recuperación automática del comprobante invitado fuera de la sesión de su pestaña, ni reintegros o conciliación bancaria automática. Estas limitaciones del commit inicial siguen vigentes.
 
 Referencias consultadas para la formalización: [CLI migration new](https://supabase.com/docs/reference/cli/supabase-migration-new), [cambios de CLI v3](https://supabase.com/changelog/supabase-cli-v3), [release oficial 3.3.0](https://github.com/supabase/cli/releases/tag/v3.3.0). Se verificó el SHA-256 del ZIP portable contra el digest del release; no se añadieron dependencias al proyecto.
+
+## Preparación del Draft PR — 26/11/2026
+
+Base remota verificada: `992557ca6f613b5c9fae1f764a5730abe580ee98`. La actualización posterior a la QA es exclusivamente documental; no cambia código ni SQL y no requiere repetir las regresiones aprobadas. Migración única y ordenada, sin editar migraciones anteriores. Diff de 22 archivos limitado al checkout, eliminación de importación automática, integración e historial, pruebas y documentación; sin configuraciones de Etapa C ni correos.
+
+No hay workflows versionados en main ni en esta rama. Se conserva como referencia la configuración de Pages confirmada por el usuario: main, raíz, sin webhooks ni integraciones externas de despliegue. La API del conector no expone esa configuración actual; no se afirma haberla releído. Push exclusivamente de la rama; Draft, sin auto-merge. No ejecutar la migración ni publicar Edge/frontend al abrir el PR.
