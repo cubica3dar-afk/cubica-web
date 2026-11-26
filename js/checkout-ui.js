@@ -31,7 +31,7 @@
   }
   function clearPersonal(){
     generation++;loadedOwner=null;
-    for(const id of fields){const node=get(id);if(!node)continue;node.value=id==="payment-method"?"Efectivo":"";delete node.dataset.checkoutEdited;}
+    for(const id of fields){const node=get(id);if(!node)continue;node.value=id==="payment-method"?"Transferencia":"";delete node.dataset.checkoutEdited;}
     window.cubicaBuyerProfile?.clear?.();
     window.cubicaDelivery?.reset?.();
   }

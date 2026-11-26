@@ -50,3 +50,6 @@ shellContext.session={role:"admin",adminMfaEnforcement:true,adminMfaAccessAllowe
 assert.equal(shellContext.window.cubicaShellInternals.accountSidebarEligible(),false,"AAL1 no debe habilitar navegación administrativa");
 
 console.log("experience-ui.test.cjs: OK");
+
+assert.equal(orderUi.customerOrderStage({status:"Preparado",delivery:{mode:"uber"}}).label,"Producto preparado");
+assert.doesNotMatch(orderUi.customerOrderStage({status:"Preparado",delivery:{mode:"uber"}}).description,/retiro/);

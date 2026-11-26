@@ -18,6 +18,7 @@
     }
   }
   </script>
+  <link rel="stylesheet" href="css/checkout-commercial.css?v=launch1">
 </head>
 <body>
   <div id="toast-container" aria-live="polite"></div>
@@ -212,9 +213,9 @@
               <label for="customer-last-name">Apellido<input id="customer-last-name" autocomplete="family-name" maxlength="60" required></label>
               <label for="customer-email">Email<input id="customer-email" type="email" autocomplete="email" maxlength="180" required></label>
               <label for="customer-phone">Teléfono / WhatsApp<input id="customer-phone" type="tel" autocomplete="tel" maxlength="40" placeholder="+54 9 11 1234 5678"></label>
-              <label class="full-span" for="payment-method">Forma de pago<select id="payment-method" required><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option></select></label>
+              <label class="full-span" for="payment-method">Forma de pago<select id="payment-method" required><option value="Transferencia">Transferencia</option></select></label>
               <label class="full-span" for="customer-notes">Observaciones<textarea id="customer-notes" rows="3" maxlength="1500" placeholder="Personalización o información importante para este pedido"></textarea></label>
-              <div class="checkout-note full-span">Antes de confirmar, revisá los productos, la modalidad de entrega y el total. Recibirás la confirmación por email. Confirmar un pedido no acredita el pago.</div>
+              <div class="checkout-note full-span">Antes de confirmar, revisá los productos, la modalidad de entrega y el total. Conservá el comprobante que se mostrará al finalizar. Confirmar un pedido no acredita el pago.</div>
             </form>
           </div>
           <aside class="checkout-summary" aria-labelledby="checkout-summary-title">
@@ -1113,7 +1114,7 @@
       <div id="order-management-content"></div>
     </div>
   </div>
-  <script src="js/orders-ui.js?v=admin-stage-a1"></script>
+  <script src="js/orders-ui.js?v=checkout-commercial1"></script>
   <script src="js/order-management.js?v=inventory-trace1"></script>
   <div id="inventory-history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-history-title">
     <div class="modal-card order-management-card">
@@ -1132,13 +1133,15 @@
   <script src="js/auth-ui.js?v=recovery2"></script>
   <script src="supabase-inventory.js?v=catalog-admin1"></script>
   <script src="js/turnstile-ui.js?v=order-protection10"></script>
-  <script src="supabase-sales.js?v=budget-system1"></script>
+  <script src="supabase-sales.js?v=checkout-commercial1"></script>
   <script src="js/delivery-ui.js?v=checkout1"></script>
   <script src="js/checkout-profile.js?v=checkout1"></script>
-  <script src="js/checkout-ui.js?v=catalog-admin1"></script>
+  <script src="js/checkout-ui.js?v=checkout-commercial1"></script>
 
   <script src="supabase-analytics.js?v=mfa2"></script>
   <script type="module" src="viewer.js?v=20261005-2"></script>
+  <script src="js/checkout-commercial.js?v=launch2"></script>
+  <script src="js/checkout-commercial-admin.js?v=launch1"></script>
   <script src="slicer.js?v=20261009-refactor2"></script>
 </body>
 </html>
