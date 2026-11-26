@@ -31,9 +31,16 @@ async function setup({edge,rpc,storage=new Map(),storageFails=false,user=null,se
  vm.runInNewContext(fs.readFileSync(new URL('../js/checkout-commercial.js',import.meta.url),'utf8'),ctx);
  for(const fn of dom)fn();await tick();
  const field=(k,v)=>{const n=root.querySelector('#commercial-fields').querySelector(`[name="${k}"]`);n.value=v;n.onchange?.();return n;};
- field('mode','pickup');field('pickup_id',point);
+ if(root.querySelector('#commercial-fields').querySelector('[name="mode"]')){field('mode','pickup');field('pickup_id',point);}
  return {ctx,root,calls,writes,edgeCalls,confirmations,storage,field,api:ctx.window.cubicaCommercial,set accept(v){accept=v;},set record(v){record=v;},emit:n=>{for(const fn of listeners[n]||[])fn();},key:()=>`cubica_commercial_checkout_v1:${ctx.session?.supabaseUserId||'guest'}`,admin:()=>vm.runInNewContext(fs.readFileSync(new URL('../js/checkout-commercial-admin.js',import.meta.url),'utf8'),ctx)};
 }
+test('new frontend against predecessor without checkout RPC fails closed, preserving cart without a write',async()=>{
+ const h=await setup({rpc:async()=>({error:{code:'PGRST202',message:'get_checkout_options missing from predecessor schema'}})});
+ assert.match(h.root.querySelector('#commercial-message').textContent,/No pudimos cargar/);
+ await h.api.submit();
+ assert.equal(h.edgeCalls.length,0);assert.equal(h.ctx.cart.length,1);assert.equal(h.storage.size,0);
+ assert.ok(h.calls.every(c=>c.n==='get_checkout_options'));assert.match(h.root.querySelector('#commercial-message').textContent,/todavía no está habilitada/);
+});
 test('guest and registered orders use transfer, persistent receipt, server total and clear cart only on confirmation',async()=>{
  for(const user of [null,{supabaseUserId:'customer-A',role:'customer'}]){const h=await setup({user});await h.api.submit();assert.equal(h.edgeCalls.length,1);assert.equal(h.edgeCalls[0].payment,'Transferencia');assert.equal(h.edgeCalls[0].items[0].price,undefined);assert.equal(h.ctx.cart.length,0);assert.equal(h.ctx.products[0].stock,10);assert.equal(h.root.querySelector('#commercial-receipt').hidden,false);assert.match(h.root.querySelector('#commercial-receipt').innerHTML,/QA-100/);assert.equal(JSON.parse(h.storage.get(h.key())).order_id,receipt.order_id);assert.ok(!h.storage.get(h.key()).includes('qa@example'));}
 });

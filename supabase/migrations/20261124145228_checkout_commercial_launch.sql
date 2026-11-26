@@ -1,6 +1,15 @@
--- LOCAL migration candidate. Never run against production without deployment approval.
+-- Commercial checkout schema. Apply only in an explicitly approved deployment window.
 -- Existing orders are not backfilled. Public/private pickup information is separated.
 begin;
+-- Fail atomically on an incompatible predecessor or inactive MFA enforcement.
+do $$ begin
+ if to_regprocedure('private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb)') is null
+  or to_regprocedure('private.existing_delivery_order(text,text,text,text,text,text,jsonb,jsonb,uuid)') is null
+  or to_regprocedure('private.admin_mfa_enforcement_enabled()') is null then
+  raise exception 'checkout_missing_predecessor';
+ end if;
+ if not private.admin_mfa_enforcement_enabled() then raise exception 'checkout_requires_aal2_enforcement'; end if;
+end; $$;
 create table private.checkout_settings (
  singleton boolean primary key default true check(singleton), version integer not null default 1,
  bank jsonb not null default '{}', contact text not null default '', approved boolean not null default false,
@@ -255,4 +264,6 @@ begin
 end; $$;
 revoke all on function private.guard_uber_order_completion() from public,anon,authenticated;
 create trigger commercial_uber_order_completion before update of status on public.orders for each row execute function private.guard_uber_order_completion();
+-- Delivered only after COMMIT; refresh the API schema when PostgREST is present.
+notify pgrst, 'reload schema';
 commit;

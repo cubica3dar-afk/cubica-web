@@ -9,7 +9,7 @@ No se hicieron push, PR, despliegues, pedidos reales ni escrituras en Supabase. 
 
 El esquema anterior separaba pedidos y logística, pero no representaba la aprobación manual de Uber, las acreditaciones parciales ni la aceptación de una cotización independiente. Los presupuestos ya tienen condiciones comerciales en su snapshot y conversión a pedido `origin=budget`, inicialmente `accepted_unpaid`; no tenían un registro de acreditaciones parciales reutilizable.
 
-La ampliación `supabase/proposals/checkout_commercial_launch.sql` es SQL transaccional preparado y probado en PostgreSQL 17.12 aislado. **No fue ejecutado en producción ni incorporado a su historial de migraciones.** La CLI de Supabase no estaba disponible: queda pendiente generar su nombre oficial con `supabase migration new` y trasladar el SQL validado, sin cambiarlo, antes de una futura publicación autorizada.
+La ampliación inicialmente preparada como propuesta fue formalizada posteriormente en `supabase/migrations/20261124145228_checkout_commercial_launch.sql`. **No fue ejecutada en producción.** La preparación, pruebas de actualización y estrategia de publicación se documentan en [la continuación del 26/11](CHECKOUT_MIGRATION_AND_QA_20261126.md). Los resultados que siguen describen la implementación inicial.
 
 Agrega cuatro tablas privadas con RLS y sin acceso directo de clientes:
 
@@ -42,7 +42,7 @@ Se reemplaza el contrato interno de creación conservando la RPC de servicio ver
 - `js/checkout-commercial.js`, `js/checkout-commercial-admin.js`, `css/checkout-commercial.css`: comprador, comprobante y controles administrativos.
 - `index.html`, `js/checkout-ui.js`, `js/orders-ui.js`, `supabase-sales.js`: integración, transferencia por defecto, historial y retiro del importador automático. Se actualizan identificadores de recursos para evitar reutilizar el importador anterior desde cache.
 - `supabase/functions/create-order/worker.js`: normaliza `pickup_id` y dirección/barrio Uber; mantiene el formato histórico de correo para sus reintentos. No se relajan Auth, Turnstile ni límites antispam.
-- SQL candidato descrito arriba.
+- Migración formal descrita arriba.
 - Pruebas nuevas de handlers, privacidad y PostgreSQL; adaptación de la prueba de delegación del submit y de referencias de publicación de productos.
 
 ## Pruebas y evidencia
@@ -58,7 +58,7 @@ El estado de entrega no se reutiliza como pago: un pedido entregado con contrato
 
 ## Límites y pendientes antes del lanzamiento
 
-- Falta QA visual real de este checkout en escritorio y 390 px. Las reglas CSS están acotadas y los handlers se prueban con DOM simulado; no se declara aprobada una revisión visual de navegador.
+- En la entrega inicial faltaba QA de navegador. La continuación del 26/11 incorpora Chrome aislado a 1280 y 390 px; la revisión comercial manual y la integración con servicios reales siguen pendientes.
 - Falta validación integral con Auth/PostgREST/Turnstile reales en un entorno de ensayo adecuado. No se enviaron pedidos ni peticiones diagnósticas a producción en esta implementación.
 - El comprobante invitado sobrevive a recargas de la misma pestaña. Cerrar esa sesión del navegador puede perder su acceso privado: se pide guardar el número y coordinar con Cúbica. No hay acceso anónimo por número/email ni recuperación automática por correo.
 - No se implementaron reintegros, contracargos, conciliación bancaria automática ni pasarela. Los importes acreditados se registran con verificación humana y versión esperada. Un error administrativo de acreditación requiere revisión separada; no hay botón para borrar evidencia.
@@ -83,6 +83,6 @@ Usar el frontend de este commit con RPC/Edge y Auth simulados, bloqueando conexi
 
 No publicar solo el frontend: depende del contrato SQL nuevo y de la actualización Edge. La migración cierra inicialmente el checkout por falta de configuración aprobada; requiere coordinar una ventana de activación, no ejecutar un cambio inadvertido durante ventas.
 
-Antes de un Draft PR: revisar este diff, completar QA aislada y generar el archivo oficial de migración con la CLI. Después, solicitar autorización específica para push/PR. Una autorización posterior de despliegue debe cubrir por separado la migración, Edge y frontend, con comprobación de compatibilidad de reintentos históricos y configuraciones reales revisadas.
+Antes de un Draft PR: revisar este diff y completar QA manual aislada. El archivo oficial ya fue generado y probado localmente; ver la continuación del 26/11. Después, solicitar autorización específica para push/PR. Una autorización posterior de despliegue debe cubrir por separado la migración, Edge y frontend, con comprobación de compatibilidad de reintentos históricos y configuraciones reales revisadas.
 
 La habilitación productiva debe quedar pendiente hasta validar el conjunto: CBU/titular/banco/contacto proporcionados por Cúbica, puntos reales proporcionados por el administrador, Turnstile operativo para pedidos válidos y revisión del flujo. **Uber debe permanecer deshabilitado hasta terminar esa validación y autorizar su habilitación.** No activar Etapa C pública ni ejecutar rollback automático.

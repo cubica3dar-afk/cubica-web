@@ -29,6 +29,7 @@ try{
  create role anon nologin;create role authenticated nologin;create role service_role nologin;
  create extension pgcrypto with schema extensions;
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('qa.uid',true),'')::uuid$$;
+ create function private.admin_mfa_enforcement_enabled() returns boolean language sql as $$select true$$;
  create function private.is_admin() returns boolean language sql stable as $$select coalesce(current_setting('qa.admin',true)='true' and current_setting('qa.aal',true)='aal2',false)$$;
  create table public.products(id text primary key,name text,price numeric,stock integer,active boolean default true,published boolean default true,color_mode text);
  create table public.product_colors(product_id text,name text);
@@ -47,7 +48,7 @@ try{
  await db.query("create function private.create_delivery_order(text,text,text,text,text,text,jsonb,jsonb) returns jsonb language sql as $$select null::jsonb$$");
  await db.query("insert into public.products(id,name,price,stock) values('under','QA under',19999,50),('limit','QA limit',20000,50),('over','QA over',20001,50),('cheap','QA cheap',1000,50)");
  const historical=await scalar(db,"insert into public.orders(total,status,payment) values(100,'Entregado','Efectivo') returning id v");
- await db.query(read('supabase/proposals/checkout_commercial_launch.sql'));
+ await db.query(read('supabase/migrations/20261124145228_checkout_commercial_launch.sql'));
  await db.query('grant usage on schema private to anon,authenticated');
  const opts=()=>scalar(db,'select public.get_checkout_options() v');
  let sv=1;const setting=async(uber=false)=>{const r=await scalar(db,"select public.admin_save_checkout_settings($1,$2,'QA contact',true,$3) v",[sv,{cbu:'0000000000000000000000',holder:'QA SYNTHETIC',bank:'QA BANK'},uber]);sv=r.settings.version;return r;};
