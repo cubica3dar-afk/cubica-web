@@ -43,6 +43,25 @@
     box.hidden=false;box.innerHTML=`<p role="status">${esc(text)}</p><p>Los datos del intento quedan protegidos. Consultá su resultado antes de iniciar otro pedido.</p><button type="button" class="btn secondary" data-recover>Consultar resultado</button><button type="button" class="btn ghost" data-retry>Reintentar el mismo pedido</button>`;
     box.querySelector('[data-recover]').onclick=recover;box.querySelector('[data-retry]').onclick=submit;
   }
+  // At-most-one local attempt, not a payment event or server delivery guarantee.
+  async function trackPurchase(r,p){
+    if(!p.payload||!r.order_id||typeof window.cubicaTrackEvent!=='function')return;
+    const owner=identity(),version=epoch,marker='cubica_purchase_attempt_v1:'+r.order_id;
+    const send=()=>{
+      if(owner!==identity()||version!==epoch||session?.role==='admin')return;
+      try{
+        const store=typeof localStorage==='undefined'?sessionStorage:localStorage;
+        if(store.getItem(marker))return;
+        // Mark BEFORE sending: ambiguous analytics responses must not be retried.
+        store.setItem(marker,'1');
+        Promise.resolve(window.cubicaTrackEvent('purchase',null,{
+          order_number:r.order_number,total:Number(r.commercial.products_total),
+          units:(r.items||[]).reduce((sum,item)=>sum+Number(item.qty),0)
+        })).catch(()=>{});
+      }catch{/* Analytics/storage failure never changes the commercial outcome. */}
+    };
+    try{if(navigator.locks?.request)await navigator.locks.request(marker,send);else send();}catch{}
+  }
   async function confirmed(r,p){
     // Persist receipt access BEFORE clearing the cart. Storage failure remains recoverable.
     save({order_id:r.order_id,request_id:p.request_id,token:p.token,cart:p.cart});
@@ -51,6 +70,7 @@
     save({order_id:r.order_id,request_id:p.request_id,token:p.token});
     sessionStorage.removeItem('cubica_checkout_draft_v1');
     window.cubicaTurnstile?.complete();showReceipt(r);
+    await trackPurchase(r,p);
     // Refresh read-only projections; receipt success must not depend on their availability.
     const refresh=typeof session!=='undefined'&&session?.role==='admin'?window.loadCubicaSalesFromSupabase:window.loadCubicaCustomerOrdersFromSupabase;
     if(refresh)Promise.resolve(refresh()).catch(()=>{});

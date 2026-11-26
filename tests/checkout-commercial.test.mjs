@@ -24,10 +24,10 @@ const point='b6deef29-dcf3-4b7a-8b67-6d993e85d955';
 const options={ready:true,uber_enabled:true,pickup_points:[{id:point,name:'Synthetic square',description:'QA public',instructions:'Coordinate'}],bank:{cbu:'0'.repeat(22),bank:'QA BANK',holder:'QA'},contact:'QA contact'};
 const receipt={order_id:'aa13c17b-36fc-47fa-8b38-b8016ffb5953',order_number:'QA-100',items:[{name:'QA product',qty:2,price:1000}],commercial:{version:1,products_total:2000,products_credited:0,uber_status:'not_requested',uber_quote:null,pickup_public:{name:'Synthetic square'}},delivery_mode:'pickup',options};
 const tick=()=>new Promise(r=>setTimeout(r,0));
-async function setup({edge,rpc,storage=new Map(),storageFails=false,user=null,settings=options}={}){
+async function setup({edge,rpc,storage=new Map(),storageFails=false,user=null,settings=options,track}={}){
  const root=new Node(),dom=[],listeners={},calls=[],writes=[],edgeCalls=[],confirmations=[];let accept=false,record=null;
  root.innerHTML='<section id="section-checkout"><div id="checkout-layout"><form id="checkout-form"><input id="customer-email" value="qa@example.invalid"><input id="customer-phone" value="1112345678"><input id="customer-notes" value="QA notes"><select id="payment-method"></select></form><button id="checkout-confirm-btn"></button><div id="checkout-delivery-total-host"></div></div></section><div id="delivery-admin-content"></div><div id="order-delivery-panel"></div>';
- const ctx={console,Intl,crypto:webcrypto,Uint8Array,session:user,cart:[{productId:'qa',qty:2,color:''}],products:[{id:'qa',price:1000,stock:10}],orders:[],STORAGE:{cart:'cart'},writeLocal:(k,v)=>writes.push([k,structuredClone(v)]),renderCart(){},sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(storageFails)throw Error('Storage unavailable');storage.set(k,v);},removeItem:k=>storage.delete(k)},confirm:m=>{confirmations.push(m);return accept;},navigator:{clipboard:{writeText:async()=>{}}},document:{getElementById:id=>root.querySelector('#'+id),createElement:tag=>new Node(tag),addEventListener:(name,fn)=>dom.push(fn),querySelector:s=>root.querySelector(s)},window:{cubicaCheckoutAuthReady:true,cubicaValidateCheckout(){if(!ctx.cart.length)throw Error('Empty cart');},cubicaCheckoutBuyerName:()=> 'QA Customer',cubicaAdminMfaAccessAllowed:()=>ctx.session?.aal==='aal2',addEventListener:(n,fn)=>(listeners[n]??=[]).push(fn),cubicaDelivery:{refreshCheckout(){},refreshTotal(){},renderAdminOrder:async()=>{},customerHtml:()=>''},cubicaSupabase:{rpc:async(n,a)=>{calls.push({n,a:structuredClone(a)});if(rpc)return rpc(n,a);if(n==='get_checkout_options')return{data:settings};if(n==='reconcile_checkout'||n==='get_checkout_receipt')return{data:record};if(n==='checkout_customer_action')return {data:record};throw Error('Unexpected RPC '+n);}},cubicaTurnstile:{enabled:()=>true,requireToken:async()=> 'synthetic-turnstile',createOrder:async p=>{edgeCalls.push(structuredClone(p));if(edge)return edge(p);record=structuredClone(receipt);return record;},complete(){},handleFailure(){}}}};
+ const ctx={console,Intl,crypto:webcrypto,Uint8Array,session:user,cart:[{productId:'qa',qty:2,color:''}],products:[{id:'qa',price:1000,stock:10}],orders:[],STORAGE:{cart:'cart'},writeLocal:(k,v)=>writes.push([k,structuredClone(v)]),renderCart(){},sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(storageFails)throw Error('Storage unavailable');storage.set(k,v);},removeItem:k=>storage.delete(k)},confirm:m=>{confirmations.push(m);return accept;},navigator:{clipboard:{writeText:async()=>{}}},document:{getElementById:id=>root.querySelector('#'+id),createElement:tag=>new Node(tag),addEventListener:(name,fn)=>dom.push(fn),querySelector:s=>root.querySelector(s)},window:{cubicaTrackEvent:track,cubicaCheckoutAuthReady:true,cubicaValidateCheckout(){if(!ctx.cart.length)throw Error('Empty cart');},cubicaCheckoutBuyerName:()=> 'QA Customer',cubicaAdminMfaAccessAllowed:()=>ctx.session?.aal==='aal2',addEventListener:(n,fn)=>(listeners[n]??=[]).push(fn),cubicaDelivery:{refreshCheckout(){},refreshTotal(){},renderAdminOrder:async()=>{},customerHtml:()=>''},cubicaSupabase:{rpc:async(n,a)=>{calls.push({n,a:structuredClone(a)});if(rpc)return rpc(n,a);if(n==='get_checkout_options')return{data:settings};if(n==='reconcile_checkout'||n==='get_checkout_receipt')return{data:record};if(n==='checkout_customer_action')return {data:record};throw Error('Unexpected RPC '+n);}},cubicaTurnstile:{enabled:()=>true,requireToken:async()=> 'synthetic-turnstile',createOrder:async p=>{edgeCalls.push(structuredClone(p));if(edge)return edge(p);record=structuredClone(receipt);return record;},complete(){},handleFailure(){}}}};
  vm.runInNewContext(fs.readFileSync(new URL('../js/checkout-commercial.js',import.meta.url),'utf8'),ctx);
  for(const fn of dom)fn();await tick();
  const field=(k,v)=>{const n=root.querySelector('#commercial-fields').querySelector(`[name="${k}"]`);n.value=v;n.onchange?.();return n;};
@@ -91,4 +91,52 @@ test('definitive backend rejection unlocks editing; ambiguous rejection keeps im
 test('registered owner can reopen receipt from history; cancelled receipt never instructs a transfer',async()=>{
  const h=await setup({user:{supabaseUserId:'owner',role:'customer'}});let shown='';h.ctx.showSection=s=>shown=s;h.record=receipt;await h.api.openReceipt(receipt.order_id);assert.equal(shown,'checkout');assert.equal(JSON.parse(h.storage.get(h.key())).order_id,receipt.order_id);assert.equal(h.edgeCalls.length,0);assert.equal(h.ctx.cart.length,1);
  const cancelled={...receipt,order_status:'Cancelado'};const html=h.api.receiptHtml(cancelled);assert.match(html,/No transfieras/);assert.ok(!html.includes('CBU:'));
+});
+
+function analytics(h){const events=[];h.ctx.window.cubicaTrackEvent=(...args)=>events.push(JSON.parse(JSON.stringify(args)));return events;}
+test('purchase uses confirmed server metrics once, never balance or repeated receipt/payment/Uber actions',async()=>{
+ const h=await setup(),events=analytics(h);await h.api.submit();
+ assert.deepEqual(events,[['purchase',null,{order_number:'QA-100',total:2000,units:2}]]);
+ await h.api.recover();await h.api.recover();h.accept=true;
+ h.record={...receipt,commercial:{...receipt.commercial,version:2,products_credited:2000}};
+ await h.api.customerAction('report_transfer');
+ h.record={...receipt,delivery_mode:'uber',commercial:{...receipt.commercial,uber_status:'approved',uber_quote:500,quote_version:1}};
+ await h.api.recover();await h.api.customerAction('accept_uber_quote');await h.api.recover();assert.equal(events.length,1);
+});
+test('purchase after lost response recovery, including reload, is attempted once by stable order identity',async()=>{
+ const storage=new Map(),h=await setup({storage,edge:async()=>{throw Error('lost');}}),events=analytics(h);
+ await h.api.submit();assert.equal(events.length,0);h.record=receipt;await h.api.recover();assert.equal(events.length,1);
+ const restored=await setup({storage});const again=analytics(restored);restored.record=receipt;await restored.api.recover();assert.equal(again.length,0);
+ // Even another pending envelope for the same order cannot repeat it.
+ storage.set(restored.key(),JSON.stringify({owner:'guest',payload:{},order_id:receipt.order_id}));await restored.api.recover();assert.equal(again.length,0);
+});
+test('history consultation without creation intent never produces purchase',async()=>{
+ const h=await setup({user:{supabaseUserId:'owner'}}),events=analytics(h);h.ctx.showSection=()=>{};h.record=receipt;
+ await h.api.openReceipt(receipt.order_id);await h.api.recover();assert.equal(events.length,0);
+});
+test('failed and explicitly rejected orders never produce purchase',async()=>{
+ for(const code of ['order_pickup_unavailable','order_network_error']){const h=await setup({edge:async()=>{throw Object.assign(Error('QA'),{code});}}),events=analytics(h);await h.api.submit();await h.api.recover();assert.equal(events.length,0);}
+});
+test('session change while creating does not attribute another owner purchase or expose personal fields',async()=>{
+ let done;const h=await setup({edge:()=>new Promise(r=>done=r)}),events=analytics(h);const pending=h.api.submit();await tick();h.ctx.session={supabaseUserId:'other'};h.emit('cubica:auth-ready');done(receipt);await pending;assert.equal(events.length,0);
+});
+test('shared browser marker and lock prevent duplicate attempts; analytics failure does not fail the order',async()=>{
+ const shared=new Map();const run=async()=>{const h=await setup();h.ctx.localStorage={getItem:k=>shared.get(k),setItem:(k,v)=>shared.set(k,v)};h.ctx.navigator.locks={request:async(_key,fn)=>fn()};const events=analytics(h);await h.api.submit();return events;};
+ assert.equal((await run()).length,1);assert.equal((await run()).length,0);assert.deepEqual([...shared.values()],['1']);
+ const h=await setup();let calls=0;h.ctx.window.cubicaTrackEvent=()=>{calls++;return Promise.reject(Error('analytics offline'));};await h.api.submit();await h.api.recover();assert.equal(calls,1);assert.equal(h.ctx.cart.length,0);
+});
+test('unwritable analytics marker skips telemetry safely and admin purchases stay excluded',async()=>{
+ const h=await setup(),events=analytics(h);h.ctx.localStorage={getItem(){return null;},setItem(){throw Error('denied');}};await h.api.submit();assert.equal(events.length,0);assert.equal(h.ctx.cart.length,0);
+ const a=await setup({user:{supabaseUserId:'admin',role:'admin'}}),adminEvents=analytics(a);await a.api.submit();assert.equal(adminEvents.length,0);
+});
+
+test('reload recovers an unconfirmed lost response and emits its confirmed metrics',async()=>{
+ const storage=new Map(),h=await setup({storage,edge:async()=>{throw Error('lost');}});await h.api.submit();const events=[];
+ await setup({storage,track:(...a)=>events.push(JSON.parse(JSON.stringify(a))),rpc:async n=>({data:n==='get_checkout_options'?options:receipt})});
+ assert.deepEqual(events,[['purchase',null,{order_number:'QA-100',total:2000,units:2}]]);
+});
+test('session changes while waiting for analytics lock suppress attribution',async()=>{
+ const h=await setup(),events=analytics(h);let release;
+ h.ctx.navigator.locks={request:(_key,fn)=>new Promise(resolve=>release=()=>{fn();resolve();})};const submit=h.api.submit();await tick();
+ h.ctx.session={supabaseUserId:'other'};h.emit('cubica:auth-ready');release();await submit;assert.equal(events.length,0);
 });
